@@ -9,6 +9,6 @@ use crate::modules::http;
 pub(super) fn op_deka_http_call(
     #[string] action: String,
     #[serde] args: serde_json::Value,
-) -> Result<serde_json::Value, deno_core::error::CoreError> {
+) -> Result<serde_json::Value, simien_core::error::CoreError> {
     Ok(http::http_call(&action, &args))
 }

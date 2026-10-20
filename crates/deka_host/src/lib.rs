@@ -1,7 +1,7 @@
 #![allow(clippy::all, dead_code, unused_imports)]
 
 #[cfg(feature = "runtime")]
-use deno_core::Extension;
+use simien_core::Extension;
 
 pub mod build_observations;
 pub mod host_config;

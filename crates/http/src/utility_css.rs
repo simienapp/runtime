@@ -1,4 +1,4 @@
-use deno_core::{JsRuntime, ModuleCodeString, RuntimeOptions, serde_v8};
+use simien_core::{JsRuntime, ModuleCodeString, RuntimeOptions, simien_serde_v8 as serde_v8};
 use serde_json::Value;
 use std::cell::RefCell;
 use std::fs;
@@ -28,7 +28,7 @@ impl Default for UtilityCssConfig {
 /// Inject utility CSS into an HTML response.
 ///
 /// The actual scanning/generation is performed by the shared TypeScript
-/// implementation bundled at build time and executed inside a `deno_core`
+/// implementation bundled at build time and executed inside a `simien_core`
 /// isolate. This keeps the browser tour and the server runtime on a single
 /// implementation and a single JSON registry.
 pub fn inject_utility_css(html: &str, config: UtilityCssConfig) -> String {
@@ -101,7 +101,7 @@ thread_local! {
 }
 
 /// Process-lifetime tokio runtime used as the context for utility-css
-/// isolates. deno_core's V8 platform forwards delayed foreground tasks
+/// isolates. simien_core's V8 platform forwards delayed foreground tasks
 /// (e.g. V8 memory-reducer callbacks) through `tokio::runtime::Handle`, and
 /// aborts the process when such a task is posted for an isolate that was
 /// created with no runtime in context — which is every caller outside a
@@ -121,7 +121,7 @@ fn runtime_tokio() -> &'static tokio::runtime::Runtime {
 }
 
 fn create_js_runtime(
-    create_params: Option<deno_core::v8::CreateParams>,
+    create_params: Option<simien_core::v8::CreateParams>,
 ) -> JsRuntime {
     let _guard = runtime_tokio().enter();
     let mut runtime = JsRuntime::new(RuntimeOptions {
@@ -162,8 +162,8 @@ fn run_js_generator(html: &str, options_json: String) -> Result<String, String> 
             .execute_script("utility-css-run.js", ModuleCodeString::from(script))
             .map_err(|e| e.to_string())?;
 
-        deno_core::scope!(scope, runtime);
-        let local = deno_core::v8::Local::new(scope, &value);
+        simien_core::scope!(scope, runtime);
+        let local = simien_core::v8::Local::new(scope, &value);
         serde_v8::from_v8::<String>(scope, local).map_err(|e| e.to_string())
     })
 }
@@ -314,7 +314,7 @@ mod tests {
     }
 
     /// deka#799: V8's memory reducer posts delayed foreground tasks to the
-    /// isolate's task runner. deno_core aborts the process (SIGABRT, no Rust
+    /// isolate's task runner. simien_core aborts the process (SIGABRT, no Rust
     /// panic) when such a task is posted for an isolate created with no tokio
     /// runtime in context. Drive GC hard under a small heap so the memory
     /// reducer fires on plain `std::thread`s; without the fix this aborts the
@@ -332,13 +332,13 @@ mod tests {
             let script = stress.to_string();
             handles.push(std::thread::spawn(move || {
                 let mut runtime = super::create_js_runtime(Some(
-                    deno_core::v8::CreateParams::default()
+                    simien_core::v8::CreateParams::default()
                         .heap_limits(16 * 1024 * 1024, 48 * 1024 * 1024),
                 ));
                 for _ in 0..5 {
                     let _ = runtime.execute_script(
                         "stress",
-                        deno_core::ModuleCodeString::from(script.clone()),
+                        simien_core::ModuleCodeString::from(script.clone()),
                     );
                     runtime.v8_isolate().low_memory_notification();
                 }

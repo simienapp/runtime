@@ -12,10 +12,10 @@ pub(super) struct PhpDirEntry {
 #[buffer]
 pub(super) fn op_php_read_file_sync(
     #[string] path: String,
-) -> Result<Vec<u8>, deno_core::error::CoreError> {
+) -> Result<Vec<u8>, simien_core::error::CoreError> {
     enforce_read(Some(&path))?;
     std::fs::read(&path).map_err(|e| {
-        deno_core::error::CoreError::from(std::io::Error::new(
+        simien_core::error::CoreError::from(std::io::Error::new(
             e.kind(),
             format!("Failed to read file '{}': {}", path, e),
         ))
@@ -26,10 +26,10 @@ pub(super) fn op_php_read_file_sync(
 pub(super) fn op_php_write_file_sync(
     #[string] path: String,
     #[buffer] data: &[u8],
-) -> Result<(), deno_core::error::CoreError> {
+) -> Result<(), simien_core::error::CoreError> {
     enforce_write(Some(&path))?;
     std::fs::write(&path, data).map_err(|e| {
-        deno_core::error::CoreError::from(std::io::Error::new(
+        simien_core::error::CoreError::from(std::io::Error::new(
             e.kind(),
             format!("Failed to write file '{}': {}", path, e),
         ))
@@ -37,10 +37,10 @@ pub(super) fn op_php_write_file_sync(
 }
 
 #[op2(fast)]
-pub(super) fn op_php_mkdirs(#[string] path: String) -> Result<(), deno_core::error::CoreError> {
+pub(super) fn op_php_mkdirs(#[string] path: String) -> Result<(), simien_core::error::CoreError> {
     enforce_write(Some(&path))?;
     std::fs::create_dir_all(&path).map_err(|e| {
-        deno_core::error::CoreError::from(std::io::Error::new(
+        simien_core::error::CoreError::from(std::io::Error::new(
             e.kind(),
             format!("Failed to create dir '{}': {}", path, e),
         ))
@@ -49,10 +49,10 @@ pub(super) fn op_php_mkdirs(#[string] path: String) -> Result<(), deno_core::err
 
 #[op2]
 #[string]
-pub(super) fn op_php_cwd() -> Result<String, deno_core::error::CoreError> {
+pub(super) fn op_php_cwd() -> Result<String, simien_core::error::CoreError> {
     std::env::current_dir()
         .map(|p| p.to_string_lossy().to_string())
-        .map_err(|e| deno_core::error::CoreError::from(e))
+        .map_err(|e| simien_core::error::CoreError::from(e))
 }
 
 /// Resolve all symlinks in `path` via the OS and return the canonical absolute
@@ -117,10 +117,10 @@ pub(super) fn op_php_path_resolve(#[string] base: String, #[string] path: String
 #[serde]
 pub(super) fn op_php_read_dir(
     #[string] path: String,
-) -> Result<Vec<PhpDirEntry>, deno_core::error::CoreError> {
+) -> Result<Vec<PhpDirEntry>, simien_core::error::CoreError> {
     enforce_read(Some(&path))?;
     let entries = std::fs::read_dir(&path).map_err(|e| {
-        deno_core::error::CoreError::from(std::io::Error::new(
+        simien_core::error::CoreError::from(std::io::Error::new(
             e.kind(),
             format!("Failed to read dir '{}': {}", path, e),
         ))
@@ -129,19 +129,19 @@ pub(super) fn op_php_read_dir(
     let mut out = Vec::new();
     for entry in entries {
         let entry = entry.map_err(|e| {
-            deno_core::error::CoreError::from(std::io::Error::new(
+            simien_core::error::CoreError::from(std::io::Error::new(
                 e.kind(),
                 format!("Failed to read dir entry in '{}': {}", path, e),
             ))
         })?;
         let file_type = entry.file_type().map_err(|e| {
-            deno_core::error::CoreError::from(std::io::Error::new(
+            simien_core::error::CoreError::from(std::io::Error::new(
                 e.kind(),
                 format!("Failed to read dir entry type in '{}': {}", path, e),
             ))
         })?;
         let name = entry.file_name().into_string().map_err(|_| {
-            deno_core::error::CoreError::from(std::io::Error::new(
+            simien_core::error::CoreError::from(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Failed to read dir entry name: name is not valid UTF-8",
             ))

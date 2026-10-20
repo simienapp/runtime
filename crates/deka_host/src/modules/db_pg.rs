@@ -9,8 +9,8 @@ use std::error::Error as StdError;
 
 pub(super) fn with_pg_client<T>(
     cfg: PgConnConfig,
-    f: impl FnOnce(&mut Client) -> Result<T, deno_core::error::CoreError> + Send + 'static,
-) -> Result<T, deno_core::error::CoreError>
+    f: impl FnOnce(&mut Client) -> Result<T, simien_core::error::CoreError> + Send + 'static,
+) -> Result<T, simien_core::error::CoreError>
 where
     T: Send + 'static,
 {
@@ -41,7 +41,7 @@ where
         let mut client = match Client::connect(&dsn, NoTls) {
             Ok(client) => client,
             Err(err_dsn) => Client::connect(&url, NoTls).map_err(|err_url| {
-                deno_core::error::CoreError::from(std::io::Error::other(format!(
+                simien_core::error::CoreError::from(std::io::Error::other(format!(
                     "postgres connect failed: {} (dsn={}); fallback failed: {} (url={})",
                     err_dsn, dsn, err_url, url
                 )))
@@ -52,7 +52,7 @@ where
     })
     .join()
     .map_err(|_| {
-        deno_core::error::CoreError::from(std::io::Error::other("db worker thread panicked"))
+        simien_core::error::CoreError::from(std::io::Error::other("db worker thread panicked"))
     })?
 }
 

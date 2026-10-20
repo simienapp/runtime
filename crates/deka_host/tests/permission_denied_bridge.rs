@@ -3,7 +3,7 @@
 //! so the JS bridge layer can decode it into a structured `Err` instead of
 //! matching on an opaque string.
 
-use deno_core::{JsRuntime, ModuleCodeString, RuntimeOptions};
+use simien_core::{JsRuntime, ModuleCodeString, RuntimeOptions};
 
 /// A denied `op_php_read_file_sync` (fs bridge sync path) must throw a JS
 /// Error whose message starts with the RFD 27 marker and decodes via
@@ -48,9 +48,9 @@ fn denied_fs_read_op_throws_permission_denied_wire_message() {
             ModuleCodeString::from("globalThis.__denialMessage".to_string()),
         )
         .expect("read back the captured error message");
-    deno_core::scope!(scope, &mut runtime);
-    let local = deno_core::v8::Local::new(scope, &value);
-    let message: Option<String> = deno_core::serde_v8::from_v8(scope, local)
+    simien_core::scope!(scope, &mut runtime);
+    let local = simien_core::v8::Local::new(scope, &value);
+    let message: Option<String> = simien_core::simien_serde_v8::from_v8(scope, local)
         .expect("captured message must be a JS string or null");
     let message = message.expect("the denied op must throw a catchable error");
 

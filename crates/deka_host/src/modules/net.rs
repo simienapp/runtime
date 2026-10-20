@@ -1,7 +1,7 @@
 use super::bridge_metrics::record_bridge_proto_metric;
 use super::security::{enforce_net_with, security_policy_from_context};
 use super::*;
-use deno_core::OpState;
+use simien_core::OpState;
 use rustls::pki_types::{CertificateDer, ServerName};
 use std::cell::RefCell;
 use std::net::TcpListener;
@@ -106,7 +106,7 @@ fn bytes_to_json_array(bytes: &[u8]) -> serde_json::Value {
     )
 }
 
-fn handle_target(state: &NetState, handle: u64) -> Result<String, deno_core::error::CoreError> {
+fn handle_target(state: &NetState, handle: u64) -> Result<String, simien_core::error::CoreError> {
     state
         .handles
         .get(&handle)
@@ -114,7 +114,7 @@ fn handle_target(state: &NetState, handle: u64) -> Result<String, deno_core::err
         .ok_or_else(|| core_err(format!("net: unknown handle {handle}")))
 }
 
-fn listener_target(state: &NetState, handle: u64) -> Result<String, deno_core::error::CoreError> {
+fn listener_target(state: &NetState, handle: u64) -> Result<String, simien_core::error::CoreError> {
     state
         .listeners
         .get(&handle)
@@ -124,7 +124,7 @@ fn listener_target(state: &NetState, handle: u64) -> Result<String, deno_core::e
 
 // Shared actions may use either socket kind; stream-only actions must continue
 // to use handle_target so a listener never authorizes a connection operation.
-fn socket_target(state: &NetState, handle: u64) -> Result<String, deno_core::error::CoreError> {
+fn socket_target(state: &NetState, handle: u64) -> Result<String, simien_core::error::CoreError> {
     state
         .handles
         .get(&handle)
@@ -216,7 +216,7 @@ fn ensure_rustls_crypto_provider() {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 }
 
-fn parse_server_name(name: &str) -> Result<ServerName<'static>, deno_core::error::CoreError> {
+fn parse_server_name(name: &str) -> Result<ServerName<'static>, simien_core::error::CoreError> {
     ServerName::try_from(name.to_owned())
         .map_err(|e| core_err(format!("invalid server_name '{name}': {e}")))
 }
@@ -225,9 +225,9 @@ pub(super) fn net_call_impl(
     state: &mut NetState,
     action: String,
     args: serde_json::Value,
-) -> Result<serde_json::Value, deno_core::error::CoreError> {
+) -> Result<serde_json::Value, simien_core::error::CoreError> {
     let err = |msg: String| {
-        deno_core::error::CoreError::from(std::io::Error::new(std::io::ErrorKind::Other, msg))
+        simien_core::error::CoreError::from(std::io::Error::new(std::io::ErrorKind::Other, msg))
     };
 
     let args_obj = args.as_object().cloned().unwrap_or_default();
@@ -748,7 +748,7 @@ pub(super) enum NetProtoActionKind {
 pub(super) fn net_action_payload_to_proto_request(
     action: &str,
     payload: &serde_json::Value,
-) -> Result<proto::bridge_v1::NetRequest, deno_core::error::CoreError> {
+) -> Result<proto::bridge_v1::NetRequest, simien_core::error::CoreError> {
     use proto::bridge_v1::net_request::Action;
     let args = payload.as_object().cloned().unwrap_or_default();
     let action = match action {
@@ -854,7 +854,7 @@ pub(super) fn net_action_payload_to_proto_request(
 
 pub(super) fn net_proto_request_to_action_payload(
     req: &proto::bridge_v1::NetRequest,
-) -> Result<(String, serde_json::Value, NetProtoActionKind), deno_core::error::CoreError> {
+) -> Result<(String, serde_json::Value, NetProtoActionKind), simien_core::error::CoreError> {
     use proto::bridge_v1::net_request::Action;
     let Some(action) = req.action.as_ref() else {
         return Err(core_err("net proto request missing action"));
@@ -1108,7 +1108,7 @@ pub(super) fn net_proto_response_to_json(
 pub(super) fn net_call_proto_impl(
     state: &mut NetState,
     request: &[u8],
-) -> Result<Vec<u8>, deno_core::error::CoreError> {
+) -> Result<Vec<u8>, simien_core::error::CoreError> {
     // A seeded policy wins; otherwise resolve the per-execution security
     // context the dispatch path installed (production path, deka#801). A
     // missing context is an error — never a silent default policy.
@@ -1125,7 +1125,7 @@ pub(super) fn net_call_proto_impl_with(
     state: &mut NetState,
     policy: &SecurityPolicy,
     request: &[u8],
-) -> Result<Vec<u8>, deno_core::error::CoreError> {
+) -> Result<Vec<u8>, simien_core::error::CoreError> {
     let started = Instant::now();
     let req = proto::bridge_v1::NetRequest::decode(request)
         .map_err(|e| core_err(format!("net proto decode failed: {}", e)))?;
@@ -1181,7 +1181,7 @@ pub(super) fn net_call_proto_impl_with(
 fn validate_tcp_connect_port(
     action: &str,
     payload: &serde_json::Value,
-) -> Result<(), deno_core::error::CoreError> {
+) -> Result<(), simien_core::error::CoreError> {
     if action == "connect" || action == "connect_tls" {
         tcp_connect_port(payload)?;
     }
@@ -1190,7 +1190,7 @@ fn validate_tcp_connect_port(
 
 pub(super) fn tcp_connect_port(
     payload: &serde_json::Value,
-) -> Result<u16, deno_core::error::CoreError> {
+) -> Result<u16, simien_core::error::CoreError> {
     let port = payload
         .get("port")
         .and_then(|value| value.as_u64())
@@ -1201,7 +1201,7 @@ pub(super) fn tcp_connect_port(
         .ok_or_else(|| core_err("connect: port must be in range 1..=65535"))
 }
 
-fn tcp_bind_port(payload: &serde_json::Value) -> Result<u16, deno_core::error::CoreError> {
+fn tcp_bind_port(payload: &serde_json::Value) -> Result<u16, simien_core::error::CoreError> {
     let port = payload
         .get("port")
         .and_then(|value| value.as_u64())
@@ -1227,7 +1227,7 @@ pub(super) fn net_policy_target(payload: &serde_json::Value) -> Option<String> {
 pub(super) fn op_php_net_call_proto(
     op_state: Rc<RefCell<OpState>>,
     #[buffer] request: &[u8],
-) -> Result<Vec<u8>, deno_core::error::CoreError> {
+) -> Result<Vec<u8>, simien_core::error::CoreError> {
     let mut op_state = op_state.borrow_mut();
     let state = op_state.borrow_mut::<NetState>();
     net_call_proto_impl(state, request)
@@ -1238,7 +1238,7 @@ pub(super) fn op_php_net_call_proto(
 pub(super) fn op_php_net_proto_encode(
     #[string] action: String,
     #[serde] payload: serde_json::Value,
-) -> Result<Vec<u8>, deno_core::error::CoreError> {
+) -> Result<Vec<u8>, simien_core::error::CoreError> {
     let request = net_action_payload_to_proto_request(&action, &payload)?;
     Ok(request.encode_to_vec())
 }
@@ -1247,7 +1247,7 @@ pub(super) fn op_php_net_proto_encode(
 #[serde]
 pub(super) fn op_php_net_proto_decode(
     #[buffer] response: &[u8],
-) -> Result<serde_json::Value, deno_core::error::CoreError> {
+) -> Result<serde_json::Value, simien_core::error::CoreError> {
     let decoded = proto::bridge_v1::NetResponse::decode(response)
         .map_err(|e| core_err(format!("net proto decode response failed: {}", e)))?;
     Ok(net_proto_response_to_json(&decoded))

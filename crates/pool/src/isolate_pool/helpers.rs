@@ -10,7 +10,7 @@ pub(super) fn set_request_globals(
     tenant_info: Option<&crate::tenant::TenantInfo>,
     shop_secrets: &SecretsMap,
 ) -> Result<(), String> {
-    deno_core::scope!(scope, runtime);
+    simien_core::scope!(scope, runtime);
     let context = scope.get_current_context();
     let global = context.global(scope);
     let handler_path = handler_path.unwrap_or_default();

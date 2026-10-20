@@ -20,17 +20,17 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::rc::Rc;
 
-use deno_core::ModuleLoadOptions;
-use deno_core::ModuleLoadReferrer;
-use deno_core::ModuleLoadResponse;
-use deno_core::ModuleLoader;
-use deno_core::ModuleSource;
-use deno_core::ModuleSourceCode;
-use deno_core::ModuleSpecifier;
-use deno_core::ModuleType;
-use deno_core::ResolutionKind;
-use deno_core::resolve_import;
-use deno_error::JsErrorBox;
+use simien_core::ModuleLoadOptions;
+use simien_core::ModuleLoadReferrer;
+use simien_core::ModuleLoadResponse;
+use simien_core::ModuleLoader;
+use simien_core::ModuleSource;
+use simien_core::ModuleSourceCode;
+use simien_core::ModuleSpecifier;
+use simien_core::ModuleType;
+use simien_core::ResolutionKind;
+use simien_core::resolve_import;
+use simien_error::JsErrorBox;
 
 use deka_modules::modules::MODULES_DIR;
 use permissions::host_bridge::{self, GrantTable};
@@ -677,7 +677,7 @@ mod tests {
 
     #[test]
     fn runtime_js_builtins_resolve_without_install() {
-        use deno_core::{ModuleLoader, ModuleSourceCode, ResolutionKind};
+        use simien_core::{ModuleLoader, ModuleSourceCode, ResolutionKind};
 
         let root = tempfile::tempdir().expect("temp project");
         let entry = root.path().join("handler.js");
@@ -760,7 +760,7 @@ mod tests {
             .expect("synthetic wrapper entrypoint resolves");
         assert_eq!(resolved, wrapper);
 
-        let outside = deno_core::ModuleSpecifier::from_file_path(root.path().join("other.js"))
+        let outside = simien_core::ModuleSpecifier::from_file_path(root.path().join("other.js"))
             .expect("outside fixture URL");
         let err = loader
             .resolve_artifact_path(&server, outside.as_str(), "file:///main")

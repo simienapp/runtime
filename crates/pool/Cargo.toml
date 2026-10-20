@@ -11,8 +11,8 @@ security = { path = "../security" }
 permissions = { path = "../permissions" }
 nanoid = { workspace = true }
 core_affinity = { workspace = true }
-deno_core = { workspace = true }
-deno_error = { workspace = true }
+simien_core = { workspace = true }
+simien_error = { workspace = true }
 libc = "0.2"
 num_cpus = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

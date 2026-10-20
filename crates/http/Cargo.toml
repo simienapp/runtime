@@ -25,7 +25,7 @@ runtime_core = { path = "../runtime_core" }
 pool = { path = "../pool" }
 serde_json = { workspace = true }
 chrono = { workspace = true }
-deno_core = { workspace = true }
+simien_core = { workspace = true }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

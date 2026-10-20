@@ -27,7 +27,6 @@ members = [
     "crates/transport",
     "crates/pool",
     "crates/engine",
-    "crates/modules_common",
     "crates/deka_host",
     "crates/wasm_guest",
     "crates/wasm_guest_macros",
@@ -52,10 +51,8 @@ version = "0.61.0"
 
 [workspace.dependencies]
 # V8 Runtime (Deno Core)
-deno_core = "0.412.0"
-deno_napi = "0.190.0"
-deno_permissions = "0.118.0"
-deno_error = "0.7.1"
+simien_core = "0.1.0"
+simien_error = "0.1.0"
 
 # Async Runtime
 tokio = { version = "1.41", features = ["full"] }

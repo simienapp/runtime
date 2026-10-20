@@ -10,7 +10,7 @@ use super::*;
 /// it's dropped. With many isolates on a single worker thread only the
 /// most recently constructed one is `Isolate::GetCurrent()`; older
 /// isolates sit below on the enter stack. Any V8 API that calls
-/// `ContextScope::new` (directly or via `deno_core::scope!`) panics if
+/// `ContextScope::new` (directly or via `simien_core::scope!`) panics if
 /// the scope's isolate isn't the current one. Re-`Enter`ing the isolate
 /// we're about to drive makes it current for the duration of this guard,
 /// then `Exit` restores the previous top so the drop-order assertion on
@@ -782,7 +782,7 @@ impl WorkerThread {
             )
                 .map_err(|err| err.to_string())?;
             let import_meta_loader = loader.clone();
-            let loader: Rc<dyn deno_core::ModuleLoader> = Rc::new(loader);
+            let loader: Rc<dyn simien_core::ModuleLoader> = Rc::new(loader);
             (Some(loader), Some(wrapper_specifier), Some(import_meta_loader))
         } else {
             (None, None, None)

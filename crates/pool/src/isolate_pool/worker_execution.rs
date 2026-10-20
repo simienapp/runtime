@@ -68,7 +68,7 @@ impl WorkerThread {
 
         // Ensure THIS isolate is the currently-entered one on this thread.
         //
-        // Each `OwnedIsolate` in deno_core is `Enter()`ed at construction and
+        // Each `OwnedIsolate` in simien_core is `Enter()`ed at construction and
         // `Exit()`ed on drop, so with N isolates on one worker only the most
         // recently constructed one is `v8__Isolate__GetCurrent()`. When we
         // dispatch a request to an older isolate the current-isolate mismatch
@@ -1071,7 +1071,7 @@ impl WorkerThread {
                         // before __dekaExecuteRequest checks it.
                         if let Err(err) = isolate
                             .runtime
-                            .run_event_loop(deno_core::PollEventLoopOptions::default())
+                            .run_event_loop(simien_core::PollEventLoopOptions::default())
                             .await
                         {
                             isolate.active_requests = 0;
@@ -1329,7 +1329,7 @@ impl WorkerThread {
                 let eval = isolate.runtime.mod_evaluate(module_id);
                 if let Err(err) = isolate
                     .runtime
-                    .run_event_loop(deno_core::PollEventLoopOptions::default())
+                    .run_event_loop(simien_core::PollEventLoopOptions::default())
                     .await
                 {
                     isolate.active_requests = 0;
@@ -1359,8 +1359,8 @@ impl WorkerThread {
                 ),
             );
             if let Ok(value) = exit_value {
-                deno_core::scope!(scope, &mut isolate.runtime);
-                let local = deno_core::v8::Local::new(scope, &value);
+                simien_core::scope!(scope, &mut isolate.runtime);
+                let local = simien_core::v8::Local::new(scope, &value);
                 if let Ok(parsed) = serde_v8::from_v8::<serde_json::Value>(scope, local) {
                     if let Some(code) = parsed.as_i64() {
                         isolate.active_requests = 0;
@@ -1485,12 +1485,12 @@ impl WorkerThread {
         ) {
             // Run event loop to complete async operations
             {
-                deno_core::scope!(scope, &mut isolate.runtime);
-                let local = deno_core::v8::Local::new(scope, &result);
-                if let Ok(promise) = deno_core::v8::Local::<deno_core::v8::Promise>::try_from(local)
+                simien_core::scope!(scope, &mut isolate.runtime);
+                let local = simien_core::v8::Local::new(scope, &result);
+                if let Ok(promise) = simien_core::v8::Local::<simien_core::v8::Promise>::try_from(local)
                 {
                     match promise.state() {
-                        deno_core::v8::PromiseState::Pending => {
+                        simien_core::v8::PromiseState::Pending => {
                             needs_event_loop = true;
                         }
                         _ => needs_event_loop = false,
@@ -1503,7 +1503,7 @@ impl WorkerThread {
             let event_start = Instant::now();
             if let Err(err) = isolate
                 .runtime
-                .run_event_loop(deno_core::PollEventLoopOptions::default())
+                .run_event_loop(simien_core::PollEventLoopOptions::default())
                 .await
             {
                 if let Some(watchdog) = watchdog {
@@ -1548,8 +1548,8 @@ impl WorkerThread {
                 ),
             );
             if let Ok(value) = exit_value {
-                deno_core::scope!(scope, &mut isolate.runtime);
-                let local = deno_core::v8::Local::new(scope, &value);
+                simien_core::scope!(scope, &mut isolate.runtime);
+                let local = simien_core::v8::Local::new(scope, &value);
                 if let Ok(parsed) = serde_v8::from_v8::<serde_json::Value>(scope, local) {
                     if let Some(code) = parsed.as_i64() {
                         ExecutionOutcome::Ok(serde_json::json!({ "exit_code": code }))
@@ -1563,22 +1563,22 @@ impl WorkerThread {
                 ExecutionOutcome::Ok(serde_json::Value::Null)
             }
         } else {
-            deno_core::scope!(scope, &mut isolate.runtime);
-            let local = deno_core::v8::Local::new(scope, &result);
+            simien_core::scope!(scope, &mut isolate.runtime);
+            let local = simien_core::v8::Local::new(scope, &result);
 
-            let value_result: Result<deno_core::v8::Local<deno_core::v8::Value>, String> =
-                if let Ok(promise) = deno_core::v8::Local::<deno_core::v8::Promise>::try_from(local)
+            let value_result: Result<simien_core::v8::Local<simien_core::v8::Value>, String> =
+                if let Ok(promise) = simien_core::v8::Local::<simien_core::v8::Promise>::try_from(local)
                 {
                     match promise.state() {
-                        deno_core::v8::PromiseState::Fulfilled => Ok(promise.result(scope)),
-                        deno_core::v8::PromiseState::Rejected => {
+                        simien_core::v8::PromiseState::Fulfilled => Ok(promise.result(scope)),
+                        simien_core::v8::PromiseState::Rejected => {
                             let reason = promise.result(scope);
                             Err(format!(
                                 "Handler rejected: {}",
                                 reason.to_rust_string_lossy(scope)
                             ))
                         }
-                        deno_core::v8::PromiseState::Pending => {
+                        simien_core::v8::PromiseState::Pending => {
                             Err("Handler promise still pending after event loop".to_string())
                         }
                     }

@@ -618,7 +618,7 @@ fn call_net(
     policy: &SecurityPolicy,
     action: &str,
     payload: serde_json::Value,
-) -> Result<serde_json::Value, deno_core::error::CoreError> {
+) -> Result<serde_json::Value, simien_core::error::CoreError> {
     let request = super::net::net_action_payload_to_proto_request(action, &payload)?;
     let response = net_call_proto_impl_with(state, policy, &request.encode_to_vec())?;
     let response = proto::bridge_v1::NetResponse::decode(response.as_slice()).unwrap();

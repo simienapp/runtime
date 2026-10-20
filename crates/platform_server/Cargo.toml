@@ -7,8 +7,5 @@ edition = "2024"
 anyhow = "1"
 platform = { path = "../platform" }
 rand = "0.8"
-deno_core = { workspace = true }
-deno_napi = { workspace = true }
-deno_permissions = { workspace = true }
-modules_common = { path = "../modules_common" }
+simien_core = { workspace = true }
 deka_host = { path = "../deka_host", default-features = false, features = ["runtime"] }
