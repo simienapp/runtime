@@ -27,6 +27,7 @@ members = [
     "crates/transport",
     "crates/pool",
     "crates/web_host",
+  "crates/server",
     "crates/engine",
     "crates/deka_host",
     "crates/wasm_guest",

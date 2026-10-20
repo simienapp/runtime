@@ -1,0 +1,18 @@
+[package]
+name = "server"
+version.workspace = true
+edition = "2024"
+description = "Serves a fetch-handler app with one warm isolate per core, each serving many connections at once through simien_http"
+
+[dependencies]
+simien_core.workspace = true
+simien_http = "0.1.1"
+simien_websocket = "0.1.1"
+tokio = { workspace = true }
+web_host = { path = "../web_host" }
+pool = { path = "../pool" }
+
+[dev-dependencies]
+reqwest = { version = "0.13", features = ["blocking", "json"] }
+serde = { version = "1", features = ["derive"] }
+tempfile = "3.23.0"

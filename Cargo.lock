@@ -2595,6 +2595,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
+name = "fastwebsockets"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dac026e15fb7e44d768880b868a0fd5bd30ffdee272e88b3060f657a5a72947"
+dependencies = [
+ "base64 0.21.7",
+ "bytes",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "pin-project",
+ "rand 0.8.5",
+ "sha1 0.10.7",
+ "simdutf8",
+ "thiserror 1.0.69",
+ "tokio",
+ "utf-8",
+]
+
+[[package]]
 name = "fearless_simd"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3617,6 +3637,7 @@ dependencies = [
  "http",
  "http-body",
  "pin-project-lite",
+ "tokio",
 ]
 
 [[package]]
@@ -7079,6 +7100,7 @@ dependencies = [
  "security",
  "serde_json",
  "serve",
+ "server",
  "simien_core",
  "stdio",
  "tao",
@@ -7606,6 +7628,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "server"
+version = "0.61.0"
+dependencies = [
+ "pool",
+ "reqwest",
+ "serde",
+ "simien_core",
+ "simien_http",
+ "simien_websocket",
+ "tempfile",
+ "tokio",
+ "web_host",
+]
+
+[[package]]
 name = "servo_arc"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7914,6 +7951,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "simien_http"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3aff9a8c0ea8054e632a7086243d6733960a7ae4a6be5de783527560733b8ad4"
+dependencies = [
+ "async-compression",
+ "async-trait",
+ "aws-lc-rs",
+ "base64 0.22.1",
+ "brotli 6.0.0",
+ "bytes",
+ "flate2",
+ "http",
+ "http-body-util",
+ "httpdate",
+ "hyper",
+ "hyper-util",
+ "itertools 0.14.0",
+ "log",
+ "mime",
+ "once_cell",
+ "percent-encoding",
+ "phf 0.11.3",
+ "pin-project",
+ "scopeguard",
+ "simien_core",
+ "simien_error",
+ "simien_http_h1",
+ "simien_net",
+ "simien_websocket",
+ "smallvec",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "simien_http_h1"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92af67c193fb03ae489fdfa388f73128140783acc85b115b0145d42c920326d1"
+dependencies = [
+ "httparse",
+ "memchr",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
 name = "simien_native_certs"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7924,6 +8010,22 @@ dependencies = [
  "once_cell",
  "rustls-native-certs 0.7.3",
  "rustls-pemfile",
+]
+
+[[package]]
+name = "simien_net"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c94fb7c913322871be460b71a60f818ebeff963fb53424ba799cceddfce77170"
+dependencies = [
+ "pin-project",
+ "rustls-tokio-stream",
+ "simien_core",
+ "simien_error",
+ "simien_tls",
+ "socket2 0.5.10",
+ "thiserror 2.0.20",
+ "tokio",
 ]
 
 [[package]]
@@ -8050,6 +8152,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ef9781f88699163ecc15e64d1c471d4a8dcc726a6de0377afd3c3bc9b5226b7"
 dependencies = [
  "simien_core",
+]
+
+[[package]]
+name = "simien_websocket"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb7ed8fe4f4f4844ec3e53600517b7154ee72b68ded0f1e865827acbb7772e62"
+dependencies = [
+ "bytes",
+ "fastwebsockets",
+ "h2",
+ "http",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "once_cell",
+ "simien_core",
+ "simien_error",
+ "simien_fetch",
+ "simien_net",
+ "simien_tls",
+ "thiserror 2.0.20",
+ "tokio",
 ]
 
 [[package]]

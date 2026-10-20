@@ -17,6 +17,11 @@ pub fn register(registry: &mut Registry) {
         aliases: &[],
         description: "enable development runtime mode (watch + hmr scaffolding)",
     });
+    registry.add_flag(FlagSpec {
+        name: "--warm",
+        aliases: &[],
+        description: "serve a JS/TS fetch app with one warm isolate per core (experimental)",
+    });
 }
 
 pub fn cmd(context: &Context) {
@@ -24,6 +29,13 @@ pub fn cmd(context: &Context) {
     // flag inside production serve (deka#881).
     if context.args.flags.get("--dev").copied().unwrap_or(false) {
         crate::invoke_dev_serve(context);
+        return;
+    }
+    if context.args.flags.get("--warm").copied().unwrap_or(false) {
+        if let Err(err) = crate::serve::serve_warm(context) {
+            stdio::error("serve", &err);
+            std::process::exit(1);
+        }
         return;
     }
     // Loose file or unbuilt loose directory (no deka.json anywhere above the
@@ -76,5 +88,3 @@ pub fn serves_built_artifact(context: &Context) -> bool {
             .parent()
             .is_some_and(|dist| dist.join("build-manifest.json").is_file())
 }
-
-
