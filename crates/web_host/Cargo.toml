@@ -1,0 +1,13 @@
+[package]
+name = "web_host"
+version.workspace = true
+edition = "2024"
+description = "The WinterTC web APIs every isolate gets: simien_web, simien_fetch and simien_crypto, wired onto globalThis"
+
+[dependencies]
+simien_core.workspace = true
+simien_webidl = "0.1.1"
+simien_web = "0.1.1"
+simien_fetch = "0.1.1"
+simien_crypto = "0.1.1"
+deka_host = { path = "../deka_host", default-features = false, features = ["runtime"] }

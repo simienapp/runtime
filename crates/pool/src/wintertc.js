@@ -555,6 +555,7 @@ if (typeof globalThis.URL === 'undefined') {
   };
 }
 
+if (typeof globalThis.URLSearchParams === "undefined") {
 globalThis.URLSearchParams = class URLSearchParams {
   constructor(init) {
     this.params = [];
@@ -596,6 +597,7 @@ globalThis.URLSearchParams = class URLSearchParams {
       .join("&");
   }
 };
+}
 
 if (typeof globalThis.Headers !== "function") {
   class Headers {
