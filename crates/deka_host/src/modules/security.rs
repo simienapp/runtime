@@ -11,7 +11,7 @@ use super::*;
 /// to supply it — never a silent fall back to the process environment or to
 /// a default policy (a default would be an invisible policy). Malformed
 /// context JSON fails closed the same way.
-pub fn security_policy_from_context() -> Result<SecurityPolicy, deno_core::error::CoreError> {
+pub fn security_policy_from_context() -> Result<SecurityPolicy, simien_core::error::CoreError> {
     let Some(raw) = ::security::security_context::context_policy_json() else {
         return Err(core_err(
             "security policy missing: no per-execution security context is installed; \
@@ -21,7 +21,7 @@ pub fn security_policy_from_context() -> Result<SecurityPolicy, deno_core::error
     security_policy_from_json_str(&raw)
 }
 
-fn security_policy_from_json_str(raw: &str) -> Result<SecurityPolicy, deno_core::error::CoreError> {
+fn security_policy_from_json_str(raw: &str) -> Result<SecurityPolicy, simien_core::error::CoreError> {
     let json = serde_json::from_str::<serde_json::Value>(raw).map_err(|err| {
         core_err(format!(
             "invalid security policy in the per-execution security context: {err}"
@@ -313,7 +313,7 @@ mod security_rule_tests {
 fn permission_denied_err(
     capability: &str,
     target: Option<&str>,
-) -> deno_core::error::CoreError {
+) -> simien_core::error::CoreError {
     let denial = permissions::host_bridge::PermissionDenied {
         capability: capability.to_string(),
         target: target.unwrap_or("*").to_string(),
@@ -326,7 +326,7 @@ fn enforce_scope(
     allow_rule: &RuleList,
     deny_rule: &RuleList,
     target: Option<&str>,
-) -> Result<(), deno_core::error::CoreError> {
+) -> Result<(), simien_core::error::CoreError> {
     if !security_enforcement_enabled() {
         return Ok(());
     }
@@ -373,7 +373,7 @@ fn prompt_grants() -> &'static Mutex<HashSet<String>> {
 fn prompt_grant(
     capability: &str,
     target: Option<&str>,
-) -> Result<bool, deno_core::error::CoreError> {
+) -> Result<bool, simien_core::error::CoreError> {
     let key = prompt_scope_key(capability, target);
     let origin = classify_security_origin(capability, target);
     let target_label = target.unwrap_or("*");
@@ -512,17 +512,17 @@ fn classify_security_origin(capability: &str, target: Option<&str>) -> &'static 
     "unknown"
 }
 
-pub(super) fn enforce_read(target: Option<&str>) -> Result<(), deno_core::error::CoreError> {
+pub(super) fn enforce_read(target: Option<&str>) -> Result<(), simien_core::error::CoreError> {
     let policy = security_policy_from_context()?;
     enforce_scope("read", &policy.allow.read, &policy.deny.read, target)
 }
 
-pub(super) fn enforce_write(target: Option<&str>) -> Result<(), deno_core::error::CoreError> {
+pub(super) fn enforce_write(target: Option<&str>) -> Result<(), simien_core::error::CoreError> {
     let policy = security_policy_from_context()?;
     enforce_scope("write", &policy.allow.write, &policy.deny.write, target)
 }
 
-pub(super) fn enforce_net(target: Option<&str>) -> Result<(), deno_core::error::CoreError> {
+pub(super) fn enforce_net(target: Option<&str>) -> Result<(), simien_core::error::CoreError> {
     let policy = security_policy_from_context()?;
     enforce_net_with(&policy, target)
 }
@@ -533,7 +533,7 @@ pub(super) fn enforce_net(target: Option<&str>) -> Result<(), deno_core::error::
 pub(super) fn enforce_net_with(
     policy: &SecurityPolicy,
     target: Option<&str>,
-) -> Result<(), deno_core::error::CoreError> {
+) -> Result<(), simien_core::error::CoreError> {
     enforce_scope("net", &policy.allow.net, &policy.deny.net, target)
 }
 
@@ -564,17 +564,17 @@ pub(super) fn op_php_env_capability_granted() -> bool {
     !matches!(policy.allow.env, RuleList::None)
 }
 
-pub(super) fn enforce_env(target: Option<&str>) -> Result<(), deno_core::error::CoreError> {
+pub(super) fn enforce_env(target: Option<&str>) -> Result<(), simien_core::error::CoreError> {
     let policy = security_policy_from_context()?;
     enforce_scope("env", &policy.allow.env, &policy.deny.env, target)
 }
 
-pub(super) fn enforce_db(target: Option<&str>) -> Result<(), deno_core::error::CoreError> {
+pub(super) fn enforce_db(target: Option<&str>) -> Result<(), simien_core::error::CoreError> {
     let policy = security_policy_from_context()?;
     enforce_scope("db", &policy.allow.db, &policy.deny.db, target)
 }
 
-pub(super) fn enforce_wasm(target: Option<&str>) -> Result<(), deno_core::error::CoreError> {
+pub(super) fn enforce_wasm(target: Option<&str>) -> Result<(), simien_core::error::CoreError> {
     let policy = security_policy_from_context()?;
     enforce_scope("wasm", &policy.allow.wasm, &policy.deny.wasm, target)
 }

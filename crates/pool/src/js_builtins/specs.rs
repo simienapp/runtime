@@ -4,7 +4,7 @@
 //! resolver, dsc-externals rewrite, and dist materializer all read.
 
 use super::esm::esm_for_file;
-use deno_core::ModuleSpecifier;
+use simien_core::ModuleSpecifier;
 use std::collections::BTreeSet;
 
 pub const URL_PREFIX: &str = "deka:///js/";

@@ -1,4 +1,4 @@
-use deno_core::Extension;
+use simien_core::Extension;
 use engine::config::ServeMode;
 use platform_server::extensions_for_php_server;
 

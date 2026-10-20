@@ -1,5 +1,5 @@
 //! `import.meta` runtime values (rfd#12 amendment, deka#1139): the
-//! per-module JS preamble that overrides deno_core's host-provided
+//! per-module JS preamble that overrides simien_core's host-provided
 //! `import.meta` object, the source-override remapping used when this
 //! process executes a compiled or staged copy of the real source tree, and
 //! the backing implementation for `import.meta.resolve()`. Split out of
@@ -10,7 +10,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-use deno_core::ModuleSpecifier;
+use simien_core::ModuleSpecifier;
 
 use super::PhpxEsmLoader;
 
@@ -133,13 +133,13 @@ impl PhpxEsmLoader {
 
     /// JavaScript prepended ahead of a DekaScript/JS module's compiled body
     /// that overrides `import.meta` in place (rfd#12 amendment, deka#1139):
-    /// deno_core's host-provided object already exists by the time module
+    /// simien_core's host-provided object already exists by the time module
     /// code runs, with a writable/configurable `url` (set to the *load-time*
     /// specifier — the compiled/staged copy when one is in play) and `main`
-    /// (computed from deno_core's own main-module bookkeeping, which is
+    /// (computed from simien_core's own main-module bookkeeping, which is
     /// wrong here: `deka run`/`deka serve` always evaluate a loader-owned
     /// wrapper as the true main module and dynamically `import()` the user's
-    /// entry, so deno_core's `main` is `false` for every DekaScript module).
+    /// entry, so simien_core's `main` is `false` for every DekaScript module).
     /// Overriding from inside the module itself is the only way to correct
     /// both without a native V8 host-callback override.
     pub(super) fn import_meta_prelude(&self, specifier: &ModuleSpecifier, path: &Path) -> String {
@@ -216,7 +216,7 @@ mod tests {
             .expect("loader");
 
         let helper_specifier =
-            deno_core::ModuleSpecifier::from_file_path(helper.canonicalize().expect("canon"))
+            simien_core::ModuleSpecifier::from_file_path(helper.canonicalize().expect("canon"))
                 .unwrap();
         // See the matching comment in `entry_reports_its_own_source_and_main_true`.
         let canonical_helper_path = helper_specifier.to_file_path().expect("file path");
@@ -267,7 +267,7 @@ mod tests {
         // See the matching comment in `entry_reports_its_own_source_and_main_true`.
         let canonical_compiled_entry = entry_specifier.to_file_path().expect("file path");
         let prelude = loader.import_meta_prelude(&entry_specifier, &canonical_compiled_entry);
-        let expected_entry_url = deno_core::ModuleSpecifier::from_file_path(
+        let expected_entry_url = simien_core::ModuleSpecifier::from_file_path(
             original_root
                 .path()
                 .canonicalize()
@@ -300,9 +300,9 @@ mod tests {
 
         let compiled_helper = canonical_compiled_root.join("helper.js");
         let helper_specifier =
-            deno_core::ModuleSpecifier::from_file_path(&compiled_helper).unwrap();
+            simien_core::ModuleSpecifier::from_file_path(&compiled_helper).unwrap();
         let helper_prelude = loader.import_meta_prelude(&helper_specifier, &compiled_helper);
-        let expected_helper_url = deno_core::ModuleSpecifier::from_file_path(
+        let expected_helper_url = simien_core::ModuleSpecifier::from_file_path(
             original_root.path().canonicalize().expect("canon").join("helper.ds"),
         )
         .unwrap()
@@ -331,7 +331,7 @@ mod tests {
         let resolved = loader
             .resolve_for_import_meta("./sibling.js", &referrer)
             .expect("resolves");
-        let expected = deno_core::ModuleSpecifier::from_file_path(
+        let expected = simien_core::ModuleSpecifier::from_file_path(
             sibling.canonicalize().unwrap_or(sibling.clone()),
         )
         .unwrap()
@@ -372,7 +372,7 @@ mod tests {
         let resolved = loader
             .resolve_for_import_meta("./sibling.js", &referrer)
             .expect("resolves");
-        let expected = deno_core::ModuleSpecifier::from_file_path(
+        let expected = simien_core::ModuleSpecifier::from_file_path(
             original_root.path().canonicalize().expect("canon").join("sibling.ds"),
         )
         .unwrap()

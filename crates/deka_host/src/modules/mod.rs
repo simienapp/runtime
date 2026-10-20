@@ -1,7 +1,7 @@
 // Host capability ops: fs, db, net, crypto, concurrency.
 
 use bumpalo::Bump;
-use deno_core::op2;
+use simien_core::op2;
 use mysql::prelude::Queryable;
 use mysql::{OptsBuilder, Params as MyParams, Pool as MyPool, Value as MyValue};
 
@@ -44,11 +44,11 @@ mod security_hint;
 
 pub use security::{enforce_net_public, enforce_net_public_with, security_policy_from_context};
 
-fn core_err(msg: impl Into<String>) -> deno_core::error::CoreError {
-    deno_core::error::CoreError::from(std::io::Error::other(msg.into()))
+fn core_err(msg: impl Into<String>) -> simien_core::error::CoreError {
+    simien_core::error::CoreError::from(std::io::Error::other(msg.into()))
 }
 
-deno_core::extension!(
+simien_core::extension!(
     php_core,
     ops = [
         fs::op_php_read_file_sync,
@@ -87,7 +87,7 @@ deno_core::extension!(
     state = |state| state.put(net::NetState::new()),
 );
 
-pub fn init() -> deno_core::Extension {
+pub fn init() -> simien_core::Extension {
     php_core::init()
 }
 
@@ -96,7 +96,7 @@ pub fn init() -> deno_core::Extension {
 /// Tests use this to give each isolate its own policy rather than
 /// depending on the executing thread's context (deka#537); production
 /// installs the context per request and calls [`init`].
-pub fn init_with_net_policy(policy: SecurityPolicy) -> deno_core::Extension {
+pub fn init_with_net_policy(policy: SecurityPolicy) -> simien_core::Extension {
     let mut extension = init();
     let base_state_fn = extension.op_state_fn.take();
     extension.op_state_fn = Some(Box::new(move |state| {

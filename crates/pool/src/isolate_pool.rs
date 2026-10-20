@@ -27,10 +27,10 @@ use crate::esm_loader::{
 };
 use crate::secrets_cache::{SecretsCache, SecretsMap};
 use crate::validation;
-use deno_core::v8;
-use deno_core::{
+use simien_core::v8;
+use simien_core::{
     Extension, JsRuntime, ModuleCodeString, ModuleSpecifier, OpMetricsEvent, OpMetricsFactoryFn,
-    OpMetricsFn, RuntimeOptions, serde_v8,
+    OpMetricsFn, RuntimeOptions, simien_serde_v8 as serde_v8,
 };
 use nanoid::nanoid;
 use serve::request_envelope::StorefrontRequest;

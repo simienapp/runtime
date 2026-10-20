@@ -4,7 +4,7 @@
 //! - the WHATWG stream split (log/info/debug/dir/dirxml/table -> stdout;
 //!   warn/error/trace/assert -> stderr) reaches the process's *real* fd 1/2,
 //!   the same unbuffered path `io`'s `echo` uses (`Deno.core.print` ->
-//!   deno_core's `op_print`, which flushes on every call) — not some
+//!   simien_core's `op_print`, which flushes on every call) — not some
 //!   buffered relay that can drop output on process exit.
 //! - non-string arguments (struct / Option / Result / tuple) print through
 //!   the shared structured-printer (`inspect` in wintertc.js), not
@@ -393,7 +393,7 @@ globalThis.app = function(req) {
   ];
   const missing = whatwg.filter((m) => typeof console[m] !== "function");
   // profile/profileEnd/timeStamp/createTask are Chrome DevTools extras, not
-  // WHATWG Console Standard members; deno_core defines no built-in console
+  // WHATWG Console Standard members; simien_core defines no built-in console
   // at all (only the raw print op), so nothing exposes these unless this
   // file adds them itself.
   const chromeOnly = ["profile", "profileEnd", "timeStamp", "createTask"];

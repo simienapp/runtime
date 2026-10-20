@@ -45,7 +45,7 @@ pub(super) fn record_bridge_proto_metric(
 
 #[op2]
 #[serde]
-pub(super) fn op_php_bridge_proto_stats() -> Result<serde_json::Value, deno_core::error::CoreError>
+pub(super) fn op_php_bridge_proto_stats() -> Result<serde_json::Value, simien_core::error::CoreError>
 {
     let metrics = bridge_proto_metrics()
         .lock()

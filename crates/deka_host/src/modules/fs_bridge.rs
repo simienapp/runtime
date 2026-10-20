@@ -25,9 +25,9 @@ pub(super) fn fs_state() -> &'static Mutex<FsState> {
 pub(super) fn fs_call_impl(
     action: String,
     args: serde_json::Value,
-) -> Result<serde_json::Value, deno_core::error::CoreError> {
+) -> Result<serde_json::Value, simien_core::error::CoreError> {
     let err = |msg: String| {
-        deno_core::error::CoreError::from(std::io::Error::new(std::io::ErrorKind::Other, msg))
+        simien_core::error::CoreError::from(std::io::Error::new(std::io::ErrorKind::Other, msg))
     };
 
     // The JS bootstrap supplies a Uint8Array as a JSON number array for the
@@ -227,7 +227,7 @@ pub(super) fn fs_call_impl(
                 return Ok(serde_json::json!({ "ok": false, "error": "read_dir: missing path" }));
             }
             let entries = std::fs::read_dir(&path).map_err(|e| {
-                deno_core::error::CoreError::from(std::io::Error::new(
+                simien_core::error::CoreError::from(std::io::Error::new(
                     e.kind(),
                     format!("read_dir: {}", e),
                 ))
@@ -235,19 +235,19 @@ pub(super) fn fs_call_impl(
             let mut out = Vec::new();
             for entry in entries {
                 let entry = entry.map_err(|e| {
-                    deno_core::error::CoreError::from(std::io::Error::new(
+                    simien_core::error::CoreError::from(std::io::Error::new(
                         e.kind(),
                         format!("read_dir: {}", e),
                     ))
                 })?;
                 let file_type = entry.file_type().map_err(|e| {
-                    deno_core::error::CoreError::from(std::io::Error::new(
+                    simien_core::error::CoreError::from(std::io::Error::new(
                         e.kind(),
                         format!("read_dir: {}", e),
                     ))
                 })?;
                 let name = entry.file_name().into_string().map_err(|_| {
-                    deno_core::error::CoreError::from(std::io::Error::new(
+                    simien_core::error::CoreError::from(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
                         "read_dir: entry name is not valid UTF-8",
                     ))
@@ -303,7 +303,7 @@ pub(super) enum FsProtoActionKind {
 /// numeric input (RFD 15 / deka#758).
 fn strict_proto_bytes(
     value: Option<&serde_json::Value>,
-) -> Result<Vec<u8>, deno_core::error::CoreError> {
+) -> Result<Vec<u8>, simien_core::error::CoreError> {
     let values = value
         .and_then(serde_json::Value::as_array)
         .ok_or_else(|| core_err("fs payload must be bytes"))?;
@@ -322,7 +322,7 @@ fn strict_proto_bytes(
 pub(super) fn fs_action_payload_to_proto_request(
     action: &str,
     payload: &serde_json::Value,
-) -> Result<proto::bridge_v1::FsRequest, deno_core::error::CoreError> {
+) -> Result<proto::bridge_v1::FsRequest, simien_core::error::CoreError> {
     use proto::bridge_v1::fs_request::Action;
     let args = payload.as_object().cloned().unwrap_or_default();
     let action = match action {
@@ -401,7 +401,7 @@ pub(super) fn fs_action_payload_to_proto_request(
 
 pub(super) fn fs_proto_request_to_action_payload(
     req: &proto::bridge_v1::FsRequest,
-) -> Result<(String, serde_json::Value, FsProtoActionKind), deno_core::error::CoreError> {
+) -> Result<(String, serde_json::Value, FsProtoActionKind), simien_core::error::CoreError> {
     use proto::bridge_v1::fs_request::Action;
     let Some(action) = req.action.as_ref() else {
         return Err(core_err("fs proto request missing action"));
@@ -622,7 +622,7 @@ pub(super) fn fs_proto_response_to_json(resp: &proto::bridge_v1::FsResponse) -> 
 fn record_observation_for_action(
     action: &str,
     payload: &serde_json::Value,
-    response: Result<&serde_json::Value, &deno_core::error::CoreError>,
+    response: Result<&serde_json::Value, &simien_core::error::CoreError>,
 ) {
     use runtime_core::dist::FsObservationKind;
     let Some(path) = payload
@@ -680,7 +680,7 @@ fn is_not_found_error(message: &str) -> bool {
     message.contains("No such file or directory") || message.contains("not found")
 }
 
-pub(super) fn fs_call_proto_impl(request: &[u8]) -> Result<Vec<u8>, deno_core::error::CoreError> {
+pub(super) fn fs_call_proto_impl(request: &[u8]) -> Result<Vec<u8>, simien_core::error::CoreError> {
     let started = Instant::now();
     let req = proto::bridge_v1::FsRequest::decode(request)
         .map_err(|e| core_err(format!("fs proto decode failed: {}", e)))?;
@@ -730,7 +730,7 @@ pub(super) fn fs_call_proto_impl(request: &[u8]) -> Result<Vec<u8>, deno_core::e
 #[buffer]
 pub(super) fn op_php_fs_call_proto(
     #[buffer] request: &[u8],
-) -> Result<Vec<u8>, deno_core::error::CoreError> {
+) -> Result<Vec<u8>, simien_core::error::CoreError> {
     fs_call_proto_impl(request)
 }
 
@@ -749,7 +749,7 @@ pub(super) fn op_php_fs_call_proto(
 #[buffer]
 pub(super) async fn op_php_fs_call_proto_async(
     #[buffer(copy)] request: Vec<u8>,
-) -> Result<Vec<u8>, deno_core::error::CoreError> {
+) -> Result<Vec<u8>, simien_core::error::CoreError> {
     let security_context = ::security::security_context::current_security_context();
     tokio::task::spawn_blocking(move || {
         let _security_context = security_context
@@ -765,7 +765,7 @@ pub(super) async fn op_php_fs_call_proto_async(
 pub(super) fn op_php_fs_proto_encode(
     #[string] action: String,
     #[serde] payload: serde_json::Value,
-) -> Result<Vec<u8>, deno_core::error::CoreError> {
+) -> Result<Vec<u8>, simien_core::error::CoreError> {
     let request = fs_action_payload_to_proto_request(&action, &payload)?;
     Ok(request.encode_to_vec())
 }
@@ -774,7 +774,7 @@ pub(super) fn op_php_fs_proto_encode(
 #[serde]
 pub(super) fn op_php_fs_proto_decode(
     #[buffer] response: &[u8],
-) -> Result<serde_json::Value, deno_core::error::CoreError> {
+) -> Result<serde_json::Value, simien_core::error::CoreError> {
     let decoded = proto::bridge_v1::FsResponse::decode(response)
         .map_err(|e| core_err(format!("fs proto decode response failed: {}", e)))?;
     Ok(fs_proto_response_to_json(&decoded))

@@ -4,13 +4,13 @@ use crate::{Result, ui::WireNode};
 use deka_native_ui::{Application, Node};
 use std::cell::RefCell;
 pub struct V8App {
-    js: RefCell<deno_core::JsRuntime>,
+    js: RefCell<simien_core::JsRuntime>,
     tree: RefCell<Node>,
     nodes: RefCell<crate::component::tree::Tree>,
 }
 impl V8App {
     pub fn new() -> Result<Self> {
-        let mut js = deno_core::JsRuntime::new(Default::default());
+        let mut js = simien_core::JsRuntime::new(Default::default());
         js.execute_script("counter.js", include_str!("../examples/counter-control.js"))
             .map_err(|e| e.to_string())?;
         let mut nodes = crate::component::tree::Tree::default();
@@ -23,14 +23,14 @@ impl V8App {
     }
 }
 fn read_tree(
-    js: &mut deno_core::JsRuntime,
+    js: &mut simien_core::JsRuntime,
     nodes: &mut crate::component::tree::Tree,
 ) -> Result<Node> {
     let result = js
         .execute_script("snapshot.js", "JSON.stringify(snapshot())")
         .map_err(|e| e.to_string())?;
-    deno_core::scope!(scope, js);
-    let value = deno_core::v8::Local::new(scope, result);
+    simien_core::scope!(scope, js);
+    let value = simien_core::v8::Local::new(scope, result);
     let json = value.to_rust_string_lossy(scope);
     let wire: WireNode = serde_json::from_str(&json).map_err(|e| e.to_string())?;
     nodes.update(wire)

@@ -1,6 +1,6 @@
 use std::sync::{Arc, OnceLock};
 
-use deno_core::Extension;
+use simien_core::Extension;
 
 use crate::config::RuntimeConfig;
 use crate::introspect_archive::IntrospectArchive;

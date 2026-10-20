@@ -1,4 +1,4 @@
-use deno_core::{JsRuntime, ModuleCodeString, ModuleSpecifier, RuntimeOptions};
+use simien_core::{JsRuntime, ModuleCodeString, ModuleSpecifier, RuntimeOptions};
 
 #[tokio::test(flavor = "current_thread")]
 async fn crypto_bcrypt_verify_bridge_returns_bool_result() {
@@ -29,7 +29,7 @@ async fn crypto_bcrypt_verify_bridge_returns_bool_result() {
         .expect("load bcrypt bridge test module");
     let test_eval = runtime.mod_evaluate(test_module_id);
     runtime
-        .run_event_loop(deno_core::PollEventLoopOptions::default())
+        .run_event_loop(simien_core::PollEventLoopOptions::default())
         .await
         .expect("run bcrypt bridge test module");
     test_eval.await.expect("evaluate bcrypt bridge test module");
@@ -74,7 +74,7 @@ async fn crypto_digest_hmac_secure_compare_bridge() {
         .expect("load digest bridge test module");
     let test_eval = runtime.mod_evaluate(test_module_id);
     runtime
-        .run_event_loop(deno_core::PollEventLoopOptions::default())
+        .run_event_loop(simien_core::PollEventLoopOptions::default())
         .await
         .expect("run digest bridge test module");
     test_eval.await.expect("evaluate digest bridge test module");

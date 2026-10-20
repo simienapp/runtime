@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use deno_error::JsErrorBox;
+use simien_error::JsErrorBox;
 
 use runtime_core::DEKA_VALIDATION_ERROR_MARKER;
 

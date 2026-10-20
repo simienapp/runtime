@@ -5,7 +5,7 @@
 //! These functions only rewrite `ModuleSourceCode::String` payloads; other
 //! variants pass through untouched.
 
-use deno_core::ModuleSourceCode;
+use simien_core::ModuleSourceCode;
 
 /// Entry wrapper module source. Dynamically imports the entry and assigns the
 /// best candidate export (`default`, `app`, `App`, `handler`, or the
@@ -122,7 +122,7 @@ pub(crate) fn append_entry_footer(code: ModuleSourceCode) -> ModuleSourceCode {
 mod tests {
     use super::entry_wrapper_source;
     use super::prepend_host_bindings;
-    use deno_core::ModuleSourceCode;
+    use simien_core::ModuleSourceCode;
 
     #[test]
     fn wrapper_accepts_exported_dekascript_app() {

@@ -11,7 +11,7 @@ impl WorkerThread {
         let mut should_write_cache = false;
 
         {
-            deno_core::scope!(scope, runtime);
+            simien_core::scope!(scope, runtime);
 
             let source_str = v8::String::new(scope, handler_code)
                 .ok_or_else(|| "Failed to allocate handler source".to_string())?;

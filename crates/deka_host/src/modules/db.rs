@@ -128,15 +128,15 @@ pub(super) fn sanitize_conn_value(value: &str) -> String {
 
 fn with_sqlite_conn<T>(
     cfg: SqliteConnConfig,
-    f: impl FnOnce(&SqliteConnection) -> Result<T, deno_core::error::CoreError> + Send + 'static,
-) -> Result<T, deno_core::error::CoreError>
+    f: impl FnOnce(&SqliteConnection) -> Result<T, simien_core::error::CoreError> + Send + 'static,
+) -> Result<T, simien_core::error::CoreError>
 where
     T: Send + 'static,
 {
     std::thread::spawn(move || {
         let path = sanitize_conn_value(&cfg.path);
         let conn = SqliteConnection::open(&path).map_err(|e| {
-            deno_core::error::CoreError::from(std::io::Error::other(format!(
+            simien_core::error::CoreError::from(std::io::Error::other(format!(
                 "sqlite open failed: {} (path={})",
                 e, path
             )))
@@ -145,7 +145,7 @@ where
     })
     .join()
     .map_err(|_| {
-        deno_core::error::CoreError::from(std::io::Error::other("db worker thread panicked"))
+        simien_core::error::CoreError::from(std::io::Error::other("db worker thread panicked"))
     })?
 }
 
@@ -186,8 +186,8 @@ fn sqlite_cell_to_json(row: &rusqlite::Row<'_>, idx: usize) -> serde_json::Value
 
 fn with_mysql_conn<T>(
     cfg: MysqlConnConfig,
-    f: impl FnOnce(&mut mysql::PooledConn) -> Result<T, deno_core::error::CoreError> + Send + 'static,
-) -> Result<T, deno_core::error::CoreError>
+    f: impl FnOnce(&mut mysql::PooledConn) -> Result<T, simien_core::error::CoreError> + Send + 'static,
+) -> Result<T, simien_core::error::CoreError>
 where
     T: Send + 'static,
 {
@@ -208,13 +208,13 @@ where
             .write_timeout(Some(Duration::from_secs(5)));
 
         let pool = MyPool::new(opts).map_err(|e| {
-            deno_core::error::CoreError::from(std::io::Error::other(format!(
+            simien_core::error::CoreError::from(std::io::Error::other(format!(
                 "mysql pool failed: {} (host={}, port={}, database={}, user={})",
                 e, host, cfg.port, database, user
             )))
         })?;
         let mut conn = pool.get_conn().map_err(|e| {
-            deno_core::error::CoreError::from(std::io::Error::other(format!(
+            simien_core::error::CoreError::from(std::io::Error::other(format!(
                 "mysql connect failed: {}",
                 e
             )))
@@ -223,7 +223,7 @@ where
     })
     .join()
     .map_err(|_| {
-        deno_core::error::CoreError::from(std::io::Error::other("db worker thread panicked"))
+        simien_core::error::CoreError::from(std::io::Error::other("db worker thread panicked"))
     })?
 }
 
@@ -280,9 +280,9 @@ fn mysql_value_to_json(value: &MyValue) -> serde_json::Value {
 pub(super) fn db_call_impl(
     action: String,
     args: serde_json::Value,
-) -> Result<serde_json::Value, deno_core::error::CoreError> {
+) -> Result<serde_json::Value, simien_core::error::CoreError> {
     let err = |msg: String| {
-        deno_core::error::CoreError::from(std::io::Error::new(std::io::ErrorKind::Other, msg))
+        simien_core::error::CoreError::from(std::io::Error::new(std::io::ErrorKind::Other, msg))
     };
 
     let args_obj = args.as_object().cloned().unwrap_or_default();
@@ -503,7 +503,7 @@ pub(super) fn db_call_impl(
                         params.iter().map(json_to_pg_param).collect();
                     let refs: Vec<&(dyn ToSql + Sync)> = boxed.iter().map(|v| v.as_ref()).collect();
                     let rows = client.query(&sql, &refs).map_err(|e| {
-                        deno_core::error::CoreError::from(std::io::Error::other(format!(
+                        simien_core::error::CoreError::from(std::io::Error::other(format!(
                             "postgres query failed: {}",
                             e
                         )))
@@ -522,7 +522,7 @@ pub(super) fn db_call_impl(
                 })?,
                 DbDriverConfig::Sqlite(cfg) => with_sqlite_conn(cfg, move |conn| {
                     let mut stmt = conn.prepare(&sql).map_err(|e| {
-                        deno_core::error::CoreError::from(std::io::Error::other(format!(
+                        simien_core::error::CoreError::from(std::io::Error::other(format!(
                             "sqlite prepare failed: {}",
                             e
                         )))
@@ -532,7 +532,7 @@ pub(super) fn db_call_impl(
                     let mut rows = stmt
                         .query(sqlite_params_from_iter(sqlite_params.iter()))
                         .map_err(|e| {
-                            deno_core::error::CoreError::from(std::io::Error::other(format!(
+                            simien_core::error::CoreError::from(std::io::Error::other(format!(
                                 "sqlite query failed: {}",
                                 e
                             )))
@@ -540,7 +540,7 @@ pub(super) fn db_call_impl(
 
                     let mut out_rows = Vec::new();
                     while let Some(row) = rows.next().map_err(|e| {
-                        deno_core::error::CoreError::from(std::io::Error::other(format!(
+                        simien_core::error::CoreError::from(std::io::Error::other(format!(
                             "sqlite row fetch failed: {}",
                             e
                         )))
@@ -559,7 +559,7 @@ pub(super) fn db_call_impl(
                     let mysql_params =
                         MyParams::Positional(params.iter().map(json_to_mysql_value).collect());
                     let rows: Vec<mysql::Row> = conn.exec(&sql, mysql_params).map_err(|e| {
-                        deno_core::error::CoreError::from(std::io::Error::other(format!(
+                        simien_core::error::CoreError::from(std::io::Error::other(format!(
                             "mysql query failed: {}",
                             e
                         )))
@@ -633,7 +633,7 @@ pub(super) fn db_call_impl(
                         params.iter().map(json_to_pg_param).collect();
                     let refs: Vec<&(dyn ToSql + Sync)> = boxed.iter().map(|v| v.as_ref()).collect();
                     client.execute(&sql, &refs).map_err(|e| {
-                        deno_core::error::CoreError::from(std::io::Error::other(format!(
+                        simien_core::error::CoreError::from(std::io::Error::other(format!(
                             "postgres exec failed: {}",
                             e
                         )))
@@ -641,7 +641,7 @@ pub(super) fn db_call_impl(
                 })?,
                 DbDriverConfig::Sqlite(cfg) => with_sqlite_conn(cfg, move |conn| {
                     let mut stmt = conn.prepare(&sql).map_err(|e| {
-                        deno_core::error::CoreError::from(std::io::Error::other(format!(
+                        simien_core::error::CoreError::from(std::io::Error::other(format!(
                             "sqlite prepare failed: {}",
                             e
                         )))
@@ -651,7 +651,7 @@ pub(super) fn db_call_impl(
                     let changed = stmt
                         .execute(sqlite_params_from_iter(sqlite_params.iter()))
                         .map_err(|e| {
-                            deno_core::error::CoreError::from(std::io::Error::other(format!(
+                            simien_core::error::CoreError::from(std::io::Error::other(format!(
                                 "sqlite exec failed: {}",
                                 e
                             )))
@@ -662,7 +662,7 @@ pub(super) fn db_call_impl(
                     let mysql_params =
                         MyParams::Positional(params.iter().map(json_to_mysql_value).collect());
                     let result = conn.exec_iter(&sql, mysql_params).map_err(|e| {
-                        deno_core::error::CoreError::from(std::io::Error::other(format!(
+                        simien_core::error::CoreError::from(std::io::Error::other(format!(
                             "mysql exec failed: {}",
                             e
                         )))
@@ -812,7 +812,7 @@ pub(super) fn db_proto_to_json_value(value: &proto::bridge_v1::Value) -> serde_j
 
 pub(super) fn db_proto_request_to_action_payload(
     req: &proto::bridge_v1::DbRequest,
-) -> Result<(String, serde_json::Value, DbProtoActionKind), deno_core::error::CoreError> {
+) -> Result<(String, serde_json::Value, DbProtoActionKind), simien_core::error::CoreError> {
     use proto::bridge_v1::db_request::Action;
     let Some(action) = req.action.as_ref() else {
         return Err(core_err("db proto request missing action"));
@@ -895,7 +895,7 @@ pub(super) fn db_proto_request_to_action_payload(
 pub(super) fn db_action_payload_to_proto_request(
     action: &str,
     payload: &serde_json::Value,
-) -> Result<proto::bridge_v1::DbRequest, deno_core::error::CoreError> {
+) -> Result<proto::bridge_v1::DbRequest, simien_core::error::CoreError> {
     use proto::bridge_v1::db_request::Action;
     let args = payload.as_object().cloned().unwrap_or_default();
     let action = match action {
@@ -1254,7 +1254,7 @@ pub(super) fn db_proto_response_to_json(resp: &proto::bridge_v1::DbResponse) -> 
     serde_json::Value::Object(out)
 }
 
-pub(super) fn db_call_proto_impl(request: &[u8]) -> Result<Vec<u8>, deno_core::error::CoreError> {
+pub(super) fn db_call_proto_impl(request: &[u8]) -> Result<Vec<u8>, simien_core::error::CoreError> {
     let started = Instant::now();
     let req = proto::bridge_v1::DbRequest::decode(request)
         .map_err(|e| core_err(format!("db proto decode failed: {}", e)))?;
@@ -1295,7 +1295,7 @@ pub(super) fn db_target_from_payload(action: &str, payload: &serde_json::Value) 
 #[buffer]
 pub(super) fn op_php_db_call_proto(
     #[buffer] request: &[u8],
-) -> Result<Vec<u8>, deno_core::error::CoreError> {
+) -> Result<Vec<u8>, simien_core::error::CoreError> {
     db_call_proto_impl(request)
 }
 
@@ -1304,7 +1304,7 @@ pub(super) fn op_php_db_call_proto(
 pub(super) fn op_php_db_proto_encode(
     #[string] action: String,
     #[serde] payload: serde_json::Value,
-) -> Result<Vec<u8>, deno_core::error::CoreError> {
+) -> Result<Vec<u8>, simien_core::error::CoreError> {
     let request = db_action_payload_to_proto_request(&action, &payload)?;
     Ok(request.encode_to_vec())
 }
@@ -1313,7 +1313,7 @@ pub(super) fn op_php_db_proto_encode(
 #[serde]
 pub(super) fn op_php_db_proto_decode(
     #[buffer] response: &[u8],
-) -> Result<serde_json::Value, deno_core::error::CoreError> {
+) -> Result<serde_json::Value, simien_core::error::CoreError> {
     let decoded = proto::bridge_v1::DbResponse::decode(response)
         .map_err(|e| core_err(format!("db proto decode response failed: {}", e)))?;
     Ok(db_proto_response_to_json(&decoded))

@@ -8,7 +8,7 @@ serve = { path = "../serve" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tracing = "0.1"
-deno_core = { workspace = true }
+simien_core = { workspace = true }
 pool = { path = "../pool" }
 runtime_core = { path = "../runtime_core" }
 toml = { workspace = true }

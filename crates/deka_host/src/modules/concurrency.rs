@@ -166,7 +166,7 @@ async fn lock_release_impl(token: u64) -> serde_json::Value {
 pub(super) async fn op_php_concurrency_lock_acquire(
     #[string] name: String,
     #[number] timeout_ms: u64,
-) -> Result<serde_json::Value, deno_core::error::CoreError> {
+) -> Result<serde_json::Value, simien_core::error::CoreError> {
     Ok(lock_acquire_impl(name, timeout_ms).await)
 }
 
@@ -174,7 +174,7 @@ pub(super) async fn op_php_concurrency_lock_acquire(
 #[serde]
 pub(super) async fn op_php_concurrency_lock_release(
     #[number] token: u64,
-) -> Result<serde_json::Value, deno_core::error::CoreError> {
+) -> Result<serde_json::Value, simien_core::error::CoreError> {
     Ok(lock_release_impl(token).await)
 }
 

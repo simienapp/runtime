@@ -1,4 +1,4 @@
-use deno_core::{JsRuntime, ModuleCodeString, RuntimeOptions};
+use simien_core::{JsRuntime, ModuleCodeString, RuntimeOptions};
 
 #[test]
 fn deka_vault_bridge_is_scoped_per_isolate_shop() {
@@ -88,8 +88,8 @@ fn run_shop_isolate(
     let value = runtime
         .execute_script("vault_isolation_test.js", ModuleCodeString::from(script))
         .expect("execute vault isolation test");
-    deno_core::scope!(scope, &mut runtime);
-    let local = deno_core::v8::Local::new(scope, &value);
+    simien_core::scope!(scope, &mut runtime);
+    let local = simien_core::v8::Local::new(scope, &value);
     let json = local.to_rust_string_lossy(scope);
     serde_json::from_str(&json).expect("parse isolate result")
 }

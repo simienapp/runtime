@@ -14,8 +14,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use deno_core::OpState;
-use deno_core::op2;
+use simien_core::OpState;
+use simien_core::op2;
 
 use super::PhpxEsmLoader;
 
@@ -25,16 +25,16 @@ fn op_deka_import_meta_resolve(
     op_state: Rc<RefCell<OpState>>,
     #[string] specifier: String,
     #[string] referrer: String,
-) -> Result<String, deno_core::error::CoreError> {
+) -> Result<String, simien_core::error::CoreError> {
     let op_state = op_state.borrow();
     let loader = op_state.borrow::<PhpxEsmLoader>();
     loader
         .resolve_for_import_meta(&specifier, &referrer)
-        .map_err(|err| deno_core::error::CoreError::from(std::io::Error::other(err)))
+        .map_err(|err| simien_core::error::CoreError::from(std::io::Error::other(err)))
 }
 
-deno_core::extension!(deka_import_meta, ops = [op_deka_import_meta_resolve],);
+simien_core::extension!(deka_import_meta, ops = [op_deka_import_meta_resolve],);
 
-pub fn init() -> deno_core::Extension {
+pub fn init() -> simien_core::Extension {
     deka_import_meta::init()
 }

@@ -1,4 +1,4 @@
-use deno_core::{JsRuntime, ModuleCodeString, RuntimeOptions};
+use simien_core::{JsRuntime, ModuleCodeString, RuntimeOptions};
 
 #[test]
 fn tenant_cannot_enable_privileged_filesystem_access() {

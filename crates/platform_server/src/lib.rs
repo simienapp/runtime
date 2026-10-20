@@ -1,6 +1,5 @@
 use anyhow::{Result, anyhow};
-use deno_core::Extension;
-use modules_common::permissions_extension;
+use simien_core::Extension;
 use platform::{Env, Fs, Io, Net, Platform, Ports, Process, Random, Time};
 use rand::RngCore;
 use std::io::Write;
@@ -224,9 +223,7 @@ impl Ports for ServerPorts {
 }
 
 pub fn extensions_for_php_server() -> Vec<Extension> {
-    let mut extensions = vec![permissions_extension(), deno_napi::deno_napi::init(None)];
-    extensions.extend(deka_host::extensions());
-    extensions
+    deka_host::extensions()
 }
 
 /// Same as [`extensions_for_php_server`], but the net bridge enforces the
@@ -236,7 +233,5 @@ pub fn extensions_for_php_server() -> Vec<Extension> {
 pub fn extensions_for_php_server_with_net_policy(
     policy: deka_host::SecurityPolicy,
 ) -> Vec<Extension> {
-    let mut extensions = vec![permissions_extension(), deno_napi::deno_napi::init(None)];
-    extensions.extend(deka_host::extensions_with_net_policy(policy));
-    extensions
+    deka_host::extensions_with_net_policy(policy)
 }

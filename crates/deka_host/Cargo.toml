@@ -7,7 +7,7 @@ build = "build.rs"
 [features]
 default = ["runtime"]
 runtime = [
-    "dep:deno_core",
+    "dep:simien_core",
     "dep:tokio",
     "dep:postgres",
     "dep:mysql",
@@ -32,7 +32,7 @@ runtime = [
 deka-modules = "0.3.0"
 security = { path = "../security" }
 permissions = { path = "../permissions" }
-deno_core = { workspace = true, optional = true }
+simien_core = { workspace = true, optional = true }
 bumpalo = "3"
 bytes = "1"
 chrono = { version = "0.4", features = ["clock"] }
