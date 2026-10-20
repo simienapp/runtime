@@ -501,3 +501,40 @@ mod tests {
         let _ = fs::remove_dir_all(&root_b);
     }
 }
+
+/// `serve --warm`: the app's default export served by one warm isolate per
+/// core (the `server` crate), each handling many requests at once.
+pub fn serve_warm(context: &Context) -> Result<(), String> {
+    let resolved = runtime_config::resolve_handler_path(
+        &context
+            .extensions()
+            .get::<::run::handler::HandlerSnapshot>()
+            .expect("handler snapshot populated before dispatch")
+            .input,
+    )
+    .map_err(|err| format!("Failed to resolve handler path: {}", err))?;
+    let entry = resolved
+        .path
+        .canonicalize()
+        .map_err(|err| format!("{}: {err}", resolved.path.display()))?;
+    if !entry.is_file() {
+        return Err(format!("--warm serves a single entry file, not {}", entry.display()));
+    }
+    let mut serve_options = pool::validation::ServeOptions::default();
+    apply_cli_serve_overrides(context, &mut serve_options);
+    let port = serve_options.port.unwrap_or(8530);
+    let isolates = std::thread::available_parallelism().map_or(1, |n| n.get());
+    let server = server::start(server::ServerOptions {
+        addr: ([0, 0, 0, 0], port).into(),
+        project_root: entry.parent().unwrap_or(&entry).to_path_buf(),
+        entry,
+        isolates,
+        inbox_capacity: 1024,
+    })?;
+    stdio_log::log(
+        "serve",
+        &format!("listening on http://localhost:{} with {isolates} warm isolates", server.addr.port()),
+    );
+    server.wait();
+    Ok(())
+}

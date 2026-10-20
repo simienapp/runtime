@@ -7100,6 +7100,7 @@ dependencies = [
  "security",
  "serde_json",
  "serve",
+ "server",
  "simien_core",
  "stdio",
  "tao",

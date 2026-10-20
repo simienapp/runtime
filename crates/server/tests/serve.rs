@@ -97,7 +97,10 @@ fn an_isolate_keeps_its_state_between_requests() {
     let (_dir, addr) = start(1);
     let client = client();
     for _ in 0..3 {
-        client.get(format!("http://{addr}/x")).send().expect("request");
+        client
+            .get(format!("http://{addr}/x"))
+            .send()
+            .expect("request");
     }
     let hits: serde_json_value::Hits = client
         .get(format!("http://{addr}/hits"))
