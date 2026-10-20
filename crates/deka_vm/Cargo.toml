@@ -20,7 +20,7 @@ deka_native_ir = { path = "../deka_native_ir", optional = true }
 simien_core = { workspace = true, optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
-encoding_rs = "=0.8.41"
+encoding_rs = "0.8"
 url = { version = "2.5.8", optional = true }
 reqwest = { version = "0.13", optional = true }
 hmac = { version = "0.12", optional = true }
