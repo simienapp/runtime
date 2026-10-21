@@ -117,7 +117,7 @@ impl Permissions {
                 false,
             ),
         };
-        SecurityPolicy {
+        let mut policy = SecurityPolicy {
             allow: SecurityScope {
                 read: fs_rule(&caps.read, working_dir),
                 write: fs_rule(&caps.write, working_dir),
@@ -134,7 +134,9 @@ impl Permissions {
             },
             deny: SecurityScope::default(),
             prompt,
-        }
+        };
+        security::security_policy::allow_code_like_deno(&mut policy);
+        policy
     }
 }
 

@@ -49,15 +49,27 @@ pub struct SecurityPolicy {
 }
 
 impl Default for SecurityPolicy {
+    /// Deno's defaults: nothing granted for files, network, environment or
+    /// programs; code may evaluate code and load wasm.
     fn default() -> Self {
-        Self {
-            allow: SecurityScope {
-                run: RuleList::List(vec!["simien".to_string()]),
-                ..SecurityScope::default()
-            },
+        let mut policy = Self {
+            allow: SecurityScope::default(),
             deny: SecurityScope::default(),
             prompt: true,
-        }
+        };
+        allow_code_like_deno(&mut policy);
+        policy
+    }
+}
+
+/// Deno never gates `eval`, `new Function`, `import()` or WebAssembly, and
+/// people coming from Deno expect the same here. So in every policy, however
+/// it was built, they are allowed unless `deny` names them: dynamic code is
+/// always on in `allow`, and wasm is all of it unless `allow` lists modules.
+pub fn allow_code_like_deno(policy: &mut SecurityPolicy) {
+    policy.allow.dynamic = true;
+    if matches!(policy.allow.wasm, RuleList::None) {
+        policy.allow.wasm = RuleList::All;
     }
 }
 
@@ -334,6 +346,7 @@ pub fn parse_deka_security_policy(root: &Value) -> PolicyParseOutcome {
     }
 
     apply_legacy_permissions(obj, &mut policy, &mut diagnostics);
+    allow_code_like_deno(&mut policy);
 
     PolicyParseOutcome {
         policy,

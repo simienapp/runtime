@@ -216,10 +216,10 @@ fn default_policy() -> pool::ExecutionSecurity {
     }
 }
 
-/// The warm server loads the app under the project's policy: under the
-/// default one, an app that evaluates code from a string doesn't start.
+/// The warm server loads the app under the project's policy: when it denies
+/// dynamic code, an app that evaluates code from a string doesn't start.
 #[test]
-fn an_app_that_uses_eval_does_not_start_under_the_default_policy() {
+fn the_warm_server_loads_the_app_under_the_projects_policy() {
     let dir = tempfile::tempdir().expect("app dir");
     let entry = dir.path().join("app.js");
     std::fs::write(
@@ -227,6 +227,8 @@ fn an_app_that_uses_eval_does_not_start_under_the_default_policy() {
         "const n = eval(\"1 + 1\");\nexport default { fetch: () => new Response(String(n)) };\n",
     )
     .expect("write app");
+    let mut policy = security::security_policy::SecurityPolicy::default();
+    policy.deny.dynamic = true;
     let started = server::start(ServerOptions {
         addr: "127.0.0.1:0".parse().expect("addr"),
         entry,
@@ -235,7 +237,10 @@ fn an_app_that_uses_eval_does_not_start_under_the_default_policy() {
         inbox_capacity: 8,
         max_busy: None,
         on_event: None,
-        security: default_policy(),
+        security: pool::ExecutionSecurity {
+            policy_json: security::security_policy::policy_to_json(&policy).to_string(),
+            no_prompt: true,
+        },
     });
     let error = started.err().expect("the app must not start");
     assert!(error.contains("eval is disabled by the security policy"), "{error}");

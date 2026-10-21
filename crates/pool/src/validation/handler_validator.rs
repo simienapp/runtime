@@ -338,7 +338,7 @@ mod dynamic_code_tests {
 
     #[test]
     fn explicit_deny_beats_allow() {
-        let policy = r#"{"allow":{"dynamic":true},"deny":{"dynamic":true}}"#;
+        let policy = r#"{"security":{"allow":{"dynamic":true},"deny":{"dynamic":true}}}"#;
         let err = super::validate_dynamic_code_with_policy(
             "const value = eval('1 + 1');",
             "handler.js",

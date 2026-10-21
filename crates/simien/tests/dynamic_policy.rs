@@ -1,19 +1,20 @@
-//! `security.allow.dynamic` is enforced on a real `simien run` of a JavaScript
-//! app: eval, the Function constructor and their member spellings are refused
-//! under the default policy, and run when simien.json allows dynamic code.
-//! (Ported from the deka CLI's dynamic_policy_boundary, which drove DekaScript.)
+//! Dynamic code on a real `simien run` of a JavaScript app. Like Deno, `eval`,
+//! the `Function` constructor and `import()` run by default; simien.json can
+//! still refuse them with `"deny": {"dynamic": true}`, and then every spelling
+//! is refused before any of the app runs.
 
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-const DENY: &str = r#"{"name":"gate","security":{"prompt":false}}"#;
-const ALLOW: &str = r#"{"name":"gate","security":{"allow":{"dynamic":true},"prompt":false}}"#;
+const DEFAULT: &str = r#"{"name":"gate","security":{"prompt":false}}"#;
+const DENY: &str = r#"{"name":"gate","security":{"deny":{"dynamic":true},"prompt":false}}"#;
 
 fn project(manifest: &str, source: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("project");
     fs::write(dir.path().join("simien.json"), manifest).expect("simien.json");
     fs::write(dir.path().join("main.js"), source).expect("main.js");
+    fs::write(dir.path().join("two.js"), "export const two = 2;\n").expect("two.js");
     dir
 }
 
@@ -32,36 +33,30 @@ fn evaluating(spelling: &str) -> String {
     format!("const result = {spelling};\nconsole.log(\"ran\", result);\n")
 }
 
+const SPELLINGS: [&str; 6] = [
+    "eval(\"1 + 1\")",
+    "globalThis.eval(\"1 + 1\")",
+    "globalThis[\"eval\"](\"1 + 1\")",
+    "(0, eval)(\"1 + 1\")",
+    "new Function(\"return 1 + 1\")()",
+    "globalThis.Function(\"return 1 + 1\")()",
+];
+
 #[test]
-fn eval_is_refused_before_it_runs_under_the_default_policy() {
-    let out = run(project(DENY, &evaluating("eval(\"1 + 1\")")).path());
-    assert!(out.contains("eval is disabled by the security policy"), "{out}");
-    assert!(!out.contains("ran 2"), "eval ran anyway: {out}");
+fn dynamic_code_runs_by_default_as_in_deno() {
+    for spelling in SPELLINGS {
+        let out = run(project(DEFAULT, &evaluating(spelling)).path());
+        assert!(out.contains("ran 2"), "{spelling}: {out}");
+    }
+    let out = run(project(DEFAULT, "const m = await import(\"./two.js\");\nconsole.log(\"ran\", m.two);\n").path());
+    assert!(out.contains("ran 2"), "import(): {out}");
 }
 
 #[test]
-fn member_and_constructor_spellings_are_refused_too() {
-    for spelling in [
-        "globalThis.eval(\"1 + 1\")",
-        "globalThis[\"eval\"](\"1 + 1\")",
-        "(0, eval)(\"1 + 1\")",
-        "new Function(\"return 1 + 1\")()",
-        "globalThis.Function(\"return 1 + 1\")()",
-    ] {
+fn simien_json_can_deny_dynamic_code_and_every_spelling_is_refused_before_it_runs() {
+    for spelling in SPELLINGS {
         let out = run(project(DENY, &evaluating(spelling)).path());
         assert!(out.contains("disabled by the security policy"), "{spelling}: {out}");
         assert!(!out.contains("ran 2"), "{spelling} ran anyway: {out}");
     }
-}
-
-#[test]
-fn simien_json_can_allow_dynamic_code() {
-    let out = run(project(ALLOW, &evaluating("eval(\"1 + 1\")")).path());
-    assert!(out.contains("ran 2"), "an explicit dynamic grant must let it run: {out}");
-}
-
-#[test]
-fn an_ordinary_program_runs_under_the_default_policy() {
-    let out = run(project(DENY, &evaluating("1 + 1")).path());
-    assert!(out.contains("ran 2"), "{out}");
 }
