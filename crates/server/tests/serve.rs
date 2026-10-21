@@ -245,3 +245,41 @@ fn the_warm_server_loads_the_app_under_the_projects_policy() {
     let error = started.err().expect("the app must not start");
     assert!(error.contains("eval is disabled by the security policy"), "{error}");
 }
+
+/// The warm server's isolates get the framework's carve-outs (Simien APS 2):
+/// `node:async_hooks` resolves, and `process` has only `platform` and a
+/// policy-checked `env` (the default policy reads nothing).
+#[test]
+fn the_warm_server_has_the_framework_carve_outs() {
+    let dir = tempfile::tempdir().expect("app dir");
+    let entry = dir.path().join("app.js");
+    std::fs::write(
+        &entry,
+        "import { AsyncLocalStorage } from \"node:async_hooks\";\n\
+         const storage = new AsyncLocalStorage();\n\
+         export default { fetch: (req) => storage.run(new URL(req.url).pathname, async () => {\n\
+           await null;\n\
+           return Response.json({ store: storage.getStore(), platform: process.platform, keys: Object.keys(process), env: typeof process.env.HOME });\n\
+         }) };\n",
+    )
+    .expect("write app");
+    let server = server::start(ServerOptions {
+        addr: "127.0.0.1:0".parse().expect("addr"),
+        entry,
+        project_root: dir.path().to_path_buf(),
+        isolates: 1,
+        inbox_capacity: 8,
+        max_busy: None,
+        on_event: None,
+        security: default_policy(),
+    })
+    .expect("start");
+    let body: serde_json::Value = reqwest::blocking::get(format!("http://{}/some/path", server.addr))
+        .expect("request")
+        .json()
+        .expect("json");
+    assert_eq!(body["store"], "/some/path");
+    assert_eq!(body["platform"], carve_outs::platform());
+    assert_eq!(body["keys"], serde_json::json!(["platform", "env"]));
+    assert_eq!(body["env"], "undefined", "the default policy reads no variable");
+}

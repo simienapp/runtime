@@ -25,6 +25,7 @@ members = [
   "crates/packages",
   "crates/container",
   "crates/project",
+  "crates/carve_outs",
   "crates/schema",
   "crates/schema_sync",
   "crates/devloop",

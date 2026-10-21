@@ -686,6 +686,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "carve_outs"
+version = "0.61.0"
+dependencies = [
+ "security",
+ "serde_json",
+ "sha2 0.10.9",
+ "simien_core",
+ "simien_web",
+]
+
+[[package]]
 name = "castaway"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5275,6 +5286,7 @@ dependencies = [
 name = "pool"
 version = "0.61.0"
 dependencies = [
+ "carve_outs",
  "compiler",
  "core_affinity",
  "deka-modules",
@@ -6672,10 +6684,12 @@ dependencies = [
 name = "server"
 version = "0.61.0"
 dependencies = [
+ "carve_outs",
  "pool",
  "reqwest",
  "security",
  "serde",
+ "serde_json",
  "simien_core",
  "simien_http",
  "simien_websocket",
@@ -9268,6 +9282,7 @@ dependencies = [
 name = "web_host"
 version = "0.61.0"
 dependencies = [
+ "carve_outs",
  "deka_host",
  "simien_core",
  "simien_crypto",

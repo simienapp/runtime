@@ -1,0 +1,6 @@
+js/path/ and js/url.js are vendored from Deno's ext/node (the deno_node crate,
+version 0.198.0), which ports them from Node.js. Both are MIT licensed:
+
+- Deno: Copyright 2018-2026 the Deno authors. See LICENSE-deno.md.
+- Node.js: Copyright Joyent, Inc. and other Node contributors. Released under
+  the MIT license (https://github.com/nodejs/node/blob/main/LICENSE).
