@@ -64,7 +64,7 @@ fn blocked(result: Result<Synced, SyncError>) -> Vec<String> {
 }
 
 fn open(root: &Path) -> Project {
-    project::init::make(root, Some(&format!("sync-{}", std::process::id())), Some(PORT), false).unwrap();
+    project::db::make(root, Some(&format!("sync-{}", std::process::id())), Some(PORT), false).unwrap();
     Project::open(root).unwrap()
 }
 

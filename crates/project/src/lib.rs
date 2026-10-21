@@ -1,9 +1,12 @@
-//! A Simien project: the folder with simien.json (`name`, `ports`), its
-//! schema in `simien/schema.ts`, the files Simien generates into
-//! `simien/_generated/`, and `.simien/`, where its local secrets live
-//! (never committed). Also `simien init`, which makes one.
+//! A Simien project: the folder with simien.json, its schema in
+//! `simien/schema.ts`, the files Simien generates into `simien/_generated/`,
+//! and `.simien/`, where its local secrets live (never committed). Also
+//! `simien db init`, which gives a project its database.
+//!
+//! simien.json is the source of truth: a project has a database exactly when
+//! it has a `db` section (`"db": { "ports": { "postgres", "zega" } }`).
 
-pub mod init;
+pub mod db;
 
 use std::path::{Path, PathBuf};
 
@@ -17,11 +20,17 @@ pub struct Ports {
     pub zega: u16,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct Database {
+    pub ports: Ports,
+}
+
 #[derive(Debug, Clone)]
 pub struct Project {
     pub root: PathBuf,
     pub name: String,
-    pub ports: Ports,
+    /// simien.json's `db`: none until `simien db init`.
+    pub database: Option<Database>,
 }
 
 impl Project {
@@ -33,7 +42,7 @@ impl Project {
                 return Self::open(&dir);
             }
             if !dir.pop() {
-                return Err(format!("no {CONFIG} here or above; run `simien init` first"));
+                return Err(format!("no {CONFIG} here or above; run `simien db init` first"));
             }
         }
     }
@@ -42,20 +51,28 @@ impl Project {
         #[derive(Deserialize)]
         struct Config {
             name: Option<String>,
-            ports: Option<Ports>,
+            db: Option<Database>,
         }
         let path = root.join(CONFIG);
         let text = std::fs::read_to_string(&path).map_err(|err| format!("{}: {err}", path.display()))?;
         let config: Config =
             serde_json::from_str(&text).map_err(|err| format!("{}: {err}", path.display()))?;
-        match (config.name, config.ports) {
-            (Some(name), Some(ports)) if !name.is_empty() => Ok(Self {
+        match config.name {
+            Some(name) if !name.is_empty() => Ok(Self {
                 root: root.to_path_buf(),
                 name,
-                ports,
+                database: config.db,
             }),
-            _ => Err(format!("{CONFIG} needs name and ports.postgres / ports.zega")),
+            _ => Err(format!("{CONFIG} needs a name")),
         }
+    }
+
+    /// The database's ports, or what to run when the project has none.
+    pub fn ports(&self) -> Result<&Ports, String> {
+        self.database
+            .as_ref()
+            .map(|database| &database.ports)
+            .ok_or_else(|| format!("{} has no database; run `simien db init`", self.name))
     }
 
     /// `simien/schema.ts`.

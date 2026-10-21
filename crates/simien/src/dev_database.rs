@@ -25,7 +25,8 @@ fn print(event: &Value, globals: Globals) {
     output::event(event, globals, || {
         let text = |key: &str| event[key].as_str().unwrap_or_default().to_string();
         match event["event"].as_str().unwrap_or_default() {
-            "no_database" => stdio::hint(&format!("no database yet: create {} to add one", text("file"))),
+            "no_database" => stdio::hint(&format!("no database: run `{}` to add one", text("add"))),
+            "stopping" => stdio::log("database", &format!("stopping the stack: {}", text("reason"))),
             "starting" => stdio::log("database", "starting Postgres + pg_zega and Zega…"),
             "watching" => {
                 stdio::info("Postgres", &text("postgres"));

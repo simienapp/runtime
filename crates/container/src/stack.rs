@@ -33,6 +33,7 @@ pub fn stack_name(project: &Project) -> String {
 
 /// The kebele stack description, secrets included.
 pub fn describe(project: &Project) -> Result<Value, String> {
+    let ports = project.ports()?;
     let token = project.secret("zega_token")?;
     Ok(json!({
         "name": stack_name(project),
@@ -40,7 +41,7 @@ pub fn describe(project: &Project) -> Result<Value, String> {
             "zega": {
                 "image": ZEGA_IMAGE,
                 "env": { "ZEGA_TOKEN": token },
-                "ports": [{ "host": project.ports.zega, "container": 9342 }],
+                "ports": [{ "host": ports.zega, "container": 9342 }],
                 "volumes": [{ "volume": "zega", "path": "/var/lib/zega" }],
             },
             "postgres": {
@@ -50,7 +51,7 @@ pub fn describe(project: &Project) -> Result<Value, String> {
                     "ZEGA_PASSWORD": token,
                     "ZEGA_URL": "http://zega:9342",
                 },
-                "ports": [{ "host": project.ports.postgres, "container": 5432 }],
+                "ports": [{ "host": ports.postgres, "container": 5432 }],
                 "volumes": [{ "volume": "postgres", "path": "/var/lib/postgresql/data" }],
                 "health": { "command": ["pg_isready", "-U", "postgres"] },
                 "dependsOn": ["zega"],
@@ -195,14 +196,15 @@ pub fn readiness(project: &Project, services: &[Service]) -> Result<Readiness, S
     let postgres = services
         .iter()
         .any(|s| s.service == "postgres" && s.health.as_deref() == Some("healthy"));
-    let zega = zega_answers(project.ports.zega, &project.secret("zega_token")?);
+    let ports = project.ports()?;
+    let zega = zega_answers(ports.zega, &project.secret("zega_token")?);
     Ok(Readiness {
         postgres: Endpoint {
-            url: format!("postgres://postgres@127.0.0.1:{}/postgres", project.ports.postgres),
+            url: format!("postgres://postgres@127.0.0.1:{}/postgres", ports.postgres),
             ready: postgres,
         },
         zega: Endpoint {
-            url: format!("http://127.0.0.1:{}", project.ports.zega),
+            url: format!("http://127.0.0.1:{}", ports.zega),
             ready: zega,
         },
     })

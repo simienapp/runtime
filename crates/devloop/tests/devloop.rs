@@ -41,44 +41,43 @@ fn is(name: &'static str) -> impl Fn(&Value) -> bool {
 }
 
 #[test]
-fn the_stack_starts_when_a_schema_appears_and_stays_in_step() {
+fn db_init_while_dev_runs_starts_the_stack_and_keeps_it_in_step() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().to_path_buf();
-    project::init::make(&root, Some(&format!("devloop-{}", std::process::id())), Some(PORT), false).unwrap();
-    let stack = Stack(Project::open(&root).unwrap());
-    let schema_file = stack.0.schema_file();
-    std::fs::remove_file(&schema_file).unwrap();
-
+    let name = format!("devloop-{}", std::process::id());
+    // A project with no db section yet.
+    std::fs::write(root.join("simien.json"), format!("{{ \"name\": \"{name}\" }}\n")).unwrap();
     let events: Events = Arc::default();
     let sink = Arc::clone(&events);
     let devloop = devloop::start(root.clone(), move |e| sink.lock().unwrap().push(e)).unwrap();
 
-    // No schema: nothing starts.
-    wait_for(&events, 0, Duration::from_secs(10), is("no_database"));
+    // No db section: nothing starts.
+    let none = wait_for(&events, 0, Duration::from_secs(10), is("no_database"));
+    assert_eq!(none["add"], "simien db init");
     std::thread::sleep(Duration::from_secs(1));
     assert!(!events.lock().unwrap().iter().any(is("starting")));
-    assert_eq!(container::stack::containers(&stack.0).unwrap().len(), 0);
 
-    // A schema appears mid-session: the stack starts and the schema syncs.
+    // `simien db init` while dev runs: the stack starts with its ports and the
+    // starter schema's tables sync.
     let from = seen(&events);
-    std::fs::write(
-        &schema_file,
-        "import { defineSchema, defineTable, v } from \"@simien/client/schema\"\n\nexport default defineSchema({\n  users: defineTable({ name: v.string() }),\n})\n",
-    )
-    .unwrap();
+    project::db::make(&root, None, Some(PORT), false).unwrap();
+    let stack = Stack(Project::open(&root).unwrap());
+    let schema_file = stack.0.schema_file();
     let synced = wait_for(&events, from, Duration::from_secs(240), |e| e["event"] == "synced" || e["event"] == "error");
-    assert_eq!(synced["changes"], serde_json::json!(["add table users"]), "{synced}");
-    assert!(events.lock().unwrap().iter().any(is("watching")));
+    assert_eq!(
+        synced["changes"],
+        serde_json::json!(["add table users", "add table posts", "add edge wrote (users → posts)"]),
+        "{synced}"
+    );
+    let watching = wait_for(&events, from, Duration::from_secs(1), is("watching"));
+    assert_eq!(watching["postgres"], format!("postgres://postgres@127.0.0.1:{PORT}/postgres"));
 
     // A save syncs.
     let from = seen(&events);
-    std::fs::write(
-        &schema_file,
-        "import { defineSchema, defineTable, v } from \"@simien/client/schema\"\n\nexport default defineSchema({\n  users: defineTable({ name: v.string(), email: v.optional(v.string()) }),\n})\n",
-    )
-    .unwrap();
+    let text = std::fs::read_to_string(&schema_file).unwrap();
+    std::fs::write(&schema_file, text.replace("posts: defineTable({", "posts: defineTable({ draft: v.optional(v.boolean()),")).unwrap();
     let synced = wait_for(&events, from, Duration::from_secs(30), |e| e["event"] == "synced" || e["event"] == "error");
-    assert!(synced["changes"].to_string().contains("users.email"), "{synced}");
+    assert!(synced["changes"].to_string().contains("posts.draft"), "{synced}");
 
     // A direct change in the database rewrites schema.ts.
     let from = seen(&events);
@@ -89,6 +88,19 @@ fn the_stack_starts_when_a_schema_appears_and_stays_in_step() {
     assert_eq!(pulled["from"], "ALTER TABLE");
     let text = std::fs::read_to_string(&schema_file).unwrap();
     assert!(text.contains("views: v.optional(v.int())"), "{text}");
+    drop(sql);
+
+    // Removing the db section stops the stack.
+    let from = seen(&events);
+    std::fs::write(root.join("simien.json"), format!("{{ \"name\": \"{name}\" }}\n")).unwrap();
+    wait_for(&events, from, Duration::from_secs(60), is("stopping"));
+    // `stack` opened the project while it had its db section, so it can
+    // still ask kebele about those containers.
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while container::stack::containers(&stack.0).unwrap().iter().any(|s| s.state == "running") {
+        assert!(Instant::now() < deadline, "the stack is still running");
+        std::thread::sleep(Duration::from_millis(500));
+    }
 
     drop(devloop);
 }

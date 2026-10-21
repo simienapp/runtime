@@ -1,12 +1,14 @@
 //! `simien dev`'s database side, next to the app server.
 //!
-//! A project has a database when `simien/schema.ts` exists. Without one,
-//! nothing starts. When it appears, or is there from the start, the local
-//! stack (Postgres + pg_zega and Zega, through kebele) starts and the schema
+//! simien.json decides: a project has a database exactly when it has a `db`
+//! section. Without one, nothing starts. When it appears (`simien db init`
+//! while dev runs), or is there from the start, the local stack (Postgres +
+//! pg_zega and Zega, through kebele) starts with its ports and the schema
 //! sync runs:
 //! - a save of schema.ts syncs (saves in quick succession collapse into one);
 //! - a direct change in the database rewrites schema.ts;
-//! - new ports in simien.json restart the stack on them.
+//! - new ports restart the stack on them; removing the section stops it
+//!   (data kept).
 //!
 //! Nothing here exits on an error: it is reported and the loop waits for the
 //! next change, so fixing schema.ts or starting Docker is enough.
@@ -103,9 +105,9 @@ impl Drop for Running {
 
 fn run(root: &Path, tx: &Sender<Change>, rx: &Receiver<Change>, stop: &AtomicBool, on_event: &dyn Fn(Value)) {
     let mut running: Option<Running> = None;
-    let mut said_no_schema = false;
-    // Starts with a pass, as if schema.ts had just been saved.
-    let mut queue = VecDeque::from([Change::Schema]);
+    let mut said_no_database = false;
+    // Starts with a pass, as if simien.json had just been saved.
+    let mut queue = VecDeque::from([Change::Config]);
     while !stop.load(Ordering::SeqCst) {
         let change = match queue.pop_front() {
             Some(change) => change,
@@ -115,6 +117,19 @@ fn run(root: &Path, tx: &Sender<Change>, rx: &Receiver<Change>, stop: &AtomicBoo
                 Err(RecvTimeoutError::Disconnected) => return,
             },
         };
+        if let Change::Database(tag) = &change {
+            if let (Some(r), Ok(project)) = (running.as_mut(), Project::open(root)) {
+                pulled(&project, &mut r.db, tag, on_event);
+            }
+            continue;
+        }
+        // Saves in quick succession are one pass; a database change heard
+        // meanwhile waits its turn.
+        while let Ok(next) = rx.recv_timeout(SETTLE) {
+            if let Change::Database(tag) = next {
+                queue.push_back(Change::Database(tag));
+            }
+        }
         let project = match Project::open(root) {
             Ok(project) => project,
             Err(message) => {
@@ -122,39 +137,30 @@ fn run(root: &Path, tx: &Sender<Change>, rx: &Receiver<Change>, stop: &AtomicBoo
                 continue;
             }
         };
-        let ports = (project.ports.postgres, project.ports.zega);
-        if running.as_ref().is_some_and(|r| r.ports != ports) {
-            on_event(json!({ "event": "restarting", "postgres": ports.0, "zega": ports.1 }));
+        // simien.json's db section decides: none, or different ports, stops
+        // what is running.
+        let wanted = project.database.as_ref().map(|db| (db.ports.postgres, db.ports.zega));
+        if let Some(r) = &running
+            && Some(r.ports) != wanted
+        {
             running = None;
+            let event = match wanted {
+                None => json!({ "event": "stopping", "reason": "simien.json has no db section" }),
+                Some((postgres, zega)) => json!({ "event": "restarting", "postgres": postgres, "zega": zega }),
+            };
+            on_event(event);
             if let Err(message) = container::stack::stop(&project) {
                 on_event(json!({ "event": "error", "message": message }));
             }
         }
-        match change {
-            Change::Database(tag) => {
-                if let Some(r) = running.as_mut() {
-                    pulled(&project, &mut r.db, &tag, on_event);
-                }
-                continue;
-            }
-            Change::Config if running.is_some() => continue,
-            Change::Schema | Change::Config => {}
-        }
-        // Saves in quick succession are one sync; a database change heard
-        // meanwhile waits its turn.
-        while let Ok(next) = rx.recv_timeout(SETTLE) {
-            if let Change::Database(tag) = next {
-                queue.push_back(Change::Database(tag));
-            }
-        }
-        if !project.schema_file().exists() {
-            if !said_no_schema {
-                on_event(json!({ "event": "no_database", "file": schema_sync::schema_path(&project) }));
-                said_no_schema = true;
+        let Some(ports) = wanted else {
+            if !said_no_database {
+                on_event(json!({ "event": "no_database", "file": project::CONFIG, "add": "simien db init" }));
+                said_no_database = true;
             }
             continue;
-        }
-        said_no_schema = false;
+        };
+        said_no_database = false;
         if running.is_none() {
             match bring_up(&project, ports, tx, on_event) {
                 Ok(started) => running = Some(started),

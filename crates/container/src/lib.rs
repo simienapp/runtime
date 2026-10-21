@@ -94,9 +94,12 @@ fn run(context: &Context, command: impl FnOnce(&Context, Globals) -> Result<(), 
     }
 }
 
+/// The project here, which must have a database.
 fn find() -> Result<Project, String> {
     let here = std::env::current_dir().map_err(|err| err.to_string())?;
-    Project::find(&here)
+    let project = Project::find(&here)?;
+    project.ports()?;
+    Ok(project)
 }
 
 fn container(context: &Context) {
