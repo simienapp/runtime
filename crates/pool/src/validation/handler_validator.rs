@@ -144,12 +144,23 @@ impl DynamicCodeValidator {
 }
 
 impl<'a> Visit<'a> for DynamicCodeValidator {
+    // Like Deno: `import()` of a fixed path (a string, or a template with no
+    // `${}`) is part of the static module graph, and the module it loads is
+    // checked like any other; bundlers emit these for code splitting. Only a
+    // computed specifier is dynamic code.
     fn visit_import_expression(&mut self, node: &ImportExpression<'a>) {
-        self.reject(
-            node.span,
-            "Dynamic import is disabled by the security policy",
-            "Declare the module dependency statically or run with an explicit dynamic allowance.",
-        );
+        let fixed = match &node.source {
+            Expression::StringLiteral(_) => true,
+            Expression::TemplateLiteral(template) => template.expressions.is_empty(),
+            _ => false,
+        };
+        if !fixed {
+            self.reject(
+                node.span,
+                "Dynamic import of a computed specifier is disabled by the security policy",
+                "Import a fixed path (import(\"./module.js\")) or allow dynamic code in simien.json.",
+            );
+        }
         walk::walk_import_expression(self, node);
     }
 
@@ -281,7 +292,8 @@ mod dynamic_code_tests {
             "const value = eval('1 + 1');",
             "const value = new Function('return 7')();",
             "const value = Function('return 7')();",
-            "const value = import('./late.js');",
+            "const value = import(name);",
+            "const value = import(`./${name}.js`);",
             // Member, paren and sequence spellings of the same globals. Each of
             // these ran straight past the first version of this validator.
             "const value = globalThis.eval('1 + 1');",
@@ -295,6 +307,19 @@ mod dynamic_code_tests {
             assert!(result.is_err(), "expected rejection for {source}");
             let error = result.unwrap_err();
             assert!(error.contains("Dynamic Code Disabled"), "{error}");
+        }
+    }
+
+    /// A fixed-path `import()` is static, as in Deno: bundlers emit these
+    /// for code splitting.
+    #[test]
+    fn a_fixed_path_import_is_not_dynamic_code() {
+        for source in [
+            "const value = import('./late.js');",
+            "const value = import(`./_next/static/chunk-abc.js`);",
+        ] {
+            validate_dynamic_code(source, "handler.js", false)
+                .unwrap_or_else(|err| panic!("{source} must not be rejected: {err}"));
         }
     }
 
