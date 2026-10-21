@@ -46,9 +46,37 @@ jobs:
       - name: Check
         run: cargo check --locked --workspace --all-targets
       - name: Clippy (crates held to zero warnings)
-        run: cargo clippy --locked -p web_host -p server -p simien -p output -p container -p project -p packages -p schema -p check --all-targets --no-deps -- -D warnings
+        run: cargo clippy --locked -p web_host -p server -p simien -p output -p container -p project -p packages -p schema -p schema_sync -p check --all-targets --no-deps -- -D warnings
       - name: Test
         run: cargo test --locked -p web_host -p server -p simien -p output -p container -p project -p packages -p schema -p check -p platform_server -p pool
       - name: Web APIs in a served app
         run: cargo test --locked -p cli --test web_apis
+      - run: sccache --show-stats
+
+  # simien dev's schema sync against a real local stack: Docker (on the
+  # runner) runs pg_zega and Zega through kebele, as `simien container start`
+  # does. The test fails without them; it never skips.
+  schema-sync:
+    name: Schema sync (real Postgres + Zega)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: "true"
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
+      - name: sccache is required
+        run: sccache --show-stats
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      # kebele's CLI runs on Bun.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.4.0'
+      - name: kebele
+        run: bun install --global kebele@0.10.0 && kebele --version
+      - name: Sync rules on real data
+        run: cargo test --locked -p schema_sync --test sync
       - run: sccache --show-stats
