@@ -32,4 +32,5 @@ compile = { path = "../compile" }
 self_cmd = { path = "../self_cmd" }
 
 [dev-dependencies]
+reqwest = { version = "0.13", features = ["blocking", "json"] }
 tempfile = "3.23.0"

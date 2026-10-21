@@ -1,16 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/deka_syntax",
-    "crates/deka_fmt",
-    "crates/deka_native_ir",
-    "crates/deka_native_ui",
-    "crates/deka_vm",
-    "crates/deka_cli",
     "crates/deka_executable",
-    "crates/deka_native_web",
     "crates/dcore",
-    "crates/cli",
     "crates/runtime",
     "crates/runtime_core",
     "crates/run",
@@ -39,19 +31,9 @@ members = [
   "crates/check",
     "crates/engine",
     "crates/deka_host",
-    "crates/wasm_guest",
-    "crates/wasm_guest_macros",
-    "crates/wasm_cli",
-    "crates/pm",
-    "crates/deka_db",
-    "crates/deka_task",
-    "crates/deka_deploy",
-    "crates/deka_registry",
-    "crates/deka_test",
     "crates/self_cmd",
     "crates/deka_cache",
     "crates/deka_build",
-    "crates/corpus_gate",
 ]
 # Vendored forks are path dependencies wired in through [patch.crates-io], not members:
 # their own lints and formatting stay upstream's.
@@ -92,7 +74,6 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = "0.4"
 toml = "0.8"
-pm = { path = "crates/pm" }
 
 # Preserve the small shipped VM profile without changing the legacy CLI's profile.
 [profile.native]

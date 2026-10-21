@@ -1,7 +1,0 @@
-export fn App() {
-    return (
-        <view>
-            <p>Hello, world!</p>
-        </view>
-    );
-}

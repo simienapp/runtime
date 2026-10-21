@@ -1,3 +1,0 @@
-export fn Page() {
-  return <section><h1>Not found</h1></section>
-}

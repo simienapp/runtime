@@ -1,1 +1,0 @@
-[build] route collision: `/posts/hello` appears twice in staticParams for `/posts/[slug]`

@@ -1,3 +1,0 @@
-struct Fault { message: string }
-export fn source() Exception<number, Fault> { return Throw(Fault { message: "imported" }); }
-export { Fault }

@@ -3,17 +3,9 @@ name = "self_cmd"
 version.workspace = true
 edition = "2024"
 
-[features]
-default = []
-# deka#992: self-update is deferred until closer to MVP. Off by default so
-# `monitor`/`update` and their `pm::releases` check-latest dependency do not
-# compile into (or get advertised by) a normal build.
-self-update = ["dep:pm", "pm/self-update"]
-
 [dependencies]
 deka-cli-core = { version = "0.5.0", default-features = false, features = ["registry"] }
 compiler = { path = "../compiler" }
-pm = { path = "../pm", optional = true }
 stdio = "0.4.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

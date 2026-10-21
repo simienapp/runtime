@@ -1,2 +1,0 @@
-import { used, unused } from './dep.ds'
-export const answer = used + 1;

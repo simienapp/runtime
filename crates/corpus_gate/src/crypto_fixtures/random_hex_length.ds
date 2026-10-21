@@ -1,6 +1,0 @@
-import { echo } from "io"
-import { random_hex } from "crypto"
-echo(match (random_hex(8)) {
-  Ok(v) => v.length,
-  Err(e) => 0,
-})

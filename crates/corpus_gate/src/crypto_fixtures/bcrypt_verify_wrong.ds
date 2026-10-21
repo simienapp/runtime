@@ -1,6 +1,0 @@
-import { echo } from "io"
-import { bcrypt_verify } from "crypto"
-echo(match (bcrypt_verify("wrong", "$2y$04$6ck.DhBYy8ZL.sAFGrLZtuLI1F5cSwaM5XHJRxoZFRMx1n8ZpYtJa")) {
-  Ok(v) => v,
-  Err(e) => true,
-})
