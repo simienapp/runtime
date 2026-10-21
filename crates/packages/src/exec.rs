@@ -36,6 +36,8 @@ pub enum Kind {
 #[derive(Debug, Serialize)]
 pub struct Program {
     pub package: String,
+    /// The package's folder (its package.json, with any `permissions`).
+    pub package_dir: PathBuf,
     pub bin: String,
     pub path: PathBuf,
     pub kind: Kind,
@@ -49,9 +51,9 @@ pub struct Program {
 impl Program {
     /// The sandbox it runs in, for a project at `project`. Keep it until the
     /// program ends.
-    pub fn sandbox(&self, project: &Path) -> anyhow::Result<gelada::Sandbox> {
+    pub fn sandbox(&self, project: &Path) -> anyhow::Result<crate::sandbox::Prepared> {
         let places = crate::sandbox::Places::detect(project, None)?;
-        crate::sandbox::for_x(&places, &self.package)
+        crate::sandbox::for_x(&places, &self.package, &self.package_dir)
     }
 
     pub fn command(&self, sandbox: &gelada::Sandbox, args: &[String]) -> anyhow::Result<Command> {
@@ -169,6 +171,7 @@ fn find(node_modules: &Path, name: &str) -> anyhow::Result<Option<Program>> {
     };
     Ok(Some(Program {
         package: name.to_string(),
+        package_dir: node_modules.join(name),
         bin,
         path,
         kind,

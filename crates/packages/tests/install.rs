@@ -10,11 +10,20 @@ use base64::Engine;
 use packages::{OpenOptions, Project};
 use sha2::Digest;
 
+/// What `asker` declares in its package.json: a folder in the project and
+/// a host.
+const ASKER_PERMISSIONS: &str =
+    r#","permissions":{"write":["$PROJECT/out"],"net":["downloads.example.test"]}"#;
+
 /// The program `tool` ships: prints its arguments.
 const TOOL: &str = "#!/bin/sh\necho \"tool $*\"\n";
 
 fn tarball(name: &str, version: &str, deps: &str, scripts: &str) -> Vec<u8> {
-    let bin = if name == "tool" { r#","bin":{"tool":"bin/tool"}"# } else { "" };
+    let bin = match name {
+        "tool" => r#","bin":{"tool":"bin/tool"}"#,
+        "asker" => ASKER_PERMISSIONS,
+        _ => "",
+    };
     let package_json = format!(
         r#"{{"name":"{name}","version":"{version}","main":"index.js","dependencies":{{{deps}}},"scripts":{{{scripts}}}{bin}}}"#
     );
@@ -47,6 +56,7 @@ fn serve_registry() -> String {
         ("scripted", "1.0.0", "", r#""postinstall":"echo ran > ran.txt""#),
         ("tool", "1.0.0", "", ""),
         ("nosy", "1.0.0", "", r#""postinstall":"echo x > \"$INIT_CWD/escaped.txt\"""#),
+        ("asker", "1.0.0", "", r#""postinstall":"mkdir -p \"$INIT_CWD/out\" && echo x > \"$INIT_CWD/out/asked.txt\"""#),
     ];
     let tarballs: Vec<(String, Vec<u8>)> = packages
         .iter()
@@ -290,9 +300,9 @@ async fn install_scripts_run_only_for_packages_simien_json_allows() {
 }
 
 fn run_tool(program: &packages::exec::Program, project: &Path) -> String {
-    let sandbox = program.sandbox(project).unwrap();
+    let prepared = program.sandbox(project).unwrap();
     let output = program
-        .command(&sandbox, &["a".to_string(), "--b".to_string()])
+        .command(&prepared.sandbox, &["a".to_string(), "--b".to_string()])
         .unwrap()
         .output()
         .unwrap();
@@ -392,4 +402,48 @@ async fn an_install_script_cannot_write_outside_its_package() {
     let error = format!("{:#}", result.expect_err("the script's write must fail"));
     assert!(error.contains("postinstall"), "{error}");
     assert!(!dir.path().join("escaped.txt").exists());
+}
+
+async fn install_with(dir: &Path, cache: &Path) -> anyhow::Result<packages::InstallReport> {
+    Project::open(
+        dir,
+        OpenOptions {
+            cache_root: Some(cache.to_path_buf()),
+            ..Default::default()
+        },
+    )
+    .await?
+    .install()
+    .await
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_declared_permission_is_a_request_until_approved() {
+    let registry = serve_registry();
+    let cache = tempfile::tempdir().unwrap();
+
+    // Declared, not approved: the script runs without it and is blocked; the
+    // error says how to approve it.
+    let dir = project_with(&registry, r#"{ "asker": "^1.0.0" }"#);
+    std::fs::write(dir.path().join("simien.json"), r#"{ "allowScripts": ["asker"] }"#).unwrap();
+    let error = format!("{:#}", install_with(dir.path(), cache.path()).await.unwrap_err());
+    assert!(!dir.path().join("out/asked.txt").exists());
+    assert!(error.contains(r#""packagePermissions": { "asker": "#), "{error}");
+    assert!(error.contains("$PROJECT/out"), "{error}");
+
+    // The write approved, the host not: the script works, the host is pending.
+    let dir = project_with(&registry, r#"{ "asker": "^1.0.0" }"#);
+    std::fs::write(
+        dir.path().join("simien.json"),
+        r#"{ "allowScripts": ["asker"], "packagePermissions": { "asker": { "write": ["$PROJECT/out"] } } }"#,
+    )
+    .unwrap();
+    let report = install_with(dir.path(), cache.path()).await.unwrap();
+    assert_eq!(read(&dir.path().join("out/asked.txt")), "x\n");
+    let pending: Vec<(&str, &Vec<String>, &Vec<String>)> = report
+        .permissions_pending
+        .iter()
+        .map(|p| (p.package.as_str(), &p.asks.net, &p.asks.write))
+        .collect();
+    assert_eq!(pending, [("asker", &vec!["downloads.example.test".to_string()], &vec![])]);
 }

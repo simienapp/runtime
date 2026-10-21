@@ -21,7 +21,10 @@ use simien_semver::package::PackageReq;
 const PHASES: [&str; 3] = ["preinstall", "install", "postinstall"];
 
 #[derive(Debug)]
-pub struct ScriptsExecutor;
+pub struct ScriptsExecutor {
+    /// Where declared-but-unapproved permissions are reported.
+    pub pending: std::sync::Arc<std::sync::Mutex<Vec<crate::sandbox::Pending>>>,
+}
 
 #[async_trait::async_trait(?Send)]
 impl LifecycleScriptsExecutor for ScriptsExecutor {
@@ -50,7 +53,15 @@ impl LifecycleScriptsExecutor for ScriptsExecutor {
                 .parent()
                 .unwrap_or(options.root_node_modules_dir_path);
             let places = crate::sandbox::Places::detect(project, Some(&package.package_folder))?;
-            let sandbox = crate::sandbox::for_install(&places, name)?;
+            let prepared =
+                crate::sandbox::for_install(&places, name, &package.package_folder)?;
+            let prepared_note = prepared.failure_note(name);
+            let sandbox = prepared.sandbox;
+            if let Some(pending) = &prepared.pending
+                && let Ok(mut all) = self.pending.lock()
+            {
+                all.push(pending.clone());
+            }
             for init_cwd in cwds {
                 for phase in PHASES {
                     let Some(script) = package.scripts.get(phase) else {
@@ -72,8 +83,9 @@ impl LifecycleScriptsExecutor for ScriptsExecutor {
                         })?;
                     if !status.success() {
                         bail!(
-                            "{}: `{script}` ({phase}) failed with {status}",
-                            package.package.id.nv
+                            "{}: `{script}` ({phase}) failed with {status}; {}",
+                            package.package.id.nv,
+                            prepared_note
                         );
                     }
                 }

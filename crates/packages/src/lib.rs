@@ -58,6 +58,10 @@ pub struct InstallReport {
     pub node_modules: PathBuf,
     pub lockfile: PathBuf,
     pub millis: u128,
+    /// Permissions packages declared that nothing grants yet (APS 3), with
+    /// the simien.json line that would approve each.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub permissions_pending: Vec<sandbox::Pending>,
 }
 
 /// How to open a project.
@@ -82,6 +86,8 @@ pub struct Project {
     lockfile: Option<Arc<LockfileLock<RealSys>>>,
     npmrc: Arc<ResolvedNpmRc>,
     http: Arc<HttpClient>,
+    /// Filled by the install scripts executor.
+    pending: Arc<std::sync::Mutex<Vec<sandbox::Pending>>>,
     started: Instant,
 }
 
@@ -121,6 +127,7 @@ impl Project {
             npmrc.clone(),
         ));
         let http = Arc::new(HttpClient::new()?);
+        let pending = Arc::new(std::sync::Mutex::new(Vec::new()));
         let registry = Arc::new(RegistryInfoProvider::new(
             npm_cache.clone(),
             http.clone(),
@@ -185,7 +192,9 @@ impl Project {
         let installer = Arc::new(NpmInstaller::new(
             None,
             // Only packages simien.json's allowScripts names run scripts.
-            Arc::new(scripts::ScriptsExecutor),
+            Arc::new(scripts::ScriptsExecutor {
+                pending: pending.clone(),
+            }),
             npm_cache,
             Arc::new(NpmInstallDepsProvider::from_workspace(
                 &workspace, production, false,
@@ -225,6 +234,7 @@ impl Project {
             lockfile,
             npmrc,
             http,
+            pending,
             started,
         })
     }
@@ -272,6 +282,11 @@ impl Project {
             node_modules: self.root.join("node_modules"),
             lockfile: self.root.join(simien_resolver::workspace::LOCKFILE_NAME),
             millis: self.started.elapsed().as_millis(),
+            permissions_pending: self
+                .pending
+                .lock()
+                .map(|pending| pending.clone())
+                .unwrap_or_default(),
         })
     }
 
