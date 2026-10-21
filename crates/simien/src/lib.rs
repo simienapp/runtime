@@ -37,6 +37,7 @@ pub fn register_fns() -> Vec<fn(&mut Registry)> {
         runtime::register_run,
         runtime::register_serve,
         dev::register,
+        project::init::register,
         container::register,
         compile::register,
         introspect::register,

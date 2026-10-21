@@ -15,6 +15,7 @@ path = "src/bin/s.rs"
 
 [dependencies]
 container = { path = "../container" }
+project = { path = "../project" }
 dcore = { path = "../dcore" }
 output = { path = "../output" }
 stdio = "0.5.0"

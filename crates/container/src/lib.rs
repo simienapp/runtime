@@ -8,7 +8,6 @@ use dcore::{CommandSpec, Context, FlagSpec, ParamSpec, Registry, SubcommandSpec}
 use output::{Globals, SimienError};
 use serde_json::{Value, json};
 
-pub mod project;
 pub mod stack;
 
 use project::Project;

@@ -8,7 +8,7 @@
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use container::project::Project;
+use project::Project;
 use container::stack;
 
 struct Fake {

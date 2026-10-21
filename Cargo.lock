@@ -1215,6 +1215,7 @@ version = "0.61.0"
 dependencies = [
  "dcore",
  "output",
+ "project",
  "serde",
  "serde_json",
  "stdio 0.5.0",
@@ -6407,6 +6408,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 
 [[package]]
+name = "project"
+version = "0.61.0"
+dependencies = [
+ "dcore",
+ "output",
+ "serde",
+ "serde_json",
+ "stdio 0.5.0",
+ "tempfile",
+]
+
+[[package]]
 name = "prost"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7815,6 +7828,7 @@ dependencies = [
  "dev",
  "introspect",
  "output",
+ "project",
  "run",
  "runtime",
  "self_cmd",
