@@ -38,6 +38,11 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev libxdo-dev \
             libasound2-dev libfontconfig1-dev libwayland-dev libxkbcommon-x11-dev libx11-xcb-dev \
             libegl1-mesa-dev libvulkan-dev libxcb-shape0-dev libxcb-xfixes0-dev clang pkg-config libssl-dev
+      - name: Pre-approved permissions match simienapp/permissions at the pin
+        run: |
+          pin=$(cat crates/packages/permissions-pin)
+          curl -fsSL "https://raw.githubusercontent.com/simienapp/permissions/$pin/permissions.json" -o "$RUNNER_TEMP/permissions.json"
+          cmp "$RUNNER_TEMP/permissions.json" crates/packages/permissions.json
       - name: Check
         run: cargo check --locked --workspace --all-targets
       - name: Clippy (crates held to zero warnings)

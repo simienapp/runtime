@@ -6,6 +6,7 @@ description = "npm packages for Simien: install, add, remove and the rest, on th
 publish = false
 
 [dependencies]
+gelada = "0.1"
 anyhow = "1"
 async-trait = "0.1"
 dcore = { path = "../dcore" }
