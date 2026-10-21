@@ -33,6 +33,7 @@ members = [
   "crates/packages",
   "crates/container",
   "crates/project",
+  "crates/schema",
   "crates/check",
     "crates/engine",
     "crates/deka_host",

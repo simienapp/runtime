@@ -179,7 +179,8 @@ fn install(context: &Context) {
             stdio::success(&format!(
                 "{} packages installed in {} ms",
                 report.packages, report.millis
-            ))
+            ));
+            print_pending(&report);
         });
         Ok(())
     });
@@ -233,10 +234,23 @@ fn add(context: &Context) {
                     "{} packages in node_modules, {} ms",
                     report.packages, report.millis
                 ));
+                print_pending(&report);
             },
         );
         Ok(())
     });
+}
+
+/// Packages that asked for permissions nobody approved (APS 3): what they
+/// asked for, and the simien.json line that approves it.
+fn print_pending(report: &crate::InstallReport) {
+    for pending in &report.permissions_pending {
+        stdio::warn(
+            &pending.package,
+            "asks for permissions that aren't approved; its scripts ran without them",
+        );
+        stdio::detail(&format!("approve in simien.json: {}", pending.approval()));
+    }
 }
 
 fn remove(context: &Context) {
@@ -346,11 +360,24 @@ fn x(context: &Context) {
             anyhow::bail!("name the package to run, e.g. `simien x prettier --write .`");
         };
         let program = crate::exec::resolve(&root, spec, None).await?;
+        let prepared = program.sandbox(&root)?;
         let status = program
-            .command(output::Passthrough::of(context))?
+            .command(&prepared.sandbox, output::Passthrough::of(context))?
             .status()
             .with_context(|| format!("running {}", program.path.display()))?;
         code = exit_code(status);
+        if code != 0 {
+            // The program's own output is on stdout; the note goes to stderr.
+            let note = prepared.failure_note(&program.package);
+            if Globals::of(context).human {
+                stdio::warn("sandbox", &note);
+            } else {
+                eprintln!(
+                    "{}",
+                    json!({ "event": "sandboxed_program_failed", "code": code, "note": note, "pending": prepared.pending })
+                );
+            }
+        }
         Ok(())
     });
     std::process::exit(code);
