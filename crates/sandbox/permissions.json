@@ -1,0 +1,60 @@
+{
+  "$schema": "./schema.json",
+  "version": 1,
+  "packages": {
+    "electron": {
+      "reason": "postinstall downloads the Electron binary from GitHub releases, caching the zip under the user's cache (writing its own folder needs no grant)",
+      "install": {
+        "net": [
+          "github.com",
+          "objects.githubusercontent.com"
+        ],
+        "write": [
+          "$CACHE/electron"
+        ]
+      }
+    },
+    "puppeteer": {
+      "reason": "postinstall downloads Chrome for Testing into the user's cache",
+      "install": {
+        "net": [
+          "storage.googleapis.com"
+        ],
+        "write": [
+          "$CACHE/puppeteer"
+        ],
+        "env": [
+          "PUPPETEER_CACHE_DIR",
+          "PUPPETEER_SKIP_DOWNLOAD"
+        ]
+      }
+    },
+    "@prisma/engines": {
+      "reason": "postinstall downloads the query and schema engines for this platform (into its own folder, which needs no grant), caching them under the user's cache",
+      "install": {
+        "net": [
+          "binaries.prisma.sh"
+        ],
+        "write": [
+          "$CACHE/prisma"
+        ]
+      }
+    },
+    "playwright": {
+      "reason": "`playwright install` downloads browsers into the user's cache",
+      "x": {
+        "net": [
+          "cdn.playwright.dev",
+          "playwright.download.prss.microsoft.com",
+          "playwright.azureedge.net"
+        ],
+        "write": [
+          "$CACHE/ms-playwright"
+        ],
+        "env": [
+          "PLAYWRIGHT_BROWSERS_PATH"
+        ]
+      }
+    }
+  }
+}

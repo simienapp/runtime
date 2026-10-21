@@ -6,6 +6,7 @@ description = "npm packages for Simien: install, add, remove and the rest, on th
 publish = false
 
 [dependencies]
+simien_sandbox = { path = "../sandbox" }
 anyhow = "1"
 async-trait = "0.1"
 dcore = { path = "../dcore" }

@@ -3,6 +3,10 @@
 //! Node programs, and most install scripts are Node programs, so they run
 //! through the user's shell with their own `node`; when there is no `node`
 //! but there is `bun`, a `node` shim pointing at bun goes first on PATH.
+//!
+//! Every script runs in the sandbox (APS 3): it writes only its own package
+//! folder, has no network and sees no credentials, unless Simien's
+//! pre-approved list grants the package more.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -40,12 +44,24 @@ impl LifecycleScriptsExecutor for ScriptsExecutor {
             } else {
                 package.init_cwds.iter().map(PathBuf::as_path).collect()
             };
+            let name = package.package.id.nv.name.as_str();
+            let project = options
+                .root_node_modules_dir_path
+                .parent()
+                .unwrap_or(options.root_node_modules_dir_path);
+            let places = simien_sandbox::Places::detect(project, Some(&package.package_folder))?;
+            let mut policy = simien_sandbox::Policy::install(places);
+            if let Some(grant) = simien_sandbox::preapproved(name).and_then(|entry| entry.install) {
+                policy
+                    .grant(&grant)
+                    .map_err(|err| anyhow::anyhow!("{name}: pre-approved permissions: {err}"))?;
+            }
             for init_cwd in cwds {
                 for phase in PHASES {
                     let Some(script) = package.scripts.get(phase) else {
                         continue;
                     };
-                    let status = shell(script)
+                    let status = shell(&policy, script)?
                         .current_dir(&package.package_folder)
                         .env("PATH", &path)
                         .env("INIT_CWD", init_cwd)
@@ -73,16 +89,16 @@ impl LifecycleScriptsExecutor for ScriptsExecutor {
     }
 }
 
-fn shell(script: &str) -> Command {
-    if cfg!(windows) {
-        let mut command = Command::new("cmd");
-        command.args(["/d", "/s", "/c", script]);
-        command
+/// `script` through the shell, in `policy`'s sandbox.
+fn shell(policy: &simien_sandbox::Policy, script: &str) -> anyhow::Result<Command> {
+    let (program, flags): (&str, &[&str]) = if cfg!(windows) {
+        ("cmd", &["/d", "/s", "/c"])
     } else {
-        let mut command = Command::new("sh");
-        command.args(["-c", script]);
-        command
-    }
+        ("sh", &["-c"])
+    };
+    let mut command = policy.command(program)?;
+    command.args(flags).arg(script);
+    Ok(command)
 }
 
 pub(crate) fn on_path(program: &str) -> Option<PathBuf> {

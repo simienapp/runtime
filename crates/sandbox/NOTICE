@@ -1,0 +1,8 @@
+simien_sandbox
+
+src/seatbelt_base.sbpl and src/seatbelt_network.sbpl are forked from OpenAI
+Codex (https://github.com/openai/codex, codex-rs/sandboxing/src, commit
+696b4502dfaacd91133c3691a23dc91ae3b14bc9), licensed under the Apache License,
+Version 2.0. Codex's policies are in turn based on Chromium's macOS sandbox
+policies (BSD-3-Clause). Simien's changes are its own file, network and
+secret rules, which are added after these policies in src/macos.rs.

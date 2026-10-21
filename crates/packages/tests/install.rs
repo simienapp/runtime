@@ -46,6 +46,7 @@ fn serve_registry() -> String {
         ("right", "1.2.0", "", ""),
         ("scripted", "1.0.0", "", r#""postinstall":"echo ran > ran.txt""#),
         ("tool", "1.0.0", "", ""),
+        ("nosy", "1.0.0", "", r#""postinstall":"echo x > \"$INIT_CWD/escaped.txt\"""#),
     ];
     let tarballs: Vec<(String, Vec<u8>)> = packages
         .iter()
@@ -288,9 +289,10 @@ async fn install_scripts_run_only_for_packages_simien_json_allows() {
     assert_eq!(read(&package.join("ran.txt")), "ran\n");
 }
 
-fn run_tool(program: &packages::exec::Program) -> String {
+fn run_tool(program: &packages::exec::Program, project: &Path) -> String {
+    let policy = program.policy(project).unwrap();
     let output = program
-        .command(&["a".to_string(), "--b".to_string()])
+        .command(&policy, &["a".to_string(), "--b".to_string()])
         .unwrap()
         .output()
         .unwrap();
@@ -310,7 +312,7 @@ async fn x_runs_a_program_the_project_does_not_have() {
         .unwrap();
     assert_eq!(program.kind, packages::exec::Kind::Script);
     assert!(program.path.starts_with(cache.path().join("x")), "{}", program.path.display());
-    assert_eq!(run_tool(&program), "tool a --b\n");
+    assert_eq!(run_tool(&program, dir.path()), "tool a --b\n");
     assert!(!dir.path().join("node_modules").exists(), "the project is left alone");
 }
 
@@ -338,7 +340,7 @@ async fn x_prefers_the_projects_own_copy() {
         .unwrap();
     assert!(program.path.starts_with(dir.path()), "{}", program.path.display());
     assert!(!cache.path().join("x").exists(), "nothing installed beside the cache");
-    assert_eq!(run_tool(&program), "tool a --b\n");
+    assert_eq!(run_tool(&program, dir.path()), "tool a --b\n");
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -368,4 +370,26 @@ async fn audit_reports_the_advisories_that_cover_installed_versions() {
         .collect();
     assert_eq!(found, [("right", "1.2.0", 1001, &["left".to_string()][..])]);
     assert_eq!(report.findings[0].severity, packages::Severity::High);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn an_install_script_cannot_write_outside_its_package() {
+    let registry = serve_registry();
+    let dir = project_with(&registry, r#"{ "nosy": "^1.0.0" }"#);
+    std::fs::write(dir.path().join("simien.json"), r#"{ "allowScripts": ["nosy"] }"#).unwrap();
+    let cache = tempfile::tempdir().unwrap();
+    let result = Project::open(
+        dir.path(),
+        OpenOptions {
+            cache_root: Some(cache.path().to_path_buf()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .install()
+    .await;
+    let error = format!("{:#}", result.expect_err("the script's write must fail"));
+    assert!(error.contains("postinstall"), "{error}");
+    assert!(!dir.path().join("escaped.txt").exists());
 }
