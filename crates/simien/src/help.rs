@@ -9,8 +9,8 @@ use dcore::help::OwnershipIndex;
 use dcore::{CommandSpec, Registry};
 use serde::Serialize;
 
-use crate::banner;
-use crate::output::Globals;
+use output::Globals;
+use output::banner;
 
 #[derive(Serialize)]
 #[serde(untagged)]

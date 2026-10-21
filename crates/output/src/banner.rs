@@ -35,3 +35,14 @@ pub fn logo(color: bool) -> String {
         .collect::<Vec<_>>()
         .join("\n")
 }
+
+/// The start-up banner a server prints with --human: stdio's Vite-style
+/// banner (the same as the TypeScript CLI's) under the Simien mark.
+pub fn start_banner(tagline: &str, urls: Vec<stdio::BannerEntry>) {
+    stdio::start_banner(&stdio::StartBanner {
+        mark: stdio::Mark::Art(logo(show(true))),
+        tagline: Some(format!("{tagline}  simien v{}", env!("CARGO_PKG_VERSION"))),
+        urls,
+        ..Default::default()
+    });
+}

@@ -518,7 +518,10 @@ pub fn serve_warm(context: &Context) -> Result<(), String> {
         .canonicalize()
         .map_err(|err| format!("{}: {err}", resolved.path.display()))?;
     if !entry.is_file() {
-        return Err(format!("--warm serves a single entry file, not {}", entry.display()));
+        return Err(format!(
+            "--warm serves a single entry file, not {}",
+            entry.display()
+        ));
     }
     let mut serve_options = pool::validation::ServeOptions::default();
     apply_cli_serve_overrides(context, &mut serve_options);
@@ -531,9 +534,28 @@ pub fn serve_warm(context: &Context) -> Result<(), String> {
         isolates,
         inbox_capacity: 1024,
     })?;
-    stdio_log::log(
-        "serve",
-        &format!("listening on http://localhost:{} with {isolates} warm isolates", server.addr.port()),
+    let globals = output::Globals::of(context);
+    let url = format!("http://localhost:{}", server.addr.port());
+    output::event(
+        &serde_json::json!({ "event": "listening", "url": url, "isolates": isolates }),
+        globals,
+        || {
+            output::banner::start_banner(
+                &format!("serving {}", resolved.path.display()),
+                vec![
+                    stdio_new::BannerEntry {
+                        label: "Local".into(),
+                        url: Some(url.clone()),
+                        ..Default::default()
+                    },
+                    stdio_new::BannerEntry {
+                        label: "Isolates".into(),
+                        status: Some(format!("{isolates} warm, one per core")),
+                        ..Default::default()
+                    },
+                ],
+            )
+        },
     );
     server.wait();
     Ok(())

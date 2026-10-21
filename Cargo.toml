@@ -29,6 +29,7 @@ members = [
     "crates/web_host",
   "crates/server",
   "crates/simien",
+  "crates/output",
     "crates/engine",
     "crates/deka_host",
     "crates/wasm_guest",

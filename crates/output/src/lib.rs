@@ -3,6 +3,8 @@
 //! stderr, the rest on stdout). A failure is JSON on stderr (stdio's error
 //! with --human) and exit code 1; a usage mistake is the same with code 2.
 
+pub mod banner;
+
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 

@@ -80,3 +80,36 @@ fn nopretty_is_one_line() {
         1
     );
 }
+
+#[test]
+fn serve_warm_announces_itself_as_a_json_event() {
+    use std::io::{BufRead, BufReader};
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("app.js"),
+        "export default { fetch() { return new Response('ok') } }\n",
+    )
+    .unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_s"))
+        .args(["serve", "app.js", "--warm", "--port", "0"])
+        .current_dir(dir.path())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut line = String::new();
+    BufReader::new(child.stdout.take().unwrap())
+        .read_line(&mut line)
+        .unwrap();
+    child.kill().unwrap();
+    child.wait().unwrap();
+    let event = json(line.as_bytes());
+    assert_eq!(event["event"], "listening", "{line}");
+    assert!(
+        event["url"]
+            .as_str()
+            .unwrap()
+            .starts_with("http://localhost:")
+    );
+    assert!(event["isolates"].as_u64().unwrap() >= 1);
+}

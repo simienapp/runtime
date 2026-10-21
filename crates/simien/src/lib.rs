@@ -5,9 +5,9 @@
 
 use dcore::{FlagSpec, ParamSpec, ParseErrorKind, Registry, RegistryBuilder};
 
-pub mod banner;
 pub mod help;
-pub mod output;
+
+pub use output::banner;
 
 use output::Globals;
 
