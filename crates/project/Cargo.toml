@@ -1,0 +1,16 @@
+[package]
+name = "project"
+version.workspace = true
+edition = "2024"
+description = "A Simien project: simien.json, its local secrets, its generated files, and simien init"
+publish = false
+
+[dependencies]
+dcore = { path = "../dcore" }
+output = { path = "../output" }
+stdio = "0.5.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+tempfile = "3.23.0"

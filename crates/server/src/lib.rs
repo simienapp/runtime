@@ -7,14 +7,31 @@
 //! accept thread ──least queued──▶ inbox ─▶ isolate 0 (its own thread)
 //!                               ▶ inbox ─▶ isolate 1
 //!                               ▶ …
+//! watchdog thread: stops an isolate stuck in JavaScript; a fresh one
+//! takes its slot
 //! ```
+//!
+//! Each isolate's event loop runs next to a heartbeat timer. JavaScript
+//! that never returns to the event loop (an endless loop in a request)
+//! starves the timer; when its heartbeat is older than `max_busy`, the
+//! watchdog terminates the isolate's execution. The slot's thread then
+//! starts a fresh isolate, and the accept loop sends new connections to it.
+//! An isolate that stops for any other reason is replaced the same way.
 
 use std::net::SocketAddr;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::RwLock;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::thread;
+use std::time::Duration;
+use std::time::Instant;
 
 use simien_core::Extension;
 use simien_core::JsRuntime;
@@ -35,6 +52,63 @@ pub struct ServerOptions {
     /// Connections each isolate may have waiting before the accept thread
     /// tries another.
     pub inbox_capacity: usize,
+    /// How long an isolate may run JavaScript without returning to its
+    /// event loop before the watchdog stops it and a fresh isolate takes its
+    /// place. Also bounds loading the app. None: no limit.
+    pub max_busy: Option<Duration>,
+    /// Told when an isolate is replaced. The server prints nothing itself.
+    pub on_event: Option<Arc<dyn Fn(Event) + Send + Sync>>,
+}
+
+/// Something the server did on its own.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Event {
+    /// Isolate `isolate` stopped and a fresh one is starting in its place.
+    Restarting { isolate: usize, reason: String },
+    /// The fresh isolate is serving.
+    Restarted { isolate: usize },
+    /// The fresh isolate failed to start; it is tried again shortly.
+    RestartFailed { isolate: usize, error: String },
+}
+
+/// How often a running isolate's heartbeat is recorded.
+const HEARTBEAT: Duration = Duration::from_millis(50);
+/// The wait before trying again to start an isolate that failed to start.
+const RESTART_BACKOFF: Duration = Duration::from_secs(1);
+
+/// One isolate's place: where its connections go, and what the watchdog
+/// needs to stop it.
+struct Slot {
+    /// None while the isolate is (re)starting.
+    sender: RwLock<Option<ConnectionSender>>,
+    handle: Mutex<Option<simien_core::v8::IsolateHandle>>,
+    /// Milliseconds since `Shared::epoch` at the last heartbeat.
+    heartbeat: AtomicU64,
+    /// Set when the watchdog terminated it.
+    stopped_by_watchdog: AtomicBool,
+}
+
+struct Shared {
+    addr: SocketAddr,
+    entry: PathBuf,
+    project_root: PathBuf,
+    capacity: usize,
+    max_busy: Option<Duration>,
+    on_event: Option<Arc<dyn Fn(Event) + Send + Sync>>,
+    epoch: Instant,
+    slots: Vec<Slot>,
+}
+
+impl Shared {
+    fn now(&self) -> u64 {
+        self.epoch.elapsed().as_millis() as u64
+    }
+
+    fn emit(&self, event: Event) {
+        if let Some(on_event) = &self.on_event {
+            on_event(event);
+        }
+    }
 }
 
 /// A server whose isolates are all up and serving.
@@ -59,27 +133,47 @@ pub fn start(options: ServerOptions) -> Result<Server, String> {
         .local_addr()
         .map_err(|err| format!("failed to read the bound address: {err}"))?;
 
-    let (ready_tx, ready_rx) = mpsc::channel::<Result<ConnectionSender, String>>();
-    for index in 0..options.isolates.max(1) {
+    let isolates = options.isolates.max(1);
+    let shared = Arc::new(Shared {
+        addr,
+        entry: options.entry,
+        project_root: options.project_root,
+        capacity: options.inbox_capacity,
+        max_busy: options.max_busy,
+        on_event: options.on_event,
+        epoch: Instant::now(),
+        slots: (0..isolates)
+            .map(|_| Slot {
+                sender: RwLock::new(None),
+                handle: Mutex::new(None),
+                heartbeat: AtomicU64::new(0),
+                stopped_by_watchdog: AtomicBool::new(false),
+            })
+            .collect(),
+    });
+
+    if let Some(max_busy) = shared.max_busy {
+        let shared = shared.clone();
+        thread::Builder::new()
+            .name("watchdog".into())
+            .spawn(move || watchdog(&shared, max_busy))
+            .map_err(|err| format!("failed to start the watchdog thread: {err}"))?;
+    }
+
+    let (ready_tx, ready_rx) = mpsc::channel::<Result<(), String>>();
+    for index in 0..isolates {
         let ready = ready_tx.clone();
-        let entry = options.entry.clone();
-        let project_root = options.project_root.clone();
-        let capacity = options.inbox_capacity;
+        let shared = shared.clone();
         thread::Builder::new()
             .name(format!("isolate-{index}"))
-            .spawn(move || {
-                if let Err(err) = run_isolate(addr, entry, project_root, capacity, &ready) {
-                    let _ = ready.send(Err(err));
-                }
-            })
+            .spawn(move || supervise(&shared, index, ready))
             .map_err(|err| format!("failed to start an isolate thread: {err}"))?;
     }
     drop(ready_tx);
 
-    let mut inboxes = Vec::with_capacity(options.isolates);
-    for _ in 0..options.isolates.max(1) {
+    for _ in 0..isolates {
         match ready_rx.recv() {
-            Ok(Ok(sender)) => inboxes.push(sender),
+            Ok(Ok(())) => {}
             Ok(Err(err)) => return Err(err),
             Err(_) => return Err("an isolate thread exited before it was ready".into()),
         }
@@ -87,20 +181,87 @@ pub fn start(options: ServerOptions) -> Result<Server, String> {
 
     let accept = thread::Builder::new()
         .name("accept".into())
-        .spawn(move || accept_loop(listener, inboxes))
+        .spawn(move || accept_loop(listener, &shared))
         .map_err(|err| format!("failed to start the accept thread: {err}"))?;
     Ok(Server { addr, accept })
 }
 
-/// Hands each connection to the isolate with the fewest waiting, trying the
-/// others when that inbox is full.
-fn accept_loop(listener: TcpListener, inboxes: Vec<ConnectionSender>) {
+/// Terminates any isolate whose heartbeat is older than `max_busy`.
+fn watchdog(shared: &Shared, max_busy: Duration) {
+    let limit = max_busy.as_millis() as u64;
+    let every = (max_busy / 4).clamp(Duration::from_millis(10), Duration::from_millis(100));
+    loop {
+        thread::sleep(every);
+        let now = shared.now();
+        for slot in &shared.slots {
+            let handle = slot.handle.lock().unwrap_or_else(|err| err.into_inner());
+            let Some(handle) = handle.as_ref() else { continue };
+            let last = slot.heartbeat.load(Ordering::Relaxed);
+            if now.saturating_sub(last) > limit
+                && !slot.stopped_by_watchdog.swap(true, Ordering::Relaxed)
+            {
+                handle.terminate_execution();
+            }
+        }
+    }
+}
+
+/// Runs slot `index`'s isolate, and a fresh one each time it stops. The
+/// first start reports to `ready`; failing it fails the server's start.
+fn supervise(shared: &Shared, index: usize, ready: mpsc::Sender<Result<(), String>>) {
+    let mut ready = Some(ready);
+    loop {
+        let slot = &shared.slots[index];
+        slot.stopped_by_watchdog.store(false, Ordering::Relaxed);
+        let stop = run_isolate(shared, index, &mut ready);
+        *slot.sender.write().unwrap_or_else(|err| err.into_inner()) = None;
+        *slot.handle.lock().unwrap_or_else(|err| err.into_inner()) = None;
+        let by_watchdog = slot.stopped_by_watchdog.load(Ordering::Relaxed);
+        let limit = shared.max_busy.unwrap_or_default();
+        if let Some(ready) = ready.take() {
+            // The first start failed: the server doesn't start.
+            let error = if by_watchdog {
+                format!("{} took longer than {limit:?} to load", shared.entry.display())
+            } else {
+                stop.error
+            };
+            let _ = ready.send(Err(error));
+            return;
+        }
+        if stop.serving {
+            let reason = if by_watchdog {
+                format!("it ran JavaScript for longer than {limit:?} without yielding")
+            } else {
+                stop.error
+            };
+            shared.emit(Event::Restarting { isolate: index, reason });
+        } else {
+            shared.emit(Event::RestartFailed { isolate: index, error: stop.error });
+            thread::sleep(RESTART_BACKOFF);
+        }
+    }
+}
+
+/// Hands each connection to the serving isolate with the fewest waiting,
+/// trying the others when that inbox is full. Isolates that are restarting
+/// are skipped.
+fn accept_loop(listener: TcpListener, shared: &Shared) {
     let mut next = 0;
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
         let _ = stream.set_nodelay(true);
-        let start = least_queued(&inboxes, next);
-        next = (start + 1) % inboxes.len();
+        // A snapshot of the serving isolates' inboxes; senders are cheap clones.
+        let inboxes: Vec<ConnectionSender> = shared
+            .slots
+            .iter()
+            .filter_map(|slot| slot.sender.read().ok().and_then(|sender| sender.clone()))
+            .collect();
+        if inboxes.is_empty() {
+            // Every isolate restarting: the client sees a reset.
+            continue;
+        }
+        let start = least_queued(&inboxes, next % inboxes.len());
+        next = start + 1;
         let mut stream = InboxStream::Tcp(stream);
         for offset in 0..inboxes.len() {
             match inboxes[(start + offset) % inboxes.len()].try_send(stream) {
@@ -121,6 +282,43 @@ fn least_queued(inboxes: &[ConnectionSender], from: usize) -> usize {
         .unwrap_or(0)
 }
 
+/// Why an isolate stopped: whether it had been serving, and the error.
+struct Stop {
+    serving: bool,
+    error: String,
+}
+
+/// Polls `future` with the slot's heartbeat recorded every [`HEARTBEAT`]
+/// while the event loop gets to run. Err once the watchdog has stopped the
+/// isolate: V8 may let the isolate run on after a termination (deno_core
+/// absorbs it in a promise callback), but the app's state may be half
+/// updated, so the isolate is retired rather than trusted.
+async fn beating<F: std::future::Future>(
+    shared: &Shared,
+    slot: &Slot,
+    future: F,
+) -> Result<F::Output, String> {
+    let mut future = std::pin::pin!(future);
+    let mut tick = tokio::time::interval(HEARTBEAT);
+    loop {
+        tokio::select! {
+            biased;
+            output = &mut future => {
+                if slot.stopped_by_watchdog.load(Ordering::Relaxed) {
+                    return Err("stopped by the watchdog".into());
+                }
+                return Ok(output);
+            }
+            _ = tick.tick() => {
+                if slot.stopped_by_watchdog.load(Ordering::Relaxed) {
+                    return Err("stopped by the watchdog".into());
+                }
+                slot.heartbeat.store(shared.now(), Ordering::Relaxed);
+            }
+        }
+    }
+}
+
 fn extensions() -> Vec<Extension> {
     let mut extensions = web_host::extensions();
     extensions.push(simien_websocket::simien_websocket::init());
@@ -128,42 +326,65 @@ fn extensions() -> Vec<Extension> {
     extensions
 }
 
-/// Runs on the isolate's own thread until the process ends.
+/// Runs one isolate on this thread until it stops, and says why. Sets the
+/// slot's sender once it serves; the first time, also reports to `ready`.
 fn run_isolate(
-    addr: SocketAddr,
-    entry: PathBuf,
-    project_root: PathBuf,
-    capacity: usize,
-    ready: &mpsc::Sender<Result<ConnectionSender, String>>,
+    shared: &Shared,
+    index: usize,
+    ready: &mut Option<mpsc::Sender<Result<(), String>>>,
+) -> Stop {
+    let mut serving = false;
+    let error = match serve_isolate(shared, index, ready, &mut serving) {
+        Ok(()) => "the isolate's event loop ended".to_string(),
+        Err(err) => err,
+    };
+    Stop { serving, error }
+}
+
+fn serve_isolate(
+    shared: &Shared,
+    index: usize,
+    ready: &mut Option<mpsc::Sender<Result<(), String>>>,
+    serving: &mut bool,
 ) -> Result<(), String> {
+    let slot = &shared.slots[index];
+    let entry = shared.entry.clone();
     let tokio = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|err| format!("failed to start the isolate's runtime: {err}"))?;
     tokio.block_on(async move {
-        let loader = pool::PhpxEsmLoader::new(project_root, entry.clone(), None, None, None, false)
-            .map_err(|err| err.to_string())?;
+        let loader = pool::PhpxEsmLoader::new(
+            shared.project_root.clone(),
+            entry.clone(),
+            None,
+            None,
+            None,
+            false,
+        )
+        .map_err(|err| err.to_string())?;
         let mut runtime = JsRuntime::new(RuntimeOptions {
             extensions: extensions(),
             module_loader: Some(Rc::new(loader)),
             ..Default::default()
         });
+        slot.heartbeat.store(shared.now(), Ordering::Relaxed);
+        *slot.handle.lock().unwrap_or_else(|err| err.into_inner()) =
+            Some(runtime.v8_isolate().thread_safe_handle());
         let (sender, rid) = simien_http::connection_inbox(
             &mut runtime.op_state().borrow_mut().resource_table,
-            addr,
-            capacity,
+            shared.addr,
+            shared.capacity,
         );
 
         let specifier = ModuleSpecifier::from_file_path(&entry)
             .map_err(|_| format!("invalid entry path: {}", entry.display()))?;
-        let module = runtime
-            .load_main_es_module(&specifier)
-            .await
+        let module = beating(shared, slot, runtime.load_main_es_module(&specifier))
+            .await?
             .map_err(|err| format!("failed to load {}: {err}", entry.display()))?;
         let evaluated = runtime.mod_evaluate(module);
-        runtime
-            .run_event_loop(Default::default())
-            .await
+        beating(shared, slot, runtime.run_event_loop(Default::default()))
+            .await?
             .map_err(|err| format!("failed to run {}: {err}", entry.display()))?;
         evaluated
             .await
@@ -189,10 +410,16 @@ fn run_isolate(
             .execute_script("ext:server/serve.js", serve_script(rid))
             .map_err(|err| format!("{}: {err}", entry.display()))?;
 
-        let _ = ready.send(Ok(sender));
-        runtime
-            .run_event_loop(Default::default())
-            .await
+        *slot.sender.write().unwrap_or_else(|err| err.into_inner()) = Some(sender);
+        *serving = true;
+        match ready.take() {
+            Some(ready) => {
+                let _ = ready.send(Ok(()));
+            }
+            None => shared.emit(Event::Restarted { isolate: index }),
+        }
+        beating(shared, slot, runtime.run_event_loop(Default::default()))
+            .await?
             .map_err(|err| format!("the isolate stopped: {err}"))
     })
 }

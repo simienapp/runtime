@@ -527,14 +527,16 @@ pub fn serve_warm(context: &Context) -> Result<(), String> {
     apply_cli_serve_overrides(context, &mut serve_options);
     let port = serve_options.port.unwrap_or(8530);
     let isolates = std::thread::available_parallelism().map_or(1, |n| n.get());
+    let globals = output::Globals::of(context);
     let server = server::start(server::ServerOptions {
         addr: ([0, 0, 0, 0], port).into(),
         project_root: entry.parent().unwrap_or(&entry).to_path_buf(),
         entry,
         isolates,
         inbox_capacity: 1024,
+        max_busy: Some(MAX_BUSY),
+        on_event: Some(std::sync::Arc::new(move |event| report_server_event(event, globals))),
     })?;
-    let globals = output::Globals::of(context);
     let url = format!("http://localhost:{}", server.addr.port());
     output::event(
         &serde_json::json!({ "event": "listening", "url": url, "isolates": isolates }),
@@ -559,4 +561,27 @@ pub fn serve_warm(context: &Context) -> Result<(), String> {
     );
     server.wait();
     Ok(())
+}
+
+/// How long a request may run JavaScript without yielding before its
+/// isolate is replaced.
+const MAX_BUSY: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// An isolate being replaced: a JSON event, or a warning with --human.
+fn report_server_event(event: server::Event, globals: output::Globals) {
+    let (json, line) = match &event {
+        server::Event::Restarting { isolate, reason } => (
+            serde_json::json!({ "event": "isolate_restarting", "isolate": isolate, "reason": reason }),
+            format!("isolate {isolate} stopped ({reason}); starting a fresh one"),
+        ),
+        server::Event::Restarted { isolate } => (
+            serde_json::json!({ "event": "isolate_restarted", "isolate": isolate }),
+            format!("isolate {isolate} is serving again"),
+        ),
+        server::Event::RestartFailed { isolate, error } => (
+            serde_json::json!({ "event": "isolate_restart_failed", "isolate": isolate, "error": error }),
+            format!("isolate {isolate} failed to start: {error}; trying again"),
+        ),
+    };
+    output::event(&json, globals, || stdio_new::warn("server", &line));
 }

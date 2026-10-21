@@ -1226,6 +1226,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
+name = "container"
+version = "0.61.0"
+dependencies = [
+ "dcore",
+ "output",
+ "project",
+ "serde",
+ "serde_json",
+ "stdio 0.5.0",
+ "tempfile",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6628,6 +6641,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 
 [[package]]
+name = "project"
+version = "0.61.0"
+dependencies = [
+ "dcore",
+ "output",
+ "serde",
+ "serde_json",
+ "stdio 0.5.0",
+ "tempfile",
+]
+
+[[package]]
 name = "prost"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8052,11 +8077,13 @@ name = "simien"
 version = "0.61.0"
 dependencies = [
  "compile",
+ "container",
  "dcore",
  "dev",
  "introspect",
  "output",
  "packages",
+ "project",
  "run",
  "runtime",
  "self_cmd",
@@ -8496,9 +8523,9 @@ dependencies = [
 
 [[package]]
 name = "simien_npm_installer"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ad5eefa6de55221c2f182f0780fbb627160d5cf1ccc2d940ebc7e46fb1da751"
+checksum = "cf62eef88da0c75b8ea9eca5ecded2d9789fd239eab36b7f8a527a31f19e6a66"
 dependencies = [
  "anyhow",
  "async-once-cell",
@@ -8589,22 +8616,22 @@ dependencies = [
 
 [[package]]
 name = "simien_path_util"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "487739c9a43334a492972c9711a3b975fc6941695b1ad86eaa1f2c7d8f3308d4"
+checksum = "b4fb7d027043125b2e1a776f72912d8f27cf2929363d9a86709a5ebd5a33b7fb"
 dependencies = [
  "percent-encoding",
  "simien_error",
- "sys_traits",
+ "simien_sys_traits",
  "thiserror 2.0.20",
  "url",
 ]
 
 [[package]]
 name = "simien_resolver"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2e03718610a7ce5d139dadeb5591f667d571630b46c4dc84743c2ca74f3229a"
+checksum = "74e13aaed2b0858f714b921b5b1052ea47db75ef659ef9ed55ab8f73a2bf7887"
 dependencies = [
  "anyhow",
  "async-once-cell",
@@ -9824,7 +9851,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.4",
  "windows-sys 0.61.2",
