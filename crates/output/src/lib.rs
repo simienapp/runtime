@@ -42,6 +42,20 @@ impl Globals {
     }
 }
 
+/// The arguments a command hands on untouched to the program it runs
+/// (`simien x prettier --write .` → `--write .`), on its context.
+#[derive(Debug, Clone, Default)]
+pub struct Passthrough(pub Vec<String>);
+
+impl Passthrough {
+    pub fn of(context: &dcore::Context) -> &[String] {
+        context
+            .extensions()
+            .get::<Passthrough>()
+            .map_or(&[], |passthrough| passthrough.0.as_slice())
+    }
+}
+
 /// A command's answer: JSON, or `human` printing it through stdio.
 pub fn result(value: &impl Serialize, globals: Globals, human: impl FnOnce()) {
     if globals.human {

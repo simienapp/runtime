@@ -1,5 +1,6 @@
 //! Installs from a registry served by the test itself: real packuments and
-//! gzipped tarballs over HTTP, no internet. `left@^1` depends on `right@^1`.
+//! gzipped tarballs over HTTP, no internet. `left@^1` depends on `right@^1`;
+//! `tool` ships a program (`bin`).
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
@@ -9,9 +10,13 @@ use base64::Engine;
 use packages::{OpenOptions, Project};
 use sha2::Digest;
 
+/// The program `tool` ships: prints its arguments.
+const TOOL: &str = "#!/bin/sh\necho \"tool $*\"\n";
+
 fn tarball(name: &str, version: &str, deps: &str, scripts: &str) -> Vec<u8> {
+    let bin = if name == "tool" { r#","bin":{"tool":"bin/tool"}"# } else { "" };
     let package_json = format!(
-        r#"{{"name":"{name}","version":"{version}","main":"index.js","dependencies":{{{deps}}},"scripts":{{{scripts}}}}}"#
+        r#"{{"name":"{name}","version":"{version}","main":"index.js","dependencies":{{{deps}}},"scripts":{{{scripts}}}{bin}}}"#
     );
     let index = format!("module.exports = '{name}@{version}';\n");
     let mut builder = tar::Builder::new(flate2::write::GzEncoder::new(
@@ -21,6 +26,7 @@ fn tarball(name: &str, version: &str, deps: &str, scripts: &str) -> Vec<u8> {
     for (path, body) in [
         ("package/package.json", package_json.as_bytes()),
         ("package/index.js", index.as_bytes()),
+        ("package/bin/tool", TOOL.as_bytes()),
     ] {
         let mut header = tar::Header::new_gnu();
         header.set_size(body.len() as u64);
@@ -39,6 +45,7 @@ fn serve_registry() -> String {
         ("left", "1.0.0", r#""right":"^1.0.0""#, ""),
         ("right", "1.2.0", "", ""),
         ("scripted", "1.0.0", "", r#""postinstall":"echo ran > ran.txt""#),
+        ("tool", "1.0.0", "", ""),
     ];
     let tarballs: Vec<(String, Vec<u8>)> = packages
         .iter()
@@ -58,8 +65,9 @@ fn serve_registry() -> String {
                 base64::engine::general_purpose::STANDARD.encode(sha2::Sha512::digest(bytes))
             );
             let body = format!(
-                r#"{{"name":"{name}","dist-tags":{{"latest":"{version}"}},"versions":{{"{version}":{{"name":"{name}","version":"{version}","dependencies":{{{deps}}},"scripts":{{{scripts}}},"hasInstallScript":{has},"dist":{{"tarball":"{base}{path}","integrity":"{integrity}"}}}}}}}}"#,
-                has = !scripts.is_empty()
+                r#"{{"name":"{name}","dist-tags":{{"latest":"{version}"}},"versions":{{"{version}":{{"name":"{name}","version":"{version}","dependencies":{{{deps}}},"scripts":{{{scripts}}},"hasInstallScript":{has}{bin},"dist":{{"tarball":"{base}{path}","integrity":"{integrity}"}}}}}}}}"#,
+                has = !scripts.is_empty(),
+                bin = if *name == "tool" { r#","bin":{"tool":"bin/tool"}"# } else { "" },
             );
             (format!("/{name}"), body)
         })
@@ -156,6 +164,11 @@ async fn installs_a_tree_into_isolated_node_modules_and_writes_the_lockfile() {
     );
     // ...but left can reach it, next to itself in the isolated store.
     let left = std::fs::canonicalize(node_modules.join("left")).unwrap();
+    assert!(
+        left.starts_with(std::fs::canonicalize(node_modules.join(".simien")).unwrap()),
+        "{}",
+        left.display()
+    );
     assert_eq!(
         read(&left.parent().unwrap().join("right/index.js")),
         "module.exports = 'right@1.2.0';\n"
@@ -238,4 +251,57 @@ async fn install_scripts_run_only_for_packages_simien_json_allows() {
     install(allowed.path(), cache.path()).await;
     let package = std::fs::canonicalize(allowed.path().join("node_modules/scripted")).unwrap();
     assert_eq!(read(&package.join("ran.txt")), "ran\n");
+}
+
+fn run_tool(program: &packages::exec::Program) -> String {
+    let output = program
+        .command(&["a".to_string(), "--b".to_string()])
+        .unwrap()
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    String::from_utf8(output.stdout).unwrap()
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn x_runs_a_program_the_project_does_not_have() {
+    let registry = serve_registry();
+    let dir = project_with(&registry, "{}");
+    let cache = tempfile::tempdir().unwrap();
+    let cache_root = cache.path().join("npm");
+
+    let program = packages::exec::resolve(dir.path(), "tool@1", Some(cache_root.clone()))
+        .await
+        .unwrap();
+    assert_eq!(program.kind, packages::exec::Kind::Script);
+    assert!(program.path.starts_with(cache.path().join("x")), "{}", program.path.display());
+    assert_eq!(run_tool(&program), "tool a --b\n");
+    assert!(!dir.path().join("node_modules").exists(), "the project is left alone");
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn x_prefers_the_projects_own_copy() {
+    let registry = serve_registry();
+    let dir = project_with(&registry, r#"{ "tool": "^1.0.0" }"#);
+    let cache = tempfile::tempdir().unwrap();
+    let cache_root = cache.path().join("npm");
+    Project::open(
+        dir.path(),
+        OpenOptions {
+            cache_root: Some(cache_root.clone()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .install()
+    .await
+    .unwrap();
+
+    let program = packages::exec::resolve(dir.path(), "tool", Some(cache_root))
+        .await
+        .unwrap();
+    assert!(program.path.starts_with(dir.path()), "{}", program.path.display());
+    assert!(!cache.path().join("x").exists(), "nothing installed beside the cache");
+    assert_eq!(run_tool(&program), "tool a --b\n");
 }

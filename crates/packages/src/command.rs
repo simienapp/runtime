@@ -91,6 +91,16 @@ const UNLINK: CommandSpec = CommandSpec {
     handler: unlink,
 };
 
+pub const X: CommandSpec = CommandSpec {
+    owner: "packages",
+    name: "x",
+    category: "packages",
+    summary: "run a package's program, installing it first if the project doesn't have it (`simien x prettier --write .`)",
+    aliases: &["exec"],
+    subcommands: &[],
+    handler: x,
+};
+
 pub fn register(registry: &mut Registry) {
     registry.add_command(INSTALL);
     registry.add_command(ADD);
@@ -100,6 +110,7 @@ pub fn register(registry: &mut Registry) {
     registry.add_command(UPDATE);
     registry.add_command(LINK);
     registry.add_command(UNLINK);
+    registry.add_command(X);
     registry.add_flag(FlagSpec {
         name: "--latest",
         aliases: &[],
@@ -268,6 +279,32 @@ fn remove(context: &Context) {
         );
         Ok(())
     });
+}
+
+fn x(context: &Context) {
+    let mut code = 0;
+    run(context, async |context, root| {
+        let [spec] = context.args.positionals.as_slice() else {
+            anyhow::bail!("name the package to run, e.g. `simien x prettier --write .`");
+        };
+        let program = crate::exec::resolve(&root, spec, None).await?;
+        let status = program
+            .command(output::Passthrough::of(context))?
+            .status()
+            .with_context(|| format!("running {}", program.path.display()))?;
+        code = exit_code(status);
+        Ok(())
+    });
+    std::process::exit(code);
+}
+
+/// The program's exit code, or 128 + the signal that ended it.
+fn exit_code(status: std::process::ExitStatus) -> i32 {
+    #[cfg(unix)]
+    if let Some(signal) = std::os::unix::process::ExitStatusExt::signal(&status) {
+        return 128 + signal;
+    }
+    status.code().unwrap_or(1)
 }
 
 fn outdated(context: &Context) {

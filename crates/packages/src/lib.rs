@@ -5,6 +5,7 @@
 //! through the output crate.
 
 pub mod command;
+pub mod exec;
 mod http;
 mod queries;
 mod scripts;

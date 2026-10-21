@@ -21,10 +21,10 @@ simien_error = "0.1.1"
 simien_lockfile = "0.1.1"
 simien_npm = "0.1.1"
 simien_npm_cache = "0.1.1"
-simien_npm_installer = "0.1.1"
+simien_npm_installer = "0.1.2"
 simien_npmrc = "0.1.1"
 simien_package_json = "0.1.1"
-simien_resolver = "0.1.1"
+simien_resolver = "0.1.2"
 simien_semver = "0.1.1"
 simien_sys_traits = { version = "0.1.1", features = ["real", "getrandom", "libc", "winapi"] }
 
