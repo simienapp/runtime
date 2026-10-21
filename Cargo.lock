@@ -8066,6 +8066,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "schema_sync"
+version = "0.61.0"
+dependencies = [
+ "container",
+ "fallible-iterator 0.2.0",
+ "postgres",
+ "project",
+ "schema",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

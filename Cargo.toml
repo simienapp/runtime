@@ -34,6 +34,7 @@ members = [
   "crates/container",
   "crates/project",
   "crates/schema",
+  "crates/schema_sync",
     "crates/engine",
     "crates/deka_host",
     "crates/wasm_guest",

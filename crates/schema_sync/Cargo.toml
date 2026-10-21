@@ -1,0 +1,17 @@
+[package]
+name = "schema_sync"
+version.workspace = true
+edition = "2024"
+description = "simien dev's schema sync: schema.ts → Postgres (guarded, one transaction) → generated types, and direct database changes back into schema.ts"
+publish = false
+
+[dependencies]
+fallible-iterator = "0.2"
+postgres = "0.19"
+project = { path = "../project" }
+schema = { path = "../schema" }
+serde_json = "1.0"
+
+[dev-dependencies]
+container = { path = "../container" }
+tempfile = "3.23.0"
