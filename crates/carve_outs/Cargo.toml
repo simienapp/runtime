@@ -1,0 +1,13 @@
+[package]
+name = "carve_outs"
+version.workspace = true
+edition = "2024"
+description = "The Node APIs Simien carves out for the framework (Simien APS 2), and nothing else: each module exposes only the exports listed here"
+publish = false
+
+[dependencies]
+simien_core.workspace = true
+simien_web = "0.1.1"
+sha2 = "0.10"
+security = { path = "../security" }
+serde_json = "1.0"

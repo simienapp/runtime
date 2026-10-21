@@ -10,4 +10,5 @@ simien_webidl = "0.1.1"
 simien_web = "0.1.1"
 simien_fetch = "0.1.1"
 simien_crypto = "0.1.1"
+carve_outs = { path = "../carve_outs" }
 deka_host = { path = "../deka_host", default-features = false, features = ["runtime"] }

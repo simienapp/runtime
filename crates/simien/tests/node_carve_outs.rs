@@ -1,7 +1,6 @@
 //! The Node APIs carved out for the framework (Simien APS 2), on a real
-//! `simien run`: `node:async_hooks`' AsyncLocalStorage keeps its store across
-//! await, promise callbacks and timers, and any other `node:*` module is
-//! refused by name.
+//! `simien run`, checked against Node's answers. Only the listed exports
+//! exist, and any other `node:*` module is refused by name.
 
 use std::fs;
 use std::process::Command;
@@ -61,8 +60,43 @@ console.log("got", JSON.stringify(await Promise.all([handle("a", 20), handle("b"
 
 #[test]
 fn other_node_modules_are_refused_by_name() {
-    let out = run("import { readFileSync } from \"node:fs\";\nconsole.log(\"loaded\", typeof readFileSync);\n");
-    assert!(out.contains("node:fs isn't available"), "{out}");
+    let out = run("import { spawn } from \"node:child_process\";\nconsole.log(\"loaded\", typeof spawn);\n");
+    assert!(out.contains("node:child_process isn't available"), "{out}");
     assert!(out.contains("Simien APS 2"), "{out}");
     assert!(!out.contains("loaded"), "{out}");
+}
+
+#[test]
+fn crypto_buffer_url_and_path_give_nodes_answers() {
+    let out = run(r#"
+import { createHash } from "node:crypto";
+import { Buffer } from "node:buffer";
+import { pathToFileURL } from "node:url";
+import path, { posix, win32 } from "node:path";
+import "node:fs";
+const results = {
+  sha256: createHash("sha256").update("ab").update("c").digest("hex"),
+  base64: Buffer.from(new TextEncoder().encode("Simien!").buffer).toString("base64"),
+  roundTrip: Buffer.from("U2ltaWVuIQ==", "base64").toString(),
+  isBytes: Buffer.from("hi") instanceof Uint8Array,
+  body: await new Response(Buffer.from("aGVsbG8=", "base64")).text(),
+  fileUrl: pathToFileURL("/srv/a b#c?d%e/").href,
+  join: posix.join("a", "b/../c", "./d"),
+  resolve: path.resolve("x", "y"),
+  win: win32.join("C:\\a", "..\\b", "c"),
+  sameObject: path.posix === posix,
+};
+console.log("results", JSON.stringify(results));
+"#);
+    let want = r#"results {"sha256":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad","base64":"U2ltaWVuIQ==","roundTrip":"Simien!","isBytes":true,"body":"hello","fileUrl":"file:///srv/a%20b%23c%3Fd%25e/","join":"a/c/d","resolve":"/x/y","win":"C:\\b\\c","sameObject":true}"#;
+    assert!(out.contains(want), "{out}");
+}
+
+#[test]
+fn only_the_listed_exports_exist() {
+    let out = run("import { readFileSync } from \"node:fs\";\nconsole.log(\"loaded\");\n");
+    assert!(out.contains("readFileSync"), "{out}");
+    assert!(!out.contains("loaded"), "{out}");
+    let out = run("import { createHash } from \"node:crypto\";\ncreateHash(\"md5\");\n");
+    assert!(out.contains("only \"sha256\" is carved out"), "{out}");
 }

@@ -1,6 +1,5 @@
 #![allow(clippy::all)]
 
-pub mod carve_outs;
 pub mod dsc_compile;
 pub mod esm_loader;
 pub mod islands;

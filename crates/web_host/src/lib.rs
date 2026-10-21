@@ -74,7 +74,7 @@ simien_core::extension!(
     simien_globals,
     deps = [simien_webidl, simien_web, simien_fetch, simien_crypto],
     esm_entry_point = "ext:simien_globals/globals.js",
-    esm = [dir "js", "globals.js", "async_hooks.js"],
+    esm = [dir "js", "globals.js"],
     state = |state| {
         state.put(PermissionsContainer::new(Arc::new(RuntimeNetPolicy)));
     },
@@ -91,5 +91,6 @@ pub fn extensions() -> Vec<Extension> {
             ..Default::default()
         }),
         simien_globals::init(),
+        carve_outs::simien_carve_outs::init(),
     ]
 }

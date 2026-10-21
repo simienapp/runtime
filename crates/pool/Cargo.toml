@@ -4,6 +4,7 @@ version.workspace = true
 edition = "2024"
 
 [dependencies]
+carve_outs = { path = "../carve_outs" }
 deka-modules = "0.3.0"
 compiler = { path = "../compiler" }
 serve = { path = "../serve" }

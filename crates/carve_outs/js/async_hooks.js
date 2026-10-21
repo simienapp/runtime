@@ -1,12 +1,12 @@
-// The one Node API carved out for the framework so far (Simien APS 2):
-// AsyncLocalStorage, which React Server Components (and so every App Router
-// app) needs. It is built on core's async context, which V8 carries across
+// AsyncLocalStorage, carved out for the framework (Simien APS 2): React
+// Server Components (and so every App Router app) need it. It is built on core's async context, which V8 carries across
 // await and promise jobs and which core's timers carry across callbacks.
 //
 // A context is an immutable map from each AsyncLocalStorage to its store; a
 // change makes a new map, so a context captured earlier never sees it.
 
-import { core, primordials } from "ext:core/mod.js";
+(function () {
+const { core, primordials } = __bootstrap;
 const { getAsyncContext, setAsyncContext } = core;
 const { MapPrototypeDelete, MapPrototypeForEach, MapPrototypeGet, MapPrototypeSet, ReflectApply, SafeMap } = primordials;
 
@@ -81,4 +81,5 @@ class AsyncLocalStorage {
   }
 }
 
-export { AsyncLocalStorage };
+return { AsyncLocalStorage };
+})();
