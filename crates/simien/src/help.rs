@@ -1,7 +1,12 @@
 //! The help, built from the registry so a new command can't be left out.
-//! One model renders both ways: JSON by default (the zega CLI's shape:
-//! `simien` describes the whole CLI grouped by category, `simien <command>
-//! --help` one command), and text under the mark with --human.
+//! One model renders both ways: JSON by default, and text under the mark
+//! with --human. `simien` describes the whole CLI, `simien <command> --help`
+//! one command.
+//!
+//! In the JSON, every command is a key of `commands` itself, exactly as it is
+//! typed (`simien container start` is `commands.container.start`). Categories
+//! are only headings in the --human text: an agent reading `"local":
+//! {"container": …}` would run `simien local container` (zegadb/zega#165).
 
 use std::collections::BTreeMap;
 
@@ -25,9 +30,12 @@ pub struct GlobalHelp {
     pub version: &'static str,
     pub description: &'static str,
     pub usage: &'static str,
-    /// category → command → summary (or its subcommands' summaries)
-    pub commands: BTreeMap<&'static str, BTreeMap<&'static str, Entry>>,
+    /// command → summary (or its subcommands' summaries), as typed
+    pub commands: BTreeMap<&'static str, Entry>,
     pub options: BTreeMap<String, &'static str>,
+    /// category → its commands, for the --human headings only
+    #[serde(skip)]
+    pub categories: BTreeMap<&'static str, Vec<&'static str>>,
 }
 
 #[derive(Serialize)]
@@ -70,7 +78,8 @@ fn global_options() -> BTreeMap<String, &'static str> {
 }
 
 pub fn global_help(registry: &Registry) -> GlobalHelp {
-    let mut commands: BTreeMap<&'static str, BTreeMap<&'static str, Entry>> = BTreeMap::new();
+    let mut commands: BTreeMap<&'static str, Entry> = BTreeMap::new();
+    let mut categories: BTreeMap<&'static str, Vec<&'static str>> = BTreeMap::new();
     for command in registry.commands() {
         let entry = if command.subcommands.is_empty() {
             Entry::Command(command.summary)
@@ -83,10 +92,8 @@ pub fn global_help(registry: &Registry) -> GlobalHelp {
                     .collect(),
             )
         };
-        commands
-            .entry(command.category)
-            .or_default()
-            .insert(command.name, entry);
+        commands.insert(command.name, entry);
+        categories.entry(command.category).or_default().push(command.name);
     }
     GlobalHelp {
         name: "simien",
@@ -95,6 +102,7 @@ pub fn global_help(registry: &Registry) -> GlobalHelp {
         usage: "simien [options] [command]",
         commands,
         options: global_options(),
+        categories,
     }
 }
 
@@ -156,11 +164,13 @@ pub fn print_global(registry: &Registry, globals: Globals) {
     lines.push(String::new());
     lines.push(format!("{} (v{})", help.description, help.version));
     lines.push(String::new());
-    for (category, commands) in &help.commands {
+    for (category, names) in &help.categories {
         lines.push(format!("{}:", capitalize(category)));
-        let width = commands.keys().map(|name| name.len()).max().unwrap_or(0);
-        for (name, entry) in commands {
-            match entry {
+        let width = names.iter().map(|name| name.len()).max().unwrap_or(0);
+        let mut names = names.clone();
+        names.sort();
+        for name in names {
+            match &help.commands[name] {
                 Entry::Command(summary) => lines.push(format!("  {name:width$}  {summary}")),
                 Entry::WithSubcommands(subs) => {
                     for (sub, summary) in subs {

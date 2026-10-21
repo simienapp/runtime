@@ -15,24 +15,30 @@ fn json(bytes: &[u8]) -> Value {
         .unwrap_or_else(|err| panic!("not JSON ({err}): {}", String::from_utf8_lossy(bytes)))
 }
 
+/// Every command is a key of `commands` exactly as it is typed, with its
+/// subcommands under it; no category wraps it. Agents run what the menu
+/// shows, so `"local": {"container": …}` reads as `simien local container`
+/// (zegadb/zega#165).
 #[test]
-fn help_lists_every_registered_command() {
+fn help_lists_every_command_as_it_is_typed() {
     let out = run(env!("CARGO_BIN_EXE_simien"), &[]);
     assert!(out.status.success());
     let help = json(&out.stdout);
-    let listed: Vec<String> = help["commands"]
-        .as_object()
-        .unwrap()
-        .values()
-        .flat_map(|group| group.as_object().unwrap().keys().cloned())
-        .collect();
-    for command in simien::build_registry().commands() {
-        assert!(
-            listed.iter().any(|name| name == command.name),
-            "{} is missing from help",
-            command.name
-        );
+    let listed = help["commands"].as_object().unwrap();
+    let registry = simien::build_registry();
+    for command in registry.commands() {
+        let entry = listed
+            .get(command.name)
+            .unwrap_or_else(|| panic!("{} is not a top-level command in help", command.name));
+        for sub in command.subcommands {
+            assert!(entry.get(sub.name).is_some(), "{} {} is missing from help", command.name, sub.name);
+        }
     }
+    let typed: Vec<&str> = registry.commands().iter().map(|command| command.name).collect();
+    for key in listed.keys() {
+        assert!(typed.contains(&key.as_str()), "help lists `{key}`, which isn't a command");
+    }
+    assert!(help["commands"]["container"]["start"].is_string());
 }
 
 #[test]
