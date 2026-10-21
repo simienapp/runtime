@@ -359,28 +359,74 @@ fn x(context: &Context) {
         let [spec] = context.args.positionals.as_slice() else {
             anyhow::bail!("name the package to run, e.g. `simien x prettier --write .`");
         };
-        let program = crate::exec::resolve(&root, spec, None).await?;
-        let prepared = program.sandbox(&root)?;
-        let status = program
-            .command(&prepared.sandbox, output::Passthrough::of(context))?
-            .status()
-            .with_context(|| format!("running {}", program.path.display()))?;
-        code = exit_code(status);
-        if code != 0 {
-            // The program's own output is on stdout; the note goes to stderr.
-            let note = prepared.failure_note(&program.package);
-            if Globals::of(context).human {
-                stdio::warn("sandbox", &note);
-            } else {
-                eprintln!(
-                    "{}",
-                    json!({ "event": "sandboxed_program_failed", "code": code, "note": note, "pending": prepared.pending })
-                );
-            }
-        }
+        code = run_sandboxed(&root, spec, output::Passthrough::of(context), Globals::of(context)).await?;
         Ok(())
     });
     std::process::exit(code);
+}
+
+/// Runs the program of the package `spec` in Simien's sandbox, as `simien
+/// x` does: installed first if the project doesn't have it, with the
+/// project's grants, its output passed through. Returns its exit code; on a
+/// failure, says what the sandbox allowed and how to grant more.
+pub async fn run_sandboxed(root: &Path, spec: &str, args: &[String], globals: Globals) -> anyhow::Result<i32> {
+    let program = crate::exec::resolve(root, spec, None).await?;
+    let prepared = program.sandbox(root)?;
+    let mut child = tokio::process::Command::from(program.command(&prepared.sandbox, args)?)
+        .spawn()
+        .with_context(|| format!("running {}", program.path.display()))?;
+    let status = wait_forwarding_signals(&mut child)
+        .await
+        .with_context(|| format!("running {}", program.path.display()))?;
+    let code = exit_code(status);
+    if code != 0 {
+        // The program's own output is on stdout; the note goes to stderr.
+        let note = prepared.failure_note(&program.package);
+        if globals.human {
+            stdio::warn("sandbox", &note);
+        } else {
+            eprintln!(
+                "{}",
+                json!({ "event": "sandboxed_program_failed", "code": code, "note": note, "pending": prepared.pending })
+            );
+        }
+    }
+    Ok(code)
+}
+
+/// Waits for `child`, passing on the signals that stop Simien (SIGTERM,
+/// SIGINT, SIGHUP), so stopping `simien x` or `simien dev` stops the program
+/// it runs instead of orphaning it.
+pub async fn wait_forwarding_signals(child: &mut tokio::process::Child) -> std::io::Result<std::process::ExitStatus> {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut terminate = signal(SignalKind::terminate())?;
+        let mut interrupt = signal(SignalKind::interrupt())?;
+        let mut hangup = signal(SignalKind::hangup())?;
+        loop {
+            let forward = tokio::select! {
+                status = child.wait() => return status,
+                Some(()) = terminate.recv() => libc::SIGTERM,
+                Some(()) = interrupt.recv() => libc::SIGINT,
+                Some(()) = hangup.recv() => libc::SIGHUP,
+            };
+            if let Some(pid) = child.id() {
+                // SAFETY: kill(2) with a pid this process spawned and still
+                // owns (not yet reaped, so it can't have been reused).
+                unsafe { libc::kill(pid as libc::pid_t, forward) };
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    child.wait().await
+}
+
+/// [`run_sandboxed`] from synchronous code.
+pub fn run_sandboxed_blocking(root: &Path, spec: &str, args: &[String], globals: Globals) -> anyhow::Result<i32> {
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+    let local = tokio::task::LocalSet::new();
+    local.block_on(&runtime, run_sandboxed(root, spec, args, globals))
 }
 
 /// The program's exit code, or 128 + the signal that ended it.

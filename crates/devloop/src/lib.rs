@@ -63,21 +63,28 @@ pub fn start(root: PathBuf, on_event: impl Fn(Value) + Send + 'static) -> Result
     let thread = std::thread::Builder::new()
         .name("simien-devloop".into())
         .spawn(move || {
-            let _watcher = watcher;
-            run(&root, &tx, &rx, &stopping, &on_event);
+            let mut watcher = watcher;
+            let mut watch_schema_dir = || watch_schema_dir(&mut watcher, &root);
+            run(&root, &tx, &rx, &stopping, &on_event, &mut watch_schema_dir);
         })
         .map_err(|err| err.to_string())?;
     Ok(DevLoop { stop, thread: Some(thread) })
 }
 
 /// schema.ts and simien.json changes, as `Change`s.
+///
+/// Only two folders are watched, neither recursively: the project (for
+/// simien.json, and for `simien/` appearing) and `simien/` itself, added by
+/// [`watch_schema_dir`] once it exists. A recursive watch of the project would
+/// walk `node_modules` before the first event.
 fn watch(root: &Path, tx: Sender<Change>) -> Result<notify::RecommendedWatcher, String> {
-    let schema = root.join("simien").join("schema.ts");
+    let schema_dir = root.join("simien");
+    let schema = schema_dir.join("schema.ts");
     let config = root.join(project::CONFIG);
     let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
         let Ok(event) = event else { return };
         for path in &event.paths {
-            if path == &schema {
+            if path == &schema || path == &schema_dir {
                 let _ = tx.send(Change::Schema);
             } else if path == &config {
                 let _ = tx.send(Change::Config);
@@ -85,9 +92,14 @@ fn watch(root: &Path, tx: Sender<Change>) -> Result<notify::RecommendedWatcher, 
         }
     })
     .map_err(|err| err.to_string())?;
-    // Recursive: simien/ may not exist yet.
-    watcher.watch(root, RecursiveMode::Recursive).map_err(|err| err.to_string())?;
+    watcher.watch(root, RecursiveMode::NonRecursive).map_err(|err| err.to_string())?;
     Ok(watcher)
+}
+
+/// Watches `simien/` (not recursively) once it exists; true when watched.
+fn watch_schema_dir(watcher: &mut notify::RecommendedWatcher, root: &Path) -> bool {
+    let dir = root.join("simien");
+    dir.is_dir() && watcher.watch(&dir, RecursiveMode::NonRecursive).is_ok()
 }
 
 /// A started stack with its sync connections.
@@ -103,12 +115,23 @@ impl Drop for Running {
     }
 }
 
-fn run(root: &Path, tx: &Sender<Change>, rx: &Receiver<Change>, stop: &AtomicBool, on_event: &dyn Fn(Value)) {
+fn run(
+    root: &Path,
+    tx: &Sender<Change>,
+    rx: &Receiver<Change>,
+    stop: &AtomicBool,
+    on_event: &dyn Fn(Value),
+    watch_schema_dir: &mut dyn FnMut() -> bool,
+) {
+    let mut schema_dir_watched = false;
     let mut running: Option<Running> = None;
     let mut said_no_database = false;
     // Starts with a pass, as if simien.json had just been saved.
     let mut queue = VecDeque::from([Change::Config]);
     while !stop.load(Ordering::SeqCst) {
+        if !schema_dir_watched {
+            schema_dir_watched = watch_schema_dir();
+        }
         let change = match queue.pop_front() {
             Some(change) => change,
             None => match rx.recv_timeout(Duration::from_millis(200)) {
