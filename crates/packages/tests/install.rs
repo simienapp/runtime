@@ -78,19 +78,26 @@ fn serve_registry() -> String {
             let mut reader = BufReader::new(stream.try_clone().unwrap());
             let mut request_line = String::new();
             reader.read_line(&mut request_line).unwrap();
+            let mut length = 0;
             loop {
                 let mut line = String::new();
                 if reader.read_line(&mut line).unwrap() == 0 || line == "\r\n" {
                     break;
                 }
+                if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                    length = value.trim().parse().unwrap();
+                }
             }
+            let mut request_body = vec![0; length];
+            reader.read_exact(&mut request_body).unwrap();
             let path = request_line
                 .split_whitespace()
                 .nth(1)
                 .unwrap_or("/")
                 .to_string();
-            let (status, body): (&str, Vec<u8>) =
-                if let Some((_, body)) = packuments.iter().find(|(p, _)| *p == path) {
+            let (status, body): (&str, Vec<u8>) = if path == "/-/npm/v1/security/advisories/bulk" {
+                ("200 OK", advisories(&request_body).into_bytes())
+            } else if let Some((_, body)) = packuments.iter().find(|(p, _)| *p == path) {
                     ("200 OK", body.clone().into_bytes())
                 } else if let Some((_, bytes)) = tarballs.iter().find(|(p, _)| *p == path) {
                     ("200 OK", bytes.clone())
@@ -108,6 +115,34 @@ fn serve_registry() -> String {
         }
     });
     base
+}
+
+/// The registry's advisories for what was asked about: right before 1.3.0
+/// is vulnerable, left before 1.0.0 is (so the installed left@1.0.0 isn't).
+/// Answers only for packages and versions in the request, as npm does.
+fn advisories(request: &[u8]) -> String {
+    let asked: serde_json::Value = serde_json::from_slice(request).unwrap();
+    let mut out = serde_json::Map::new();
+    for (name, id, severity, range) in [
+        ("right", 1001, "high", "<1.3.0"),
+        ("left", 1002, "critical", "<1.0.0"),
+    ] {
+        if asked.get(name).is_some() {
+            out.insert(
+                name.to_string(),
+                serde_json::json!([{
+                    "id": id,
+                    "title": format!("{name} is unsafe"),
+                    "url": format!("https://example.test/advisories/{id}"),
+                    "severity": severity,
+                    "vulnerable_versions": range,
+                    "cwe": [],
+                    "cvss": { "score": 7.5, "vectorString": null },
+                }]),
+            );
+        }
+    }
+    serde_json::Value::Object(out).to_string()
 }
 
 fn project(registry: &str) -> tempfile::TempDir {
@@ -304,4 +339,33 @@ async fn x_prefers_the_projects_own_copy() {
     assert!(program.path.starts_with(dir.path()), "{}", program.path.display());
     assert!(!cache.path().join("x").exists(), "nothing installed beside the cache");
     assert_eq!(run_tool(&program), "tool a --b\n");
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn audit_reports_the_advisories_that_cover_installed_versions() {
+    let registry = serve_registry();
+    let dir = project(&registry);
+    let cache = tempfile::tempdir().unwrap();
+    let report = Project::open(
+        dir.path(),
+        OpenOptions {
+            cache_root: Some(cache.path().to_path_buf()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .audit()
+    .await
+    .unwrap();
+
+    assert_eq!(report.packages, 2);
+    assert!(report.not_audited.is_empty());
+    let found: Vec<(&str, &str, u64, &[String])> = report
+        .findings
+        .iter()
+        .map(|f| (f.name.as_str(), f.version.as_str(), f.id, f.via.as_slice()))
+        .collect();
+    assert_eq!(found, [("right", "1.2.0", 1001, &["left".to_string()][..])]);
+    assert_eq!(report.findings[0].severity, packages::Severity::High);
 }

@@ -25,6 +25,36 @@ impl HttpClient {
         Ok(Self(client))
     }
 
+    /// POSTs `body` as JSON. None when the server has no such endpoint
+    /// (404, 405, 501); the body otherwise.
+    pub async fn post_json(
+        &self,
+        url: &Url,
+        maybe_auth: Option<&str>,
+        body: &impl serde::Serialize,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        let mut request = self
+            .0
+            .post(url.clone())
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(serde_json::to_vec(body)?);
+        if let Some(auth) = maybe_auth {
+            request = request.header(reqwest::header::AUTHORIZATION, auth);
+        }
+        let response = request
+            .send()
+            .await
+            .map_err(|err| anyhow::anyhow!("{url}: {err}"))?;
+        let status = response.status();
+        if matches!(status.as_u16(), 404 | 405 | 501) {
+            return Ok(None);
+        }
+        if !status.is_success() {
+            anyhow::bail!("{url}: HTTP {status}");
+        }
+        Ok(Some(response.bytes().await?.to_vec()))
+    }
+
     async fn get_once(
         &self,
         url: &Url,

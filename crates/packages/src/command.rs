@@ -91,6 +91,16 @@ const UNLINK: CommandSpec = CommandSpec {
     handler: unlink,
 };
 
+const AUDIT: CommandSpec = CommandSpec {
+    owner: "packages",
+    name: "audit",
+    category: "packages",
+    summary: "check installed packages against the registry's security advisories (exit 1 when any apply)",
+    aliases: &[],
+    subcommands: &[],
+    handler: audit,
+};
+
 pub const X: CommandSpec = CommandSpec {
     owner: "packages",
     name: "x",
@@ -110,6 +120,7 @@ pub fn register(registry: &mut Registry) {
     registry.add_command(UPDATE);
     registry.add_command(LINK);
     registry.add_command(UNLINK);
+    registry.add_command(AUDIT);
     registry.add_command(X);
     registry.add_flag(FlagSpec {
         name: "--latest",
@@ -279,6 +290,53 @@ fn remove(context: &Context) {
         );
         Ok(())
     });
+}
+
+fn audit(context: &Context) {
+    let mut found = false;
+    run(context, async |context, root| {
+        let globals = Globals::of(context);
+        let report = Project::open(&root, OpenOptions::default())
+            .await?
+            .audit()
+            .await?;
+        found = !report.findings.is_empty();
+        output::result(&json!({ "ok": !found, "audit": report }), globals, || {
+            for finding in &report.findings {
+                let via = if finding.via.is_empty() {
+                    String::new()
+                } else {
+                    format!(" (via {})", finding.via.join(", "))
+                };
+                let line = format!(
+                    "{}@{}: {}{via}",
+                    finding.name, finding.version, finding.title
+                );
+                let severity = serde_json::to_value(finding.severity)
+                    .ok()
+                    .and_then(|value| value.as_str().map(str::to_string))
+                    .unwrap_or_default();
+                stdio::warn(&severity, &line);
+                stdio::detail(&finding.url);
+            }
+            for registry in &report.not_audited {
+                stdio::warn("audit", &format!("{registry} has no advisory endpoint; its packages were not checked"));
+            }
+            if report.findings.is_empty() {
+                stdio::success(&format!("no known advisories for {} packages", report.packages));
+            } else {
+                stdio::fail(&format!(
+                    "{} advisories in {} packages",
+                    report.findings.len(),
+                    report.packages
+                ));
+            }
+        });
+        Ok(())
+    });
+    if found {
+        std::process::exit(1);
+    }
 }
 
 fn x(context: &Context) {

@@ -4,12 +4,14 @@
 //! remove). Commands stay thin: they parse, call [`Project`], and print
 //! through the output crate.
 
+mod audit;
 pub mod command;
 pub mod exec;
 mod http;
 mod queries;
 mod scripts;
 
+pub use audit::{AuditReport, Finding, Severity};
 pub use queries::{Dependency, Outdated, WhyPath};
 
 use std::collections::HashMap;
@@ -36,6 +38,7 @@ use simien_npm_installer::{
     LifecycleScriptsConfig, LogReporter, NpmInstaller, NpmInstallerOptions, PackageCaching,
 };
 use simien_resolver::lockfile::{LockfileFlags, LockfileLock, LockfileNpmPackageInfoApiAdapter};
+use simien_npmrc::ResolvedNpmRc;
 use simien_resolver::npm::managed::NpmResolutionCell;
 use simien_resolver::workspace::{NodeModulesLinkerMode, Workspace, WorkspaceNpmLinkPackagesRc};
 use simien_semver::StackString;
@@ -76,6 +79,8 @@ pub struct Project {
     installer: Arc<Installer>,
     resolution: Arc<NpmResolutionCell>,
     lockfile: Option<Arc<LockfileLock<RealSys>>>,
+    npmrc: Arc<ResolvedNpmRc>,
+    http: Arc<HttpClient>,
     started: Instant,
 }
 
@@ -123,7 +128,7 @@ impl Project {
         ));
         let tarballs = Arc::new(TarballCache::new(
             npm_cache.clone(),
-            http,
+            http.clone(),
             sys.clone(),
             npmrc.clone(),
             None,
@@ -217,6 +222,8 @@ impl Project {
             installer,
             resolution,
             lockfile,
+            npmrc,
+            http,
             started,
         })
     }
