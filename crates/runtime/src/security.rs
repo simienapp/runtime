@@ -45,6 +45,16 @@ pub fn resolve_security_policy_for_serve(
     )
 }
 
+/// The folder whose simien.json governs code in `dir`: the nearest one at or
+/// above it with a simien.json, else `dir`. A built entry such as
+/// `dist/server/worker.js` runs under its project's policy, not a policy-free
+/// folder of build output.
+pub fn policy_root(dir: &Path) -> &Path {
+    dir.ancestors()
+        .find(|candidate| candidate.join("simien.json").is_file())
+        .unwrap_or(dir)
+}
+
 pub fn resolve_security_policy_for_root(
     root: &Path,
     flags: &std::collections::HashMap<String, bool>,
@@ -52,6 +62,7 @@ pub fn resolve_security_policy_for_root(
     project_kind: ProjectKind,
     dev: bool,
 ) -> Result<ResolvedSecurityPolicy, String> {
+    let root = policy_root(root);
     let document = read_simien_json(root)?;
     let phase = if dev {
         permissions::permissions::ExecutionPhase::DevRequest
@@ -428,6 +439,18 @@ mod tests {
 
     fn no_flags() -> (HashMap<String, bool>, HashMap<String, String>) {
         (HashMap::new(), HashMap::new())
+    }
+
+    #[test]
+    fn a_built_entry_runs_under_its_projects_policy() {
+        let root = temp_project(r#"{ "security": { "deny": { "dynamic": true, "run": true } } }"#);
+        let server = root.join("dist").join("server");
+        fs::create_dir_all(&server).unwrap();
+        assert_eq!(policy_root(&server), root.as_path());
+        let (flags, params) = no_flags();
+        let resolved = resolve_security_policy_for_root(&server, &flags, &params, ProjectKind::Js, false)
+            .expect("resolution");
+        assert!(resolved.summary.contains("deny(run=all, dynamic=true"), "{}", resolved.summary);
     }
 
     #[test]

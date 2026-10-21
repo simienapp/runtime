@@ -53,6 +53,15 @@ fn dynamic_code_runs_by_default_as_in_deno() {
 }
 
 #[test]
+fn a_fixed_path_import_runs_even_when_dynamic_code_is_denied() {
+    let out = run(project(DENY, "const m = await import(\"./two.js\");\nconsole.log(\"ran\", m.two);\n").path());
+    assert!(out.contains("ran 2"), "{out}");
+    let out = run(project(DENY, "const name = \"two\";\nconst m = await import(`./${name}.js`);\nconsole.log(\"ran\", m.two);\n").path());
+    assert!(out.contains("computed specifier is disabled"), "{out}");
+    assert!(!out.contains("ran 2"), "{out}");
+}
+
+#[test]
 fn simien_json_can_deny_dynamic_code_and_every_spelling_is_refused_before_it_runs() {
     for spelling in SPELLINGS {
         let out = run(project(DENY, &evaluating(spelling)).path());
