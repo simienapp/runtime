@@ -71,8 +71,12 @@ jobs:
         run: sccache --show-stats
       - name: Toolchain (rust-toolchain.toml)
         run: rustup show active-toolchain || rustup toolchain install
+      # kebele's CLI runs on Bun.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.4.0'
       - name: kebele
-        run: npm install --global kebele@0.10.0 && kebele --version
+        run: bun install --global kebele@0.10.0 && kebele --version
       - name: Sync rules on real data
         run: cargo test --locked -p schema_sync --test sync
       - run: sccache --show-stats
