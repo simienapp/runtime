@@ -1,0 +1,25 @@
+[package]
+name = "check"
+version.workspace = true
+edition = "2024"
+description = "simien check: type-checks a Simien project with tsrs, the Rust port of the TypeScript 7 checker"
+publish = false
+
+# tsrs isn't on crates.io yet; pinned to a commit until it is. Bump the rev
+# deliberately, and run the tests, when moving to a newer tsrs.
+[dependencies]
+dcore = { path = "../dcore" }
+output = { path = "../output" }
+project = { path = "../project" }
+stdio = "0.5.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tsrs_execute = { git = "https://github.com/oxc-project/tsrs", rev = "280b426b89cd4ecd6153cf48228826bd60a99c61" }
+tsrs_ast = { git = "https://github.com/oxc-project/tsrs", rev = "280b426b89cd4ecd6153cf48228826bd60a99c61" }
+tsrs_core = { git = "https://github.com/oxc-project/tsrs", rev = "280b426b89cd4ecd6153cf48228826bd60a99c61" }
+tsrs_diagnostics = { git = "https://github.com/oxc-project/tsrs", rev = "280b426b89cd4ecd6153cf48228826bd60a99c61" }
+tsrs_scanner = { git = "https://github.com/oxc-project/tsrs", rev = "280b426b89cd4ecd6153cf48228826bd60a99c61" }
+tsrs_vfs = { git = "https://github.com/oxc-project/tsrs", rev = "280b426b89cd4ecd6153cf48228826bd60a99c61" }
+
+[dev-dependencies]
+tempfile = "3.23.0"
