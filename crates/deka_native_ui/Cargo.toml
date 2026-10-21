@@ -31,7 +31,7 @@ runtime-shaders = ["gpu"]
 deka_native_ir = { path = "../deka_native_ir" }
 
 # Text: parley shapes, breaks lines and falls back to system fonts (fontique); swash rasterises.
-parley = "=0.11.1"
+parley = "=0.12.0"
 swash = "=0.2.10"
 # Linux system fonts through a runtime dlopen of fontconfig: no build-time pkg-config/headers.
 fontique = { version = "=0.11.1", features = ["fontconfig-dlopen"] }
