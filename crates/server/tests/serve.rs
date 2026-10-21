@@ -44,6 +44,8 @@ fn start(isolates: usize) -> (tempfile::TempDir, std::net::SocketAddr) {
         project_root: dir.path().to_path_buf(),
         isolates,
         inbox_capacity: 128,
+        max_busy: None,
+        on_event: None,
     })
     .expect("start");
     let addr = server.addr;
@@ -116,4 +118,89 @@ mod serde_json_value {
     pub struct Hits {
         pub hits: u64,
     }
+}
+
+/// An app with a request that never returns to the event loop.
+const SPIN_APP: &str = r#"
+export default {
+  fetch(request) {
+    if (new URL(request.url).pathname === "/spin") {
+      for (;;) {}
+    }
+    return new Response("ok");
+  },
+};
+"#;
+
+#[test]
+fn a_request_stuck_in_javascript_does_not_take_the_isolate_down() {
+    let dir = tempfile::tempdir().expect("app dir");
+    let entry = dir.path().join("app.js");
+    fs::write(&entry, SPIN_APP).expect("write app");
+    let events = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = events.clone();
+    let server = server::start(ServerOptions {
+        addr: "127.0.0.1:0".parse().expect("addr"),
+        entry,
+        project_root: dir.path().to_path_buf(),
+        // One isolate: while it spins, nothing else is served.
+        isolates: 1,
+        inbox_capacity: 128,
+        max_busy: Some(Duration::from_millis(300)),
+        on_event: Some(std::sync::Arc::new(move |event| seen.lock().unwrap().push(event))),
+    })
+    .expect("start");
+    let base = format!("http://{}", server.addr);
+    std::mem::forget(server);
+
+    // The spinning request itself fails: its isolate is stopped under it.
+    let spin = client().get(format!("{base}/spin")).send();
+    assert!(spin.is_err() || !spin.unwrap().status().is_success());
+
+    // A fresh isolate serves the next request well inside the client timeout.
+    let started = std::time::Instant::now();
+    let ok = loop {
+        match client().get(format!("{base}/ok")).send() {
+            Ok(response) => break response,
+            Err(_) if started.elapsed() < Duration::from_secs(8) => {
+                std::thread::sleep(Duration::from_millis(50))
+            }
+            Err(err) => panic!("not served again: {err}"),
+        }
+    };
+    assert_eq!(ok.text().expect("body"), "ok");
+
+    let events = events.lock().unwrap().clone();
+    assert!(
+        matches!(&events[..], [server::Event::Restarting { isolate: 0, reason }, server::Event::Restarted { isolate: 0 }] if reason.contains("without yielding")),
+        "{events:?}"
+    );
+}
+
+#[test]
+fn an_app_that_never_finishes_loading_fails_to_start() {
+    let dir = tempfile::tempdir().expect("app dir");
+    let entry = dir.path().join("app.js");
+    fs::write(&entry, "for (;;) {}\nexport default { fetch() { return new Response('') } };\n")
+        .expect("write app");
+    let project_root = dir.path().to_path_buf();
+    // On a thread, so a start that never returns fails the test, not CI.
+    let (done, result) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let started = server::start(ServerOptions {
+            addr: "127.0.0.1:0".parse().expect("addr"),
+            entry,
+            project_root,
+            isolates: 1,
+            inbox_capacity: 8,
+            max_busy: Some(Duration::from_millis(300)),
+            on_event: None,
+        });
+        let _ = done.send(started.err());
+    });
+    let error = result
+        .recv_timeout(Duration::from_secs(5))
+        .expect("start must give up, not hang")
+        .expect("start must fail");
+    assert!(error.contains("took longer than"), "{error}");
 }
