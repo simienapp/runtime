@@ -326,8 +326,11 @@ impl PhpxEsmLoader {
             .unwrap_or_else(|| path.display().to_string())
     }
 
+    /// A JavaScript or TypeScript module from disk, held to the resolved
+    /// `security.allow.dynamic` policy before it reaches V8.
     fn load_js_source(&self, path: &Path) -> Result<ModuleSourceCode, JsErrorBox> {
         let text = std::fs::read_to_string(path).map_err(|err| JsErrorBox::from_err(err))?;
+        policy::enforce_dynamic_policy_on(path, &text)?;
         Ok(ModuleSourceCode::String(text.into()))
     }
 
