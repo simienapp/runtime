@@ -20,6 +20,8 @@ fn main() {
         entry,
         isolates,
         inbox_capacity: 1024,
+        max_busy: Some(std::time::Duration::from_secs(30)),
+        on_event: Some(std::sync::Arc::new(|event| eprintln!("{event:?}"))),
     })
     .unwrap_or_else(|err| panic!("{err}"));
     println!("listening on {} with {isolates} isolates", server.addr);
