@@ -161,7 +161,7 @@ pub(crate) fn start_watch(
 pub(crate) fn project_root_from_handler(handler_path: &str) -> Option<std::path::PathBuf> {
     let mut current = std::path::Path::new(handler_path).parent()?;
     loop {
-        if current.join("deka.json").is_file() {
+        if current.join("simien.json").is_file() {
             return Some(current.to_path_buf());
         }
         current = current.parent()?;

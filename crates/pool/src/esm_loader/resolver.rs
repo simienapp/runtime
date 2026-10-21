@@ -25,18 +25,18 @@ pub fn resolve_project_root(entry_path: &Path) -> Result<PathBuf, String> {
     };
 
     for dir in start.ancestors() {
-        if dir.join("deka.json").is_file() {
+        if dir.join("simien.json").is_file() {
             return Ok(dir.to_path_buf());
         }
     }
 
-    // Workers-style JS handlers do not need a deka.json (bun/deno/CF).
+    // Workers-style JS handlers do not need a simien.json (bun/deno/CF).
     if is_javascript_entry(entry_path) {
         return Ok(start);
     }
 
     Err(format!(
-        "deka runtime requires a deka.json project root (searched from {})",
+        "deka runtime requires a simien.json project root (searched from {})",
         entry_path.display()
     ))
 }
@@ -278,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn javascript_entry_skips_dsc_and_does_not_need_deka_json() {
+    fn javascript_entry_skips_dsc_and_does_not_need_simien_json() {
         let root = tempfile::tempdir().expect("temp project");
         let entry = root.path().join("handler.js");
         fs::write(
@@ -296,11 +296,11 @@ mod tests {
     }
 
     #[test]
-    fn ds_entry_still_requires_deka_json() {
+    fn ds_entry_still_requires_simien_json() {
         let root = tempfile::tempdir().expect("temp project");
         let entry = root.path().join("main.ds");
         fs::write(&entry, "export const app = 1;\n").expect("write ds");
-        let err = resolve_project_root(&entry).expect_err("ds needs deka.json");
-        assert!(err.contains("deka.json"), "{err}");
+        let err = resolve_project_root(&entry).expect_err("ds needs simien.json");
+        assert!(err.contains("simien.json"), "{err}");
     }
 }

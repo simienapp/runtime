@@ -38,7 +38,7 @@ pub fn cmd(context: &Context) {
         }
         return;
     }
-    // Loose file or unbuilt loose directory (no deka.json anywhere above the
+    // Loose file or unbuilt loose directory (no simien.json anywhere above the
     // resolved handler): compile into the user-global cache and serve the
     // materialized artifact, leaving the user's directory untouched (deka#765).
     let (context, loose_file) = match deka_cache::prepare_loose_serve(context) {

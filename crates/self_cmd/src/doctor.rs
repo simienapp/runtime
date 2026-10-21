@@ -253,7 +253,7 @@ fn render_report(env: &DoctorEnv) -> (Vec<String>, usize) {
     lines.push(format!("  running deka: {}", env.running_version));
     let pins = project_pins(&env.cwd);
     if pins.is_empty() {
-        lines.push("  no project pin found (no deka.json or node_modules/@dekaruntime/deka here)".to_string());
+        lines.push("  no project pin found (no simien.json or node_modules/@dekaruntime/deka here)".to_string());
     }
     for pin in &pins {
         lines.push(format!("  {}: {}", pin.source, pin.version));
@@ -586,7 +586,7 @@ fn resolve_sibling_or_repo_pinned(env: &DoctorEnv) -> Option<Pairing> {
 }
 
 /// Project-level pins: `node_modules/@dekaruntime/deka/package.json`'s
-/// version, and a `"deka"` string field in `deka.json` when one is present.
+/// version, and a `"deka"` string field in `simien.json` when one is present.
 fn project_pins(cwd: &Path) -> Vec<ProjectPin> {
     let mut pins = Vec::new();
     let npm_manifest = cwd
@@ -605,14 +605,14 @@ fn project_pins(cwd: &Path) -> Vec<ProjectPin> {
             });
         }
     }
-    let deka_json = cwd.join("deka.json");
-    if let Ok(text) = std::fs::read_to_string(&deka_json) {
+    let simien_json = cwd.join("simien.json");
+    if let Ok(text) = std::fs::read_to_string(&simien_json) {
         if let Some(pin) = serde_json::from_str::<serde_json::Value>(&text)
             .ok()
             .and_then(|value| value.get("deka")?.as_str().map(str::to_string))
         {
             pins.push(ProjectPin {
-                source: "deka.json \"deka\"".to_string(),
+                source: "simien.json \"deka\"".to_string(),
                 version: pin,
             });
         }
@@ -895,7 +895,7 @@ mod tests {
     }
 
     #[test]
-    fn project_pins_read_npm_manifest_and_deka_json() {
+    fn project_pins_read_npm_manifest_and_simien_json() {
         let home = tempfile::tempdir().unwrap();
         let project = home.path().join("project");
         let npm = project.join("node_modules/@dekaruntime/deka");
@@ -905,13 +905,13 @@ mod tests {
             r#"{"name":"@dekaruntime/deka","version":"0.53.4"}"#,
         )
         .unwrap();
-        std::fs::write(project.join("deka.json"), r#"{"name":"app","deka":"0.53.0"}"#).unwrap();
+        std::fs::write(project.join("simien.json"), r#"{"name":"app","deka":"0.53.0"}"#).unwrap();
 
         let pins = project_pins(&project);
         assert_eq!(pins.len(), 2);
         assert_eq!(pins[0].source, "node_modules/@dekaruntime/deka");
         assert_eq!(pins[0].version, "0.53.4");
-        assert_eq!(pins[1].source, "deka.json \"deka\"");
+        assert_eq!(pins[1].source, "simien.json \"deka\"");
         assert_eq!(pins[1].version, "0.53.0");
 
         // No project on disk: no pins, no panic.

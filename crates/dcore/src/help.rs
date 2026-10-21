@@ -56,7 +56,7 @@ fn curated_help(name: &str) -> Option<CommandHelp> {
     match name {
         "init" => Some(CommandHelp {
             usage: "deka init [directory]",
-            about: "Scaffold a new deka project: deka.json, deka.lock, .gitignore, \
+            about: "Scaffold a new deka project: simien.json, deka.lock, .gitignore, \
                     index.html, and starter source. Run it with no arguments to \
                     initialize the current directory.",
             examples: &[
@@ -88,7 +88,7 @@ fn curated_help(name: &str) -> Option<CommandHelp> {
         }),
         "run" => Some(CommandHelp {
             usage: "deka run <file> [-- <args>]",
-            about: "Run a single .ds/.dsx/.js file, or a script named in deka.json. \
+            about: "Run a single .ds/.dsx/.js file, or a script named in simien.json. \
                     The file does not need to belong to a project — a loose file \
                     compiles into a user-global cache and runs from there, without \
                     writing anything into your directory.",
@@ -111,13 +111,13 @@ fn curated_help(name: &str) -> Option<CommandHelp> {
         }),
         "install" | "add" | "i" => Some(CommandHelp {
             usage: "deka install | deka add <package> [<package>...]",
-            about: "`deka install` reads deka.json and populates ds_modules/ with \
+            about: "`deka install` reads simien.json and populates ds_modules/ with \
                     every declared dependency. `deka add` (alias: `i`) fetches one or \
-                    more packages from the registry and adds them to deka.json.",
+                    more packages from the registry and adds them to simien.json.",
             examples: &[
                 (
                     "deka install",
-                    "install every dependency declared in deka.json",
+                    "install every dependency declared in simien.json",
                 ),
                 ("deka add @deka/io", "add a single package"),
                 (

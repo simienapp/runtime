@@ -15,7 +15,7 @@ impl HandlerKey {
 }
 
 /// Per-execution security policy (deka#725; the only policy channel since
-/// deka#801). The dispatch path resolves it from `deka.json` and the pool
+/// deka#801). The dispatch path resolves it from `simien.json` and the pool
 /// worker installs it on the executing thread for the duration of the
 /// request, so bridge enforcement never reads process-global state: under
 /// `deka dev` a build-slot rematerialization cannot widen (or narrow) the

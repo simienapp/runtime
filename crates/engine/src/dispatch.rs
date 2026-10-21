@@ -138,7 +138,7 @@ pub async fn execute_request_parts(
 fn project_root_from_generated_entry(entry: &str) -> Option<PathBuf> {
     let mut current = Path::new(entry).parent()?;
     loop {
-        if current.join("deka.json").is_file() {
+        if current.join("simien.json").is_file() {
             return Some(current.to_path_buf());
         }
         current = current.parent()?;
@@ -146,7 +146,7 @@ fn project_root_from_generated_entry(entry: &str) -> Option<PathBuf> {
 }
 
 fn read_trailing_slash(project_root: &Path) -> bool {
-    let Ok(raw) = std::fs::read_to_string(project_root.join("deka.json")) else {
+    let Ok(raw) = std::fs::read_to_string(project_root.join("simien.json")) else {
         return false;
     };
     let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) else {

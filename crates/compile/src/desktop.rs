@@ -80,7 +80,7 @@ fn resolve_project(context: &Context) -> Result<PathBuf, String> {
 }
 
 fn require_web_project(root: &Path) -> Result<(), String> {
-    for name in ["deka.json", "deka.lock"] {
+    for name in ["simien.json", "deka.lock"] {
         let path = root.join(name);
         if !path.is_file() {
             return Err(format!(
@@ -98,10 +98,10 @@ fn require_web_project(root: &Path) -> Result<(), String> {
             ));
         }
     }
-    let raw = fs::read_to_string(root.join("deka.json"))
-        .map_err(|e| format!("failed to read {}: {e}", root.join("deka.json").display()))?;
+    let raw = fs::read_to_string(root.join("simien.json"))
+        .map_err(|e| format!("failed to read {}: {e}", root.join("simien.json").display()))?;
     let json: serde_json::Value = serde_json::from_str(&raw)
-        .map_err(|e| format!("invalid {}: {e}", root.join("deka.json").display()))?;
+        .map_err(|e| format!("invalid {}: {e}", root.join("simien.json").display()))?;
     let project_type = json
         .get("type")
         .and_then(|v| v.as_str())
@@ -109,8 +109,8 @@ fn require_web_project(root: &Path) -> Result<(), String> {
     if project_type.as_deref() != Some("serve") {
         let got = project_type.unwrap_or_else(|| "<missing>".to_string());
         return Err(format!(
-            "compile --desktop requires deka.json type=\"serve\" (got: {got}) at {}",
-            root.join("deka.json").display()
+            "compile --desktop requires simien.json type=\"serve\" (got: {got}) at {}",
+            root.join("simien.json").display()
         ));
     }
     Ok(())
@@ -211,7 +211,7 @@ impl Drop for ServeGuard {
 }
 
 fn project_title(root: &Path) -> String {
-    let Ok(raw) = fs::read_to_string(root.join("deka.json")) else {
+    let Ok(raw) = fs::read_to_string(root.join("simien.json")) else {
         return "Deka".to_string();
     };
     let Ok(json) = serde_json::from_str::<serde_json::Value>(&raw) else {

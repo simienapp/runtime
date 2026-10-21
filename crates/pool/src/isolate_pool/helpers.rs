@@ -125,7 +125,7 @@ pub(super) fn set_request_globals(
     };
 
     // Platform → tenant env-var injection. Only names allowed by the
-    // resolved deka.json security policy are exposed to tenant code.
+    // resolved simien.json security policy are exposed to tenant code.
     //
     // Done BEFORE the SHOP_ID injection below so per-request
     // tenant context can never be overridden by a host env var with

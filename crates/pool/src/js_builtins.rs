@@ -1,7 +1,7 @@
 //! Production React builtins for `@js/react*` (rfd#64 amendment 2).
 //!
 //! The resolver serves these specifiers in run/serve/bundle with no install
-//! and no `deka.json` entry. Development React stays feature-gated under
+//! and no `simien.json` entry. Development React stays feature-gated under
 //! `crates/http/vendor/react/`.
 //!
 //! Seams live in sibling modules:

@@ -13,10 +13,10 @@ use std::path::Path;
 use deka_modules::modules::MODULES_DIR;
 use permissions::host_bridge::GrantTable;
 
-/// Read `<root>/deka.json` and return its `(host.kinds, name)`. Both absent
+/// Read `<root>/simien.json` and return its `(host.kinds, name)`. Both absent
 /// manifest and absent fields yield empty values.
 pub(crate) fn read_manifest_host_kinds(root: &Path) -> (Option<Vec<String>>, String) {
-    let path = root.join("deka.json");
+    let path = root.join("simien.json");
     let Ok(text) = std::fs::read_to_string(&path) else {
         return (None, String::new());
     };
@@ -43,7 +43,7 @@ pub(crate) fn read_manifest_host_kinds(root: &Path) -> (Option<Vec<String>>, Str
 }
 
 pub(crate) fn read_manifest_name(root: &Path) -> Option<String> {
-    let text = std::fs::read_to_string(root.join("deka.json")).ok()?;
+    let text = std::fs::read_to_string(root.join("simien.json")).ok()?;
     let value = serde_json::from_str::<serde_json::Value>(&text).ok()?;
     value
         .get("name")

@@ -131,9 +131,9 @@ impl Default for CompileConfig {
 }
 
 impl DekaConfig {
-    /// Load config from deka.json in the current directory
+    /// Load config from simien.json in the current directory
     pub fn load(dir: &PathBuf) -> Result<Self, String> {
-        let config_path = dir.join("deka.json");
+        let config_path = dir.join("simien.json");
 
         if !config_path.exists() {
             // Return default config if file doesn't exist
@@ -141,9 +141,9 @@ impl DekaConfig {
         }
 
         let contents = std::fs::read_to_string(&config_path)
-            .map_err(|e| format!("Failed to read deka.json: {}", e))?;
+            .map_err(|e| format!("Failed to read simien.json: {}", e))?;
 
-        serde_json::from_str(&contents).map_err(|e| format!("Failed to parse deka.json: {}", e))
+        serde_json::from_str(&contents).map_err(|e| format!("Failed to parse simien.json: {}", e))
     }
 }
 

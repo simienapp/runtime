@@ -80,7 +80,7 @@ fn run(context: &Context) -> Result<(), String> {
 }
 
 /// Same root search `deka build` uses: the hint itself when it is a project
-/// root, else the nearest ancestor carrying a deka.json.
+/// root, else the nearest ancestor carrying a simien.json.
 fn resolve_project_root(input_path: &Path) -> Result<PathBuf, String> {
     let start = if input_path.is_dir() {
         input_path.to_path_buf()
@@ -93,13 +93,13 @@ fn resolve_project_root(input_path: &Path) -> Result<PathBuf, String> {
     };
 
     for dir in start.ancestors() {
-        if dir.join("deka.json").is_file() {
+        if dir.join("simien.json").is_file() {
             return Ok(dir.to_path_buf());
         }
     }
 
     Err(format!(
-        "deka verify requires a deka.json project root (searched from {})",
+        "deka verify requires a simien.json project root (searched from {})",
         input_path.display()
     ))
 }

@@ -6,7 +6,7 @@ pub(super) fn resolve_project_root(input_path: &Path) -> Result<PathBuf, String>
 
     let mut nearest_manifest_root = None;
     for dir in start.ancestors() {
-        if dir.join("deka.json").is_file() {
+        if dir.join("simien.json").is_file() {
             let dir = dir.to_path_buf();
             if dir.join("deka.lock").is_file() {
                 return canonical_project_root(dir);
@@ -22,7 +22,7 @@ pub(super) fn resolve_project_root(input_path: &Path) -> Result<PathBuf, String>
     }
 
     Err(format!(
-        "deka build requires a deka.json project root (searched from {})",
+        "deka build requires a simien.json project root (searched from {})",
         input_path.display()
     ))
 }
@@ -68,19 +68,19 @@ pub(super) fn ensure_project_layout(
     )
 }
 
-fn load_deka_json(project_root: &Path) -> Result<serde_json::Value, String> {
-    let deka_path = project_root.join("deka.json");
+fn load_simien_json(project_root: &Path) -> Result<serde_json::Value, String> {
+    let deka_path = project_root.join("simien.json");
     let raw = fs::read_to_string(&deka_path).map_err(|err| {
         format!(
             "failed to read {}: {}",
-            project_root.join("deka.json").display(),
+            project_root.join("simien.json").display(),
             err
         )
     })?;
     serde_json::from_str(&raw).map_err(|err| {
         format!(
             "invalid {}: {}",
-            project_root.join("deka.json").display(),
+            project_root.join("simien.json").display(),
             err
         )
     })
@@ -88,7 +88,7 @@ fn load_deka_json(project_root: &Path) -> Result<serde_json::Value, String> {
 
 pub(super) fn ensure_web_project_layout(project_root: &Path) -> Result<(), String> {
     let required_files = [
-        project_root.join("deka.json"),
+        project_root.join("simien.json"),
         project_root.join("deka.lock"),
     ];
     for file in &required_files {
@@ -110,7 +110,7 @@ pub(super) fn ensure_web_project_layout(project_root: &Path) -> Result<(), Strin
         return Err("public/index.html collides with the root index.html document".to_string());
     }
 
-    let json = load_deka_json(project_root)?;
+    let json = load_simien_json(project_root)?;
     let project_type = json
         .get("type")
         .and_then(|v| v.as_str())
@@ -119,9 +119,9 @@ pub(super) fn ensure_web_project_layout(project_root: &Path) -> Result<(), Strin
     if project_type.as_deref() != Some("serve") {
         let got = project_type.unwrap_or_else(|| "<missing>".to_string());
         return Err(format!(
-            "web build requires deka.json type=\"serve\" (got: {}) at {}",
+            "web build requires simien.json type=\"serve\" (got: {}) at {}",
             got,
-            project_root.join("deka.json").display()
+            project_root.join("simien.json").display()
         ));
     }
 
@@ -129,7 +129,7 @@ pub(super) fn ensure_web_project_layout(project_root: &Path) -> Result<(), Strin
 }
 
 pub(super) fn resolve_web_entry(project_root: &Path) -> Result<PathBuf, String> {
-    let json = load_deka_json(project_root)?;
+    let json = load_simien_json(project_root)?;
 
     if runtime_core::dist::is_source_app_router_project(project_root) {
         let page = project_root.join("app").join("page.dsx");
@@ -148,8 +148,8 @@ pub(super) fn resolve_web_entry(project_root: &Path) -> Result<PathBuf, String> 
         .filter(|v| !v.trim().is_empty())
         .ok_or_else(|| {
             format!(
-                "web build requires index.html + app/page.dsx, or deka.json serve.entry, in {}",
-                project_root.join("deka.json").display()
+                "web build requires index.html + app/page.dsx, or simien.json serve.entry, in {}",
+                project_root.join("simien.json").display()
             )
         })?;
 
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn build_passes_no_external_module_root_and_gates_third_party() {
         let project = tempfile::tempdir().expect("project");
-        fs::write(project.path().join("deka.json"), r#"{"name":"app"}"#).expect("manifest");
+        fs::write(project.path().join("simien.json"), r#"{"name":"app"}"#).expect("manifest");
         fs::write(project.path().join("deka.lock"), "{}").expect("lock");
 
         ensure_project_layout(project.path(), None, &[]).expect("no imports");
@@ -233,6 +233,6 @@ mod tests {
                 .map(|spec| (*spec).to_string())
                 .collect::<Vec<_>>(),
         )
-        .expect("runtime React builtins need no deka.json entry");
+        .expect("runtime React builtins need no simien.json entry");
     }
 }

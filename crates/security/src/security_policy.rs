@@ -52,7 +52,7 @@ impl Default for SecurityPolicy {
     fn default() -> Self {
         Self {
             allow: SecurityScope {
-                run: RuleList::List(vec!["deka".to_string()]),
+                run: RuleList::List(vec!["simien".to_string()]),
                 ..SecurityScope::default()
             },
             deny: SecurityScope::default(),

@@ -64,7 +64,7 @@ fn check_bare(context: &Context) {
     }
 
     let root = &context.env.cwd;
-    if !root.join("deka.json").is_file() {
+    if !root.join("simien.json").is_file() {
         stdio::error("check", USAGE);
         std::process::exit(2);
     }

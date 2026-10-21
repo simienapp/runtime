@@ -54,7 +54,7 @@ pub struct ServeConfig {
 }
 
 impl ServeConfig {
-    /// Loads `serve` config from `deka.json`.
+    /// Loads `serve` config from `simien.json`.
     ///
     /// A missing config file, or a config file with no `serve`-shaped keys
     /// at all, is a normal case and resolves to defaults. A config file that
@@ -66,14 +66,14 @@ impl ServeConfig {
     /// The separate `serve.json` file is no longer supported (deka#1038):
     /// it never grew a runtime effect for `headers`/`rewrites`/`redirects`
     /// (deka#1037), and its `mode`/`entry`/`directoryListing` keys live in
-    /// `deka.json`'s `serve` object instead.
+    /// `simien.json`'s `serve` object instead.
     pub fn load(directory: &std::path::Path) -> Result<Self, String> {
-        let deka_json_path = directory.join("deka.json");
-        Ok(load_serve_from_deka_json(&deka_json_path)?.unwrap_or_default())
+        let simien_json_path = directory.join("simien.json");
+        Ok(load_serve_from_simien_json(&simien_json_path)?.unwrap_or_default())
     }
 }
 
-fn load_serve_from_deka_json(path: &std::path::Path) -> Result<Option<ServeConfig>, String> {
+fn load_serve_from_simien_json(path: &std::path::Path) -> Result<Option<ServeConfig>, String> {
     if !path.exists() {
         return Ok(None);
     }
@@ -107,7 +107,7 @@ fn load_serve_from_deka_json(path: &std::path::Path) -> Result<Option<ServeConfi
             });
     }
 
-    // Optional convenience: allow top-level serve keys in deka.json.
+    // Optional convenience: allow top-level serve keys in simien.json.
     match serde_json::from_value::<ServeConfig>(root.clone()) {
         Ok(config)
             if config.entry.is_some()
@@ -120,7 +120,7 @@ fn load_serve_from_deka_json(path: &std::path::Path) -> Result<Option<ServeConfi
         Err(err) => {
             // Only escalate to a hard error when the file was plainly trying
             // to set one of these keys at the top level (deka#1017) — a
-            // deka.json with unrelated top-level keys that merely fails to
+            // simien.json with unrelated top-level keys that merely fails to
             // coerce into ServeConfig is not a serve-config typo.
             let looks_like_serve_config = root
                 .as_object()
@@ -546,7 +546,7 @@ mod tests {
             "export function main() { return 'main'; }",
         )
         .expect("write configured");
-        fs::write(dir.join("deka.json"), r#"{"serve":{"entry":"main.ds"}}"#).expect("write config");
+        fs::write(dir.join("simien.json"), r#"{"serve":{"entry":"main.ds"}}"#).expect("write config");
 
         let resolved = resolve_handler_path(dir.to_str().expect("path")).expect("resolve");
         let resolved_canon = resolved.path.canonicalize().expect("resolved canonicalize");

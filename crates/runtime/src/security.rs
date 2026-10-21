@@ -53,7 +53,7 @@ pub fn resolve_security_policy_for_root(
     project_kind: ProjectKind,
     dev: bool,
 ) -> Result<ResolvedSecurityPolicy, String> {
-    let document = read_deka_json(root)?;
+    let document = read_simien_json(root)?;
     let phase = if dev {
         permissions::permissions::ExecutionPhase::DevRequest
     } else {
@@ -116,13 +116,13 @@ pub fn resolve_security_policy_for_root(
     })
 }
 
-fn read_deka_json(root: &Path) -> Result<serde_json::Value, String> {
-    let deka_json_path = root.join("deka.json");
-    if deka_json_path.is_file() {
-        let raw = std::fs::read_to_string(&deka_json_path)
-            .map_err(|err| format!("failed to read {}: {}", deka_json_path.display(), err))?;
+fn read_simien_json(root: &Path) -> Result<serde_json::Value, String> {
+    let simien_json_path = root.join("simien.json");
+    if simien_json_path.is_file() {
+        let raw = std::fs::read_to_string(&simien_json_path)
+            .map_err(|err| format!("failed to read {}: {}", simien_json_path.display(), err))?;
         serde_json::from_str::<serde_json::Value>(&raw)
-            .map_err(|err| format!("invalid JSON in {}: {}", deka_json_path.display(), err))
+            .map_err(|err| format!("invalid JSON in {}: {}", simien_json_path.display(), err))
     } else {
         Ok(serde_json::json!({}))
     }
@@ -199,7 +199,7 @@ pub fn resolve_build_policy_for_root(
     params: &std::collections::HashMap<String, String>,
     dev: bool,
 ) -> Result<ResolvedSecurityPolicy, String> {
-    let document = read_deka_json(root)?;
+    let document = read_simien_json(root)?;
     if let Some(resolved) = resolve_phase_aware(
         &document,
         root,
@@ -210,7 +210,7 @@ pub fn resolve_build_policy_for_root(
     resolve_security_policy_for_root(root, flags, params, ProjectKind::Php, dev)
 }
 
-/// Resolve the platform default-tenant security policy from deka.json and
+/// Resolve the platform default-tenant security policy from simien.json and
 /// install prompt-suppression state. Returns the resolved policy so the
 /// caller hands it to every dispatched request — since deka#801 the policy
 /// travels per execution (`RequestData.security`), never through the
@@ -240,7 +240,7 @@ pub fn resolve_platform_security_for_root(
 }
 
 /// Legacy fallback for manifests that declare no permissions at all (a loose
-/// file, or a `deka.json` predating the RFD-53 `permissions` block): `deka
+/// file, or a `simien.json` predating the RFD-53 `permissions` block): `deka
 /// dev` / `serve --dev` still need to read the project and write its build
 /// cache to be usable, so this widens the three narrowest gaps rather than
 /// leaving a scaffold-less project fully denied. This is an IMPLICIT grant —
@@ -274,7 +274,7 @@ fn apply_dev_defaults(
 
     if !granted.is_empty() {
         stdio::note(&format!(
-            "dev mode implicitly granted {} (no `permissions.dev` in deka.json) — declare it explicitly with `deka init` or a `permissions.dev` block to make this permanent and visible; production stays default-deny",
+            "dev mode implicitly granted {} (no `permissions.dev` in simien.json) — add a `permissions.dev` block to simien.json to make this permanent and visible; production stays default-deny",
             granted.join(", ")
         ));
     }
@@ -467,7 +467,7 @@ mod tests {
         let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         dir.push(format!("deka-phase-perms-test-{stamp}-{seq}"));
         fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("deka.json"), manifest).unwrap();
+        fs::write(dir.join("simien.json"), manifest).unwrap();
         dir
     }
 

@@ -12,7 +12,7 @@ use runtime_core::DEKA_VALIDATION_ERROR_MARKER;
 /// Resolve the optional stdlib root from the project manifest. It is a
 /// declared, reviewable input rather than an ambient process override.
 pub(crate) fn configured_module_root(project_root: &Path) -> Result<Option<PathBuf>, JsErrorBox> {
-    let manifest = project_root.join("deka.json");
+    let manifest = project_root.join("simien.json");
     let text = match std::fs::read_to_string(&manifest) {
         Ok(text) => text,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -36,7 +36,7 @@ pub(crate) fn configured_module_root(project_root: &Path) -> Result<Option<PathB
     };
     if !root.is_dir() {
         return Err(JsErrorBox::generic(format!(
-            "deka.json moduleRoot is not a directory: {}",
+            "simien.json moduleRoot is not a directory: {}",
             root.display()
         )));
     }
@@ -144,7 +144,7 @@ mod tests {
         let stdlib = root.path().join("stdlib");
         fs::create_dir_all(&stdlib).expect("stdlib root");
         fs::write(
-            root.path().join("deka.json"),
+            root.path().join("simien.json"),
             r#"{"name":"ambient-proof","moduleRoot":"stdlib"}"#,
         )
         .expect("manifest");
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn external_module_root_exempts_stdlib_only() {
         let project = tempfile::tempdir().expect("project");
-        fs::write(project.path().join("deka.json"), r#"{"name":"tenant"}"#).expect("manifest");
+        fs::write(project.path().join("simien.json"), r#"{"name":"tenant"}"#).expect("manifest");
         fs::write(project.path().join("deka.lock"), "{}").expect("lock");
         let stdlib = tempfile::tempdir().expect("stdlib root");
 

@@ -39,7 +39,7 @@ pub struct FrameworkManifest {
 /// still develops and builds — `deka build` emits
 /// [`DEFAULT_INDEX_HARNESS`](super::DEFAULT_INDEX_HARNESS) in that case.
 pub fn is_source_app_router_project(project_root: &Path) -> bool {
-    project_root.join("deka.json").is_file()
+    project_root.join("simien.json").is_file()
         && (project_root.join("app/page.dsx").is_file()
             || project_root.join("app/page.ds").is_file())
 }
@@ -240,10 +240,10 @@ mod tests {
     fn app_router_project_detection_separates_source_from_built_output() {
         let tmp = tmp_dir("project_detection");
 
-        // The source predicate is `deka.json` + a root page, both public
+        // The source predicate is `simien.json` + a root page, both public
         // source extensions; a root index.html is NOT required (RFD 54
         // amendment 1 — the harness is a build output).
-        std::fs::write(tmp.join("deka.json"), "{}").unwrap();
+        std::fs::write(tmp.join("simien.json"), "{}").unwrap();
         std::fs::create_dir_all(tmp.join("app")).unwrap();
         std::fs::write(tmp.join("app/page.dsx"), "export fn Page() {}").unwrap();
         assert!(is_source_app_router_project(&tmp));

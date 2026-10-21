@@ -337,7 +337,7 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("app")).unwrap();
         fs::create_dir_all(root.join("src/ui")).unwrap();
-        fs::write(root.join("deka.json"), r#"{"name":"server-refresh"}"#).unwrap();
+        fs::write(root.join("simien.json"), r#"{"name":"server-refresh"}"#).unwrap();
         fs::write(
             root.join("app/page.dsx"),
             "export fn Page() ReactNode {\n  return <h1 id=\"server-title\">hello server</h1>\n}\n",

@@ -15,7 +15,7 @@ of itself.
 deka compile --desktop [project] [--outfile <path>]
 ```
 
-Requires a web project: `deka.json` with `type: "serve"`, `deka.lock`, `app/`,
+Requires a web project: `simien.json` with `type: "serve"`, `deka.lock`, `app/`,
 `public/`. dsc is required (`DEKA_DSC` or beside `deka` / on `PATH`).
 
 ## Pipeline

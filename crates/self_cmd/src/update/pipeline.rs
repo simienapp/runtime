@@ -552,7 +552,7 @@ fn managed_units_from_env() -> Result<Vec<String>, String> {
 
 /// The loader itself, with the env-resolved units passed in. An explicit
 /// `--config` with a non-empty `managed_units` list wins over the env
-/// fallback; a CWD `deka.json` is never consulted.
+/// fallback; a CWD `simien.json` is never consulted.
 fn load_managed_units_for(
     env_units: Vec<String>,
     context: &Context,
@@ -755,24 +755,24 @@ mod tests {
     }
 
     #[test]
-    fn load_managed_units_does_not_trust_cwd_deka_json() {
+    fn load_managed_units_does_not_trust_cwd_simien_json() {
         let dir = std::env::temp_dir().join(format!("deka-json-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let deka_json = dir.join("deka.json");
+        let simien_json = dir.join("simien.json");
         let content = r#"{"self":{"update":{"managed_units":["ssh.service"]}}}"#;
-        std::fs::write(&deka_json, content).unwrap();
+        std::fs::write(&simien_json, content).unwrap();
 
         let ctx = dummy_context(dir.clone());
-        // No env units: the CWD deka.json must not be consulted.
+        // No env units: the CWD simien.json must not be consulted.
         let units = load_managed_units_for(Vec::new(), &ctx).unwrap();
         assert!(units.is_empty());
 
-        // CWD deka.json does not override the explicit env fallback.
+        // CWD simien.json does not override the explicit env fallback.
         let units2 = load_managed_units_for(vec!["gg.tana.other".to_string()], &ctx).unwrap();
         assert_eq!(units2, vec!["gg.tana.other"]);
 
         // cleanup
-        let _ = std::fs::remove_file(&deka_json);
+        let _ = std::fs::remove_file(&simien_json);
         let _ = std::fs::remove_dir(&dir);
     }
 

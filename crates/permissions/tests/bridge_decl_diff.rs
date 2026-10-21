@@ -42,7 +42,7 @@ fn check_fixture(name: &str) -> permissions::bridge_decl::BridgeCheck {
     let dir = fixtures().join(name);
     let files = read_ds_files(&dir);
     assert!(!files.is_empty(), "fixture {name} has no .ds files");
-    let package = dir.join("deka.json");
+    let package = dir.join("simien.json");
     let package = std::fs::read_to_string(package).expect("fixture manifest");
     let package: serde_json::Value = serde_json::from_str(&package).expect("manifest json");
     let package = package

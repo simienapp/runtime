@@ -162,7 +162,7 @@ fn run_web_project_build(context: &Context) -> Result<(), String> {
         .transpose()?;
 
     // The build phase runs under the project's resolved security policy
-    // (deka.json + CLI overrides); permitted local reads are recorded per
+    // (simien.json + CLI overrides); permitted local reads are recorded per
     // slot for targeted `deka dev` invalidation (deka#725).
     let materialized = crate::slots::materialize_planned_slots(
         &context.args.flags,
@@ -305,7 +305,7 @@ fn run_web_project_build(context: &Context) -> Result<(), String> {
             copy_dir_recursive(&scoped, &dist_client.join(MODULES_DIR).join("@deka"))?;
         }
     }
-    for file in ["deka.json", "deka.lock"] {
+    for file in ["simien.json", "deka.lock"] {
         let src = project_root.join(file);
         if src.is_file() {
             let dst = dist_server.join(file);
@@ -565,7 +565,7 @@ fn read_serve_kind(project_root: &Path) -> Result<Option<ServeKind>, String> {
         Some("static") => Ok(Some(ServeKind::Static)),
         Some("worker") => Ok(Some(ServeKind::Worker)),
         Some(other) => Err(format!(
-            "deka.json serve.kind must be \"static\" or \"worker\", got {other:?}"
+            "simien.json serve.kind must be \"static\" or \"worker\", got {other:?}"
         )),
     }
 }
@@ -584,7 +584,7 @@ fn read_trailing_slash(project_root: &Path) -> bool {
 }
 
 fn read_serve_object(project_root: &Path) -> Result<Option<serde_json::Value>, String> {
-    let path = project_root.join("deka.json");
+    let path = project_root.join("simien.json");
     if !path.is_file() {
         return Ok(None);
     }

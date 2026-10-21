@@ -165,9 +165,9 @@ fn get_poll_interval(context: &Context) -> Duration {
         }
     }
 
-    // Try deka.json
-    let deka_json = context.env.cwd.join("deka.json");
-    if let Ok(raw) = std::fs::read_to_string(&deka_json) {
+    // Try simien.json
+    let simien_json = context.env.cwd.join("simien.json");
+    if let Ok(raw) = std::fs::read_to_string(&simien_json) {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&raw) {
             if let Some(secs) = json
                 .get("self")
@@ -316,12 +316,12 @@ mod tests {
     }
 
     #[test]
-    fn monitor_interval_from_deka_json() {
+    fn monitor_interval_from_simien_json() {
         let dir = std::env::temp_dir().join(format!("deka-mon-json-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let deka_json = dir.join("deka.json");
+        let simien_json = dir.join("simien.json");
         std::fs::write(
-            &deka_json,
+            &simien_json,
             r#"{"self":{"monitor":{"interval_seconds":42}}}"#,
         )
         .unwrap();
@@ -330,7 +330,7 @@ mod tests {
         let config = load_monitor_config(&ctx).unwrap();
         assert_eq!(config.poll_interval, Duration::from_secs(42));
 
-        let _ = std::fs::remove_file(&deka_json);
+        let _ = std::fs::remove_file(&simien_json);
         let _ = std::fs::remove_dir(&dir);
     }
 
@@ -338,9 +338,9 @@ mod tests {
     fn monitor_interval_flag_overrides_json() {
         let dir = std::env::temp_dir().join(format!("deka-mon-flag-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let deka_json = dir.join("deka.json");
+        let simien_json = dir.join("simien.json");
         std::fs::write(
-            &deka_json,
+            &simien_json,
             r#"{"self":{"monitor":{"interval_seconds":42}}}"#,
         )
         .unwrap();
@@ -353,7 +353,7 @@ mod tests {
         let config = load_monitor_config(&ctx).unwrap();
         assert_eq!(config.poll_interval, Duration::from_secs(17));
 
-        let _ = std::fs::remove_file(&deka_json);
+        let _ = std::fs::remove_file(&simien_json);
         let _ = std::fs::remove_dir(&dir);
     }
 
@@ -368,12 +368,12 @@ mod tests {
     }
 
     #[test]
-    fn monitor_does_not_trust_cwd_deka_json_for_managed_units() {
+    fn monitor_does_not_trust_cwd_simien_json_for_managed_units() {
         let dir = std::env::temp_dir().join(format!("deka-mon-cwd-units-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let deka_json = dir.join("deka.json");
+        let simien_json = dir.join("simien.json");
         std::fs::write(
-            &deka_json,
+            &simien_json,
             r#"{"self":{"update":{"managed_units":["ssh.service"]}}}"#,
         )
         .unwrap();
@@ -382,7 +382,7 @@ mod tests {
         let config = load_monitor_config(&ctx).unwrap();
         assert!(config.update_config.managed_units.is_empty());
 
-        let _ = std::fs::remove_file(&deka_json);
+        let _ = std::fs::remove_file(&simien_json);
         let _ = std::fs::remove_dir(&dir);
     }
 
