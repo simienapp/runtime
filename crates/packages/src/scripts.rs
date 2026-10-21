@@ -49,19 +49,14 @@ impl LifecycleScriptsExecutor for ScriptsExecutor {
                 .root_node_modules_dir_path
                 .parent()
                 .unwrap_or(options.root_node_modules_dir_path);
-            let places = simien_sandbox::Places::detect(project, Some(&package.package_folder))?;
-            let mut policy = simien_sandbox::Policy::install(places);
-            if let Some(grant) = simien_sandbox::preapproved(name).and_then(|entry| entry.install) {
-                policy
-                    .grant(&grant)
-                    .map_err(|err| anyhow::anyhow!("{name}: pre-approved permissions: {err}"))?;
-            }
+            let places = crate::sandbox::Places::detect(project, Some(&package.package_folder))?;
+            let sandbox = crate::sandbox::for_install(&places, name)?;
             for init_cwd in cwds {
                 for phase in PHASES {
                     let Some(script) = package.scripts.get(phase) else {
                         continue;
                     };
-                    let status = shell(&policy, script)?
+                    let status = shell(&sandbox, script)?
                         .current_dir(&package.package_folder)
                         .env("PATH", &path)
                         .env("INIT_CWD", init_cwd)
@@ -89,14 +84,14 @@ impl LifecycleScriptsExecutor for ScriptsExecutor {
     }
 }
 
-/// `script` through the shell, in `policy`'s sandbox.
-fn shell(policy: &simien_sandbox::Policy, script: &str) -> anyhow::Result<Command> {
+/// `script` through the shell, in `sandbox`.
+fn shell(sandbox: &gelada::Sandbox, script: &str) -> anyhow::Result<Command> {
     let (program, flags): (&str, &[&str]) = if cfg!(windows) {
         ("cmd", &["/d", "/s", "/c"])
     } else {
         ("sh", &["-c"])
     };
-    let mut command = policy.command(program)?;
+    let mut command = sandbox.command(program)?;
     command.args(flags).arg(script);
     Ok(command)
 }

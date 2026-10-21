@@ -7,6 +7,7 @@
 mod audit;
 pub mod command;
 pub mod exec;
+pub mod sandbox;
 mod http;
 mod queries;
 mod scripts;

@@ -290,9 +290,9 @@ async fn install_scripts_run_only_for_packages_simien_json_allows() {
 }
 
 fn run_tool(program: &packages::exec::Program, project: &Path) -> String {
-    let policy = program.policy(project).unwrap();
+    let sandbox = program.sandbox(project).unwrap();
     let output = program
-        .command(&policy, &["a".to_string(), "--b".to_string()])
+        .command(&sandbox, &["a".to_string(), "--b".to_string()])
         .unwrap()
         .output()
         .unwrap();

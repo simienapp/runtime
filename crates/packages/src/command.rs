@@ -346,9 +346,9 @@ fn x(context: &Context) {
             anyhow::bail!("name the package to run, e.g. `simien x prettier --write .`");
         };
         let program = crate::exec::resolve(&root, spec, None).await?;
-        let policy = program.policy(&root)?;
+        let sandbox = program.sandbox(&root)?;
         let status = program
-            .command(&policy, output::Passthrough::of(context))?
+            .command(&sandbox, output::Passthrough::of(context))?
             .status()
             .with_context(|| format!("running {}", program.path.display()))?;
         code = exit_code(status);

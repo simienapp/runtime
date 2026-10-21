@@ -49,25 +49,19 @@ pub struct Program {
 impl Program {
     /// The sandbox it runs in, for a project at `project`. Keep it until the
     /// program ends.
-    pub fn policy(&self, project: &Path) -> anyhow::Result<simien_sandbox::Policy> {
-        let places = simien_sandbox::Places::detect(project, None)?;
-        let mut policy = simien_sandbox::Policy::x(places);
-        if let Some(grant) = simien_sandbox::preapproved(&self.package).and_then(|entry| entry.x) {
-            policy
-                .grant(&grant)
-                .map_err(|err| anyhow::anyhow!("{}: pre-approved permissions: {err}", self.package))?;
-        }
-        Ok(policy)
+    pub fn sandbox(&self, project: &Path) -> anyhow::Result<gelada::Sandbox> {
+        let places = crate::sandbox::Places::detect(project, None)?;
+        crate::sandbox::for_x(&places, &self.package)
     }
 
-    pub fn command(&self, policy: &simien_sandbox::Policy, args: &[String]) -> anyhow::Result<Command> {
+    pub fn command(&self, sandbox: &gelada::Sandbox, args: &[String]) -> anyhow::Result<Command> {
         let mut command = match &self.runner {
             Some(runner) => {
-                let mut command = policy.command(runner)?;
+                let mut command = sandbox.command(runner)?;
                 command.arg(&self.path);
                 command
             }
-            None => policy.command(&self.path)?,
+            None => sandbox.command(&self.path)?,
         };
         command.args(args);
         let mut path = self.bin_dirs.clone();

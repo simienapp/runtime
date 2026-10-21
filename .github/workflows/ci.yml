@@ -40,15 +40,15 @@ jobs:
             libegl1-mesa-dev libvulkan-dev libxcb-shape0-dev libxcb-xfixes0-dev clang pkg-config libssl-dev
       - name: Pre-approved permissions match simienapp/permissions at the pin
         run: |
-          pin=$(cat crates/sandbox/permissions-pin)
+          pin=$(cat crates/packages/permissions-pin)
           curl -fsSL "https://raw.githubusercontent.com/simienapp/permissions/$pin/permissions.json" -o "$RUNNER_TEMP/permissions.json"
-          cmp "$RUNNER_TEMP/permissions.json" crates/sandbox/permissions.json
+          cmp "$RUNNER_TEMP/permissions.json" crates/packages/permissions.json
       - name: Check
         run: cargo check --locked --workspace --all-targets
       - name: Clippy (crates held to zero warnings)
-        run: cargo clippy --locked -p web_host -p server -p simien -p output -p packages -p simien_sandbox --all-targets --no-deps -- -D warnings
+        run: cargo clippy --locked -p web_host -p server -p simien -p output -p packages --all-targets --no-deps -- -D warnings
       - name: Test
-        run: cargo test --locked -p web_host -p server -p simien -p output -p packages -p simien_sandbox -p platform_server -p pool
+        run: cargo test --locked -p web_host -p server -p simien -p output -p packages -p platform_server -p pool
       - name: Web APIs in a served app
         run: cargo test --locked -p cli --test web_apis
       - run: sccache --show-stats
