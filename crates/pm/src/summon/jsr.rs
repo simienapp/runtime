@@ -1,9 +1,13 @@
 //! JSR acquisition and vendor-time erasure; installation is shared with URL sources.
 use super::*;
 use std::io::Write;
-use swc_common::{GLOBALS, Globals, Mark};
-use swc_ecma_parser::TsSyntax;
-use swc_ecma_visit::{VisitMut, VisitMutWith};
+use oxc_allocator::FromIn;
+use oxc_ast::ast::StringLiteral;
+use oxc_ast_visit::{VisitMut, walk_mut};
+use oxc_codegen::Codegen;
+use oxc_semantic::SemanticBuilder;
+use oxc_str::Str;
+use oxc_transformer::{TransformOptions, Transformer};
 
 pub(super) fn prepare(source: &str, staging: &Path) -> Result<Prepared> {
     let registry = std::env::var("DEKA_JSR_REGISTRY").unwrap_or_else(|_| "https://jsr.io/".into());
@@ -171,31 +175,19 @@ fn prepare_from(source: &str, staging: &Path, registry: &str) -> Result<Prepared
     // Inspect originals as well: stripping must not hide external type-only dependencies.
     let mut external = BTreeSet::new();
     for (path, source) in &modules {
-        let cm: Lrc<SourceMap> = Default::default();
-        let fm = cm.new_source_file(FileName::Custom(path.clone()).into(), source.clone());
         let ts = path.ends_with(".ts") || path.ends_with(".mts");
-        let syntax = if ts {
-            Syntax::Typescript(TsSyntax {
-                dts: path.ends_with(".d.ts"),
-                ..Default::default()
-            })
+        let source_type = if ts {
+            SourceType::from_path(path).map_err(|e| anyhow!("{path}: {e}"))?
         } else {
-            Syntax::Es(Default::default())
+            SourceType::mjs()
         };
-        let mut parser = Parser::new_from(Lexer::new(
-            syntax,
-            Default::default(),
-            StringInput::from(&*fm),
-            None,
-        ));
-        let module = parser
-            .parse_module()
-            .map_err(|e| anyhow!("{path}: invalid JSR source: {:?}", e.kind()))?;
-        if !parser.take_errors().is_empty() {
-            bail!("{path}: invalid JSR source");
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, source, source_type).parse();
+        if let Some(error) = parsed.diagnostics.errors().next() {
+            bail!("{path}: invalid JSR source: {error}");
         }
-        let mut imports = Imports::default();
-        module.visit_with(&mut imports);
+        let mut program = parsed.program;
+        let imports = Imports::of(&program);
         if imports.unknown {
             external.insert(
                 "<non-literal dynamic import/require: use explicit module specifiers>".into(),
@@ -223,19 +215,16 @@ fn prepare_from(source: &str, staging: &Path, registry: &str) -> Result<Prepared
             }
             external.insert(spec);
         }
-        let code = GLOBALS.set(&Globals::new(), || {
-            let unresolved = Mark::new();
-            let top = Mark::new();
-            let mut program = Program::Module(module);
-            program.mutate(swc_ecma_transforms_base::resolver(unresolved, top, ts));
-            if ts {
-                program.mutate(swc_ecma_transforms_typescript::strip(unresolved, top));
+        if ts {
+            let scoping = SemanticBuilder::new().build(&program).semantic.into_scoping();
+            let stripped = Transformer::new(&allocator, Path::new(path), &TransformOptions::default())
+                .build_with_scoping(scoping, &mut program);
+            if let Some(error) = stripped.diagnostics.errors().next() {
+                bail!("{path}: can't strip TypeScript: {error}");
             }
-            program.visit_mut_with(&mut RewriteImports);
-            program.mutate(swc_ecma_transforms_base::hygiene::hygiene());
-            program.mutate(swc_ecma_transforms_base::fixer::fixer(None));
-            swc_ecma_codegen::to_code_default(cm, None, &program)
-        });
+        }
+        RewriteImports { allocator: &allocator }.visit_program(&mut program);
+        let code = Codegen::new().build(&program).code;
         let dest = package.join("js").join(js_path(path));
         fs::create_dir_all(dest.parent().unwrap())?;
         write_unique(&dest, code.as_bytes())?;
@@ -270,38 +259,40 @@ fn prepare_from(source: &str, staging: &Path, registry: &str) -> Result<Prepared
     })
 }
 
-struct RewriteImports;
-impl RewriteImports {
-    fn rewrite(s: &mut Str) {
-        let spec = s.value.to_string_lossy();
+struct RewriteImports<'a> {
+    allocator: &'a Allocator,
+}
+impl<'a> RewriteImports<'a> {
+    fn rewrite(&self, s: &mut StringLiteral<'a>) {
+        let spec = s.value.as_str();
         if spec.starts_with("./") || spec.starts_with("../") {
-            s.value = js_path(&spec).into();
+            s.value = Str::from_in(js_path(spec), self.allocator);
             s.raw = None;
         }
     }
 }
-impl VisitMut for RewriteImports {
-    fn visit_mut_import_decl(&mut self, n: &mut ImportDecl) {
-        Self::rewrite(&mut n.src);
+impl<'a> VisitMut<'a> for RewriteImports<'a> {
+    fn visit_import_declaration(&mut self, n: &mut ImportDeclaration<'a>) {
+        self.rewrite(&mut n.source);
     }
-    fn visit_mut_named_export(&mut self, n: &mut NamedExport) {
-        if let Some(s) = &mut n.src {
-            Self::rewrite(s);
+    fn visit_export_from_declaration(&mut self, n: &mut ExportFromDeclaration<'a>) {
+        self.rewrite(&mut n.source);
+    }
+    fn visit_export_all_declaration(&mut self, n: &mut ExportAllDeclaration<'a>) {
+        self.rewrite(&mut n.source);
+    }
+    fn visit_import_expression(&mut self, n: &mut ImportExpression<'a>) {
+        if let Expression::StringLiteral(s) = &mut n.source {
+            self.rewrite(s);
         }
+        walk_mut::walk_import_expression(self, n);
     }
-    fn visit_mut_export_all(&mut self, n: &mut ExportAll) {
-        Self::rewrite(&mut n.src);
-    }
-    fn visit_mut_call_expr(&mut self, n: &mut CallExpr) {
-        if matches!(&n.callee, Callee::Import(_))
-            || matches!(&n.callee, Callee::Expr(e) if matches!(e.as_ref(), Expr::Ident(i) if i.sym == *"require"))
+    fn visit_call_expression(&mut self, n: &mut CallExpression<'a>) {
+        if matches!(&n.callee, Expression::Identifier(i) if i.name == "require")
+            && let Some(Argument::StringLiteral(s)) = n.arguments.first_mut()
         {
-            if let Some(ExprOrSpread { spread: None, expr }) = n.args.first_mut() {
-                if let Expr::Lit(Lit::Str(s)) = expr.as_mut() {
-                    Self::rewrite(s);
-                }
-            }
+            self.rewrite(s);
         }
-        n.visit_mut_children_with(self);
+        walk_mut::walk_call_expression(self, n);
     }
 }

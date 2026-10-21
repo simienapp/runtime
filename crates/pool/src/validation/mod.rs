@@ -4,8 +4,7 @@ pub mod handler_validator;
 
 pub use error_analysis::analyze_runtime_error;
 pub use handler_validator::{
-    PoolOptions, PoolWorkers, ServeOptions, extract_pool_options, extract_serve_options,
-    validate_dynamic_code, validate_dynamic_code_from_security_context, validate_handler,
+    PoolWorkers, ServeOptions, validate_dynamic_code, validate_dynamic_code_from_security_context,
 };
 
 pub fn format_runtime_syntax_error(
