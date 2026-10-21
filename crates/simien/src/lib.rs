@@ -5,6 +5,7 @@
 
 use dcore::{FlagSpec, ParamSpec, ParseErrorKind, Registry, RegistryBuilder};
 
+mod dev_database;
 pub mod help;
 
 pub use output::banner;
@@ -183,6 +184,9 @@ pub fn run() -> i32 {
         }
         Err(_) => {}
     }
+
+    // Lives as long as `dev` serves.
+    let _database = (command.name == "dev").then(|| dev_database::start(globals)).flatten();
 
     match args.commands.get(1) {
         None => (command.handler)(&context),

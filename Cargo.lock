@@ -2276,6 +2276,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "devloop"
+version = "0.61.0"
+dependencies = [
+ "container",
+ "notify",
+ "postgres",
+ "project",
+ "schema_sync",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "diff"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8554,6 +8567,7 @@ dependencies = [
  "container",
  "dcore",
  "dev",
+ "devloop",
  "introspect",
  "output",
  "packages",

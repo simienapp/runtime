@@ -46,14 +46,14 @@ jobs:
       - name: Check
         run: cargo check --locked --workspace --all-targets
       - name: Clippy (crates held to zero warnings)
-        run: cargo clippy --locked -p web_host -p server -p simien -p output -p container -p project -p packages -p schema -p schema_sync -p check --all-targets --no-deps -- -D warnings
+        run: cargo clippy --locked -p web_host -p server -p simien -p output -p container -p project -p packages -p schema -p schema_sync -p devloop -p check --all-targets --no-deps -- -D warnings
       - name: Test
         run: cargo test --locked -p web_host -p server -p simien -p output -p container -p project -p packages -p schema -p check -p platform_server -p pool
       - name: Web APIs in a served app
         run: cargo test --locked -p cli --test web_apis
       - run: sccache --show-stats
 
-  # simien dev's schema sync against a real local stack: Docker (on the
+  # simien dev's schema sync and database loop against a real local stack: Docker (on the
   # runner) runs pg_zega and Zega through kebele, as `simien container start`
   # does. The test fails without them; it never skips.
   schema-sync:
@@ -79,4 +79,6 @@ jobs:
         run: bun install --global kebele@0.10.0 && kebele --version
       - name: Sync rules on real data
         run: cargo test --locked -p schema_sync --test sync
+      - name: simien dev's database side on real data
+        run: cargo test --locked -p devloop --test devloop
       - run: sccache --show-stats
