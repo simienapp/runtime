@@ -272,6 +272,47 @@ pub fn start(project: &Project, timeout: Duration, mut on_event: impl FnMut(Valu
     }
 }
 
+/// What `update` did: the images pulled and the services whose containers
+/// ran an older copy (removed, then started again on the new image).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Pulled {
+    pub images: Vec<PulledImage>,
+    pub replaced: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PulledImage {
+    pub image: String,
+    pub id: String,
+}
+
+/// Pulls the pinned images and removes containers on older ones (kebele
+/// 0.10's `pull`); the data stays. Starting again is the caller's.
+pub fn pull(project: &Project, on_event: impl FnMut(Value)) -> Result<Pulled, String> {
+    let kebele = kebele(Some(&project.root))?;
+    let file = write_description(project)?;
+    let file = file.to_string_lossy().into_owned();
+    // kebele prints its progress events, then the result, one JSON per line.
+    let mut last = None;
+    let mut on_event = on_event;
+    stream(&kebele, &["pull", &file], |line| {
+        if line.get("event").is_some() {
+            on_event(line);
+        } else {
+            last = Some(line);
+        }
+    })
+    .map_err(|err| {
+        if err.contains("unknown command") {
+            "simien container update needs kebele 0.10 or newer (it has `kebele pull`)".to_string()
+        } else {
+            err
+        }
+    })?;
+    let result = last.ok_or("kebele pull gave no result")?;
+    serde_json::from_value(result).map_err(|err| format!("kebele pull's result: {err}"))
+}
+
 /// Stops and removes the containers; the data stays. Returns the removed.
 pub fn stop(project: &Project) -> Result<Vec<String>, String> {
     let kebele = kebele(Some(&project.root))?;

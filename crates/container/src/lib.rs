@@ -53,6 +53,12 @@ const CONTAINER: CommandSpec = CommandSpec {
             handler: logs,
         },
         SubcommandSpec {
+            name: "update",
+            summary: "pull the images this simien pins and replace containers on older ones; data is kept",
+            aliases: &[],
+            handler: update,
+        },
+        SubcommandSpec {
             name: "reset",
             summary: "delete the project's data and start empty (needs --yes)",
             aliases: &[],
@@ -224,6 +230,33 @@ fn logs(context: &Context) {
                 )
             });
         })
+    });
+}
+
+fn update(context: &Context) {
+    run(context, |_, globals| {
+        let project = find()?;
+        let pulled = stack::pull(&project, |event| progress(event, globals))?;
+        let now = stack::start(&project, START_TIMEOUT, |event| progress(event, globals))?;
+        output::result(
+            &json!({
+                "ok": true,
+                "replaced": pulled.replaced,
+                "images": pulled.images,
+                "postgres": now.postgres,
+                "zega": now.zega,
+            }),
+            globals,
+            || {
+                if pulled.replaced.is_empty() {
+                    stdio::success("already on the newest images");
+                } else {
+                    stdio::success(&format!("replaced {}; data kept", pulled.replaced.join(", ")));
+                }
+                show_readiness(&now);
+            },
+        );
+        Ok(())
     });
 }
 
