@@ -30,6 +30,7 @@ members = [
   "crates/server",
   "crates/simien",
   "crates/output",
+  "crates/packages",
     "crates/engine",
     "crates/deka_host",
     "crates/wasm_guest",

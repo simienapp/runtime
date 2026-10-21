@@ -325,6 +325,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-once-cell"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4288f83726785267c6f2ef073a3d83dc3f9b81464e9f99898240cced85fce35a"
+
+[[package]]
 name = "async-trait"
 version = "0.1.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -530,6 +536,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cd228125315b132eed175bf47619ac79b945b26e56b848ba203ae4ea8603609"
 dependencies = [
  "scoped-tls",
+]
+
+[[package]]
+name = "bincode"
+version = "1.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -978,6 +993,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-link 0.2.1",
 ]
@@ -1378,6 +1394,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "countme"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7704b5fdd17b18ae31c4c1da5a2e0305a2bf17b5249300a9ee9ed7b72114c636"
+
+[[package]]
 name = "cpal"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1710,6 +1732,46 @@ checksum = "bef552e6f588e446098f6ba40d89ac146c8c7b64aade83c051ee00bb5d2bc18d"
 dependencies = [
  "serde",
  "uuid",
+]
+
+[[package]]
+name = "defmt"
+version = "0.3.101"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4deef977660e373c458df605a913d4ab121db0ccd18d1ad6976dff7d37cddb53"
+dependencies = [
+ "defmt 1.2.0",
+]
+
+[[package]]
+name = "defmt"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4a0795ac740cb54d7b3775c9c17345f6aaecf884c01733b39d6017738e0e3e1"
+dependencies = [
+ "bitflags 1.3.2",
+ "defmt-macros",
+]
+
+[[package]]
+name = "defmt-macros"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "840bb056bd99c495c9188198a258ab787c79f306d864db3e6e8451442d6d8366"
+dependencies = [
+ "defmt-parser",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.5",
+]
+
+[[package]]
+name = "defmt-parser"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71958f69fb2de856c5dd51ac9377e986ca1aa5919f931bf5395a807277f889a0"
+dependencies = [
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -2219,6 +2281,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "diff"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2413,6 +2481,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ecow"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78e4f79b296fbaab6ce2e22d52cb4c7f010fe0ebe7a32e34fa25885fd797bd02"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "ed448"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2587,6 +2664,18 @@ name = "fallible-streaming-iterator"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
+
+[[package]]
+name = "faster-hex"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04839bdf9d8c10f66806fad16b852fc72aab80873aebc3cb69d85b4fa41543ed"
+dependencies = [
+ "autocfg",
+ "defmt 0.3.101",
+ "heapless",
+ "serde",
+]
 
 [[package]]
 name = "fastrand"
@@ -3417,6 +3506,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hash32"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d60b12902ba28e2730cd37e95b8c9223af2808df9e902d4df49588d1470606"
+dependencies = [
+ "byteorder",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3468,6 +3566,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ba4ff7128dee98c7dc9794b6a411377e1404dba1c97deb8d1a55297bd25d8af"
 dependencies = [
  "hashbrown 0.14.5",
+]
+
+[[package]]
+name = "heapless"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bfb9eb618601c89945a70e254898da93b13be0388091d42117462b265bb3fad"
+dependencies = [
+ "hash32",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -3540,6 +3648,17 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "hipstr"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97971ffc85d4c98de12e2608e992a43f5294ebb625fdb045b27c731b64c4c6d6"
+dependencies = [
+ "serde",
+ "serde_bytes",
+ "sptr",
 ]
 
 [[package]]
@@ -3933,6 +4052,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd62e6b5e86ea8eeeb8db1de02880a6abc01a397b2ebb64b5d74ac255318f5cb"
 
 [[package]]
+name = "imara-diff"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f01d462f766df78ab820dd06f5eb700233c51f0f4c2e846520eaf4ba6aa5c5c"
+dependencies = [
+ "hashbrown 0.15.5",
+ "memchr",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4230,6 +4359,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonc-parser"
+version = "0.32.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "840785e1a8b4fdb27be18440a35a81af64820dc185c3973ff8b012d4c6282512"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "junction"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4335,6 +4473,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "lazy-regex"
+version = "3.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0a2cce8a22920a29fdcc8c9170aa5d29edd9fbcf8bea856e24c2cb1c2419f67"
+dependencies = [
+ "lazy-regex-proc_macros",
+ "once_cell",
+ "regex",
+]
+
+[[package]]
+name = "lazy-regex-proc_macros"
+version = "3.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f1e4b1f1d8c71edb4ff2b2150ec4606445fd2ddf67ddc097655daf59286baa6"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn 3.0.5",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4414,6 +4575,24 @@ name = "libc"
 version = "0.2.189"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
+
+[[package]]
+name = "libdeflate-sys"
+version = "1.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7870e5fbd2766179a937c725fb11f4ca0ef025d982beb61bd3ce755425bd19c"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "libdeflater"
+version = "1.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cbb8285d2e2bd4b8d4155840ae81929354b4ba0d7b3c272c84761ffa2141e1f"
+dependencies = [
+ "libdeflate-sys",
+]
 
 [[package]]
 name = "libloading"
@@ -5630,6 +5809,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "packages"
+version = "0.61.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "dcore",
+ "flate2",
+ "output",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "simien_cache_dir",
+ "simien_error",
+ "simien_lockfile",
+ "simien_npm",
+ "simien_npm_cache",
+ "simien_npm_installer",
+ "simien_npmrc",
+ "simien_package_json",
+ "simien_resolver",
+ "simien_semver",
+ "simien_sys_traits",
+ "stdio 0.5.0",
+ "tar",
+ "tempfile",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "pango"
 version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5745,6 +5956,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
+name = "path-clean"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ecba01bf2678719532c5e3059e0b5f0811273d94b397088b82e3bd0a78c78fdd"
+
+[[package]]
 name = "path-dedot"
 version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5752,6 +5969,12 @@ checksum = "07ba0ad7e047712414213ff67533e6dd477af0a4e1d14fb52343e53d30ea9397"
 dependencies = [
  "once_cell",
 ]
+
+[[package]]
+name = "pathdiff"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
 
 [[package]]
 name = "pem"
@@ -6290,6 +6513,16 @@ name = "presser"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8cf8e6a8aa66ce33f63993ffc4ea4271eb5b0530a9002db8455ea6050c77bfa"
+
+[[package]]
+name = "pretty_assertions"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ae130e2f271fbc2ac3a40fb1d07180839cdbbe443c7a27e1e3c13c5cac0116d"
+dependencies = [
+ "diff",
+ "yansi",
+]
 
 [[package]]
 name = "prettyplease"
@@ -7044,6 +7277,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rowan"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "417a3a9f582e349834051b8a10c8d71ca88da4211e4093528e36b9845f6b5f21"
+dependencies = [
+ "countme",
+ "hashbrown 0.14.5",
+ "rustc-hash 1.1.0",
+ "text-size",
+]
+
+[[package]]
 name = "roxmltree"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7335,6 +7580,15 @@ name = "ryu-js"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04d056b875a9d2e6cb9a61d127afee9ac5999b9f87bcb32079d1318e505be714"
+
+[[package]]
+name = "safe_arch"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96b02de82ddbe1b636e6170c21be622223aea188ef2e139be0a5b219ec215323"
+dependencies = [
+ "bytemuck",
+]
 
 [[package]]
 name = "same-file"
@@ -7802,6 +8056,7 @@ dependencies = [
  "dev",
  "introspect",
  "output",
+ "packages",
  "run",
  "runtime",
  "self_cmd",
@@ -7816,6 +8071,55 @@ name = "simien_boxed_error"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41dea834e17f3ac2eea706f3937aa93af4f3f0f41f3b425c0a47164124e22602"
+dependencies = [
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "simien_cache_dir"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f439eb16fc297cb2b07f81892977677aec20646e62d4f14f16578f003103b981"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "chrono",
+ "data-url",
+ "http",
+ "log",
+ "once_cell",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "simien_boxed_error",
+ "simien_error",
+ "simien_maybe_sync",
+ "simien_media_type",
+ "simien_path_util",
+ "simien_sys_traits",
+ "thiserror 2.0.20",
+ "url",
+]
+
+[[package]]
+name = "simien_capacity_builder"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb7ca415296533bf6f6d31c6a69eaac8ce5fe1b6a4e062fc158ced8497cbfc42"
+dependencies = [
+ "ecow",
+ "hipstr",
+ "itoa 1.0.18",
+ "simien_capacity_builder_macros",
+]
+
+[[package]]
+name = "simien_capacity_builder_macros"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44b8f0ddbe568dd7d2f5343e760600d92be81d35354a4f4777f9371825ecf09c"
 dependencies = [
  "quote",
  "syn 2.0.119",
@@ -8030,6 +8334,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "simien_lockfile"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e13a2a5c53237b8f580dab24694c5e6842eecc4e56423efe849a2fd3a0e7be48"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "simien_semver",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "simien_maybe_sync"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b77e1d5b0e15f31125401e9715e3cf1e48845619c953b99add775ba9afc2c79"
+dependencies = [
+ "dashmap",
+ "rustc-hash 2.1.3",
+]
+
+[[package]]
+name = "simien_media_type"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07dccf1fef019b19fa0f9861e876bbe3d2a372f4c0524eefccfcd95f6193c7c9"
+dependencies = [
+ "data-url",
+ "serde",
+ "url",
+]
+
+[[package]]
+name = "simien_monch"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d51514c10e57a6b79c8390a665e7934bca0c9fa86d58a49b319885642806ad2"
+
+[[package]]
 name = "simien_native_certs"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8059,6 +8403,154 @@ dependencies = [
 ]
 
 [[package]]
+name = "simien_node_resolver"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08bee14a093efc58d31841f02929ebf954ec22327dabb041ba89b8896ab14f0a"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "lazy-regex",
+ "log",
+ "once_cell",
+ "path-clean",
+ "percent-encoding",
+ "pretty_assertions",
+ "regex",
+ "rustc-hash 2.1.3",
+ "serde",
+ "serde_json",
+ "simien_boxed_error",
+ "simien_capacity_builder",
+ "simien_error",
+ "simien_maybe_sync",
+ "simien_media_type",
+ "simien_package_json",
+ "simien_path_util",
+ "simien_semver",
+ "simien_sys_traits",
+ "thiserror 2.0.20",
+ "url",
+]
+
+[[package]]
+name = "simien_npm"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4ad95ad9129843dcf9192e11c4963e49c8da677c92357d202140c0acb7e90f9"
+dependencies = [
+ "async-trait",
+ "bytemuck",
+ "chrono",
+ "futures",
+ "indexmap 2.14.2",
+ "log",
+ "rustc-hash 2.1.3",
+ "serde",
+ "serde_json",
+ "simien_capacity_builder",
+ "simien_error",
+ "simien_lockfile",
+ "simien_monch",
+ "simien_package_json",
+ "simien_semver",
+ "thiserror 2.0.20",
+ "url",
+ "wide",
+]
+
+[[package]]
+name = "simien_npm_cache"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2820c7a1e15f5e92242c7216743dc4703dd931680e7482eb308edef128a79cfa"
+dependencies = [
+ "async-trait",
+ "aws-lc-rs",
+ "base64 0.22.1",
+ "faster-hex",
+ "flate2",
+ "futures",
+ "libdeflater",
+ "log",
+ "parking_lot",
+ "percent-encoding",
+ "serde",
+ "serde_json",
+ "sha1 0.10.7",
+ "sha2 0.10.9",
+ "simien_cache_dir",
+ "simien_error",
+ "simien_npm",
+ "simien_npmrc",
+ "simien_path_util",
+ "simien_semver",
+ "simien_sys_traits",
+ "simien_unsync",
+ "tar",
+ "thiserror 2.0.20",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "simien_npm_installer"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ad5eefa6de55221c2f182f0780fbb627160d5cf1ccc2d940ebc7e46fb1da751"
+dependencies = [
+ "anyhow",
+ "async-once-cell",
+ "async-trait",
+ "bincode",
+ "futures",
+ "lazy-regex",
+ "libc",
+ "log",
+ "once_cell",
+ "parking_lot",
+ "pathdiff",
+ "rustc-hash 2.1.3",
+ "serde",
+ "serde_json",
+ "simien_boxed_error",
+ "simien_cache_dir",
+ "simien_capacity_builder",
+ "simien_error",
+ "simien_lockfile",
+ "simien_maybe_sync",
+ "simien_npm",
+ "simien_npm_cache",
+ "simien_npmrc",
+ "simien_package_json",
+ "simien_path_util",
+ "simien_resolver",
+ "simien_semver",
+ "simien_sys_traits",
+ "simien_terminal",
+ "simien_unsync",
+ "thiserror 2.0.20",
+ "tokio",
+ "twox-hash",
+ "url",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "simien_npmrc"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7beb87465496e6f153577b7c1a4e74db21c9c0b680a212bf7b2f144aea65bd86"
+dependencies = [
+ "log",
+ "simien_monch",
+ "simien_sys_traits",
+ "thiserror 2.0.20",
+ "url",
+]
+
+[[package]]
 name = "simien_ops"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8076,6 +8568,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "simien_package_json"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5069d18d12d546840141df52fe8456e65f93dc81fca37563ecd2e39146a23538"
+dependencies = [
+ "indexmap 2.14.2",
+ "serde",
+ "serde_json",
+ "simien_boxed_error",
+ "simien_capacity_builder",
+ "simien_error",
+ "simien_maybe_sync",
+ "simien_path_util",
+ "simien_semver",
+ "simien_sys_traits",
+ "thiserror 2.0.20",
+ "url",
+]
+
+[[package]]
 name = "simien_path_util"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8084,6 +8596,67 @@ dependencies = [
  "percent-encoding",
  "simien_error",
  "sys_traits",
+ "thiserror 2.0.20",
+ "url",
+]
+
+[[package]]
+name = "simien_resolver"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2e03718610a7ce5d139dadeb5591f667d571630b46c4dc84743c2ca74f3229a"
+dependencies = [
+ "anyhow",
+ "async-once-cell",
+ "async-trait",
+ "chrono",
+ "dashmap",
+ "futures",
+ "imara-diff",
+ "indexmap 2.14.2",
+ "jsonc-parser",
+ "log",
+ "once_cell",
+ "parking_lot",
+ "phf 0.11.3",
+ "rustc-hash 2.1.3",
+ "serde",
+ "serde_json",
+ "simien_boxed_error",
+ "simien_cache_dir",
+ "simien_capacity_builder",
+ "simien_error",
+ "simien_lockfile",
+ "simien_maybe_sync",
+ "simien_media_type",
+ "simien_node_resolver",
+ "simien_npm",
+ "simien_npmrc",
+ "simien_package_json",
+ "simien_path_util",
+ "simien_semver",
+ "simien_sys_traits",
+ "simien_terminal",
+ "simien_unsync",
+ "thiserror 2.0.20",
+ "twox-hash",
+ "url",
+ "yaml_parser",
+]
+
+[[package]]
+name = "simien_semver"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f3b4260b5e22ea2375f47e9e6df715183831a66be33006ed0127138721d83aa"
+dependencies = [
+ "ecow",
+ "hipstr",
+ "once_cell",
+ "serde",
+ "simien_capacity_builder",
+ "simien_error",
+ "simien_monch",
  "thiserror 2.0.20",
  "url",
 ]
@@ -8100,6 +8673,42 @@ dependencies = [
  "simien_v8",
  "smallvec",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "simien_sys_traits"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94c8ad23521920ece30113cf98e0a12099ce8828fe8387ced7bfed598f36da2e"
+dependencies = [
+ "getrandom 0.2.17",
+ "js-sys",
+ "junction",
+ "libc",
+ "simien_sys_traits_macros",
+ "wasm-bindgen",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "simien_sys_traits_macros"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e2d53be890421d52e3a115b096885bc6fdca95ae0d1e8cd044752f470bfbeb5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "simien_terminal"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76ecfc478afd5b51a76b57a5610db4a8894a12dbf07b89981ccfb462ac859534"
+dependencies = [
+ "once_cell",
+ "termcolor",
 ]
 
 [[package]]
@@ -8405,6 +9014,12 @@ name = "sponge-cursor"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a0219bd7d979d58245a4f41f695e1ac9f8befdffadd7f61f1bae9e39abc6620"
+
+[[package]]
+name = "sptr"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b9b39299b249ad65f3b7e96443bad61c02ca5cd3589f46cb6d610a0fd6c0d6a"
 
 [[package]]
 name = "stable_deref_trait"
@@ -9277,6 +9892,12 @@ checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
 dependencies = [
  "winapi-util",
 ]
+
+[[package]]
+name = "text-size"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f18aa187839b2bdb1ad2fa35ead8c4c2976b64e4363c386d45ac0f7ee85c9233"
 
 [[package]]
 name = "thin-slice"
@@ -10686,6 +11307,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "wide"
+version = "0.7.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ce5da8ecb62bcd8ec8b7ea19f69a51275e91299be594ea5cc6ef7819e16cd03"
+dependencies = [
+ "bytemuck",
+ "safe_arch",
+]
+
+[[package]]
 name = "widestring"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11514,6 +12145,22 @@ name = "xkeysym"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9cc00251562a284751c9973bace760d86c0276c471b4be569fe6b068ee97a56"
+
+[[package]]
+name = "yaml_parser"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c422c39fd59a9dc11efa2b2be26cf9130c6ef9cb744da112a2e9e59c649e471"
+dependencies = [
+ "rowan",
+ "winnow 0.7.15",
+]
+
+[[package]]
+name = "yansi"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
 
 [[package]]
 name = "yasna"
