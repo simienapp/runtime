@@ -1036,7 +1036,7 @@ dependencies = [
  "serde_json",
  "serve",
  "sha2 0.10.9",
- "stdio",
+ "stdio 0.4.0",
  "tar",
  "tempfile",
  "tokio",
@@ -1141,7 +1141,7 @@ dependencies = [
  "flate2",
  "serde",
  "serde_json",
- "stdio",
+ "stdio 0.4.0",
  "tempfile",
 ]
 
@@ -1150,7 +1150,7 @@ name = "compiler"
 version = "0.61.0"
 dependencies = [
  "dcore",
- "stdio",
+ "stdio 0.4.0",
 ]
 
 [[package]]
@@ -1724,7 +1724,7 @@ dependencies = [
  "runtime_core",
  "serde",
  "serde_json",
- "stdio",
+ "stdio 0.4.0",
  "tempfile",
 ]
 
@@ -1739,7 +1739,7 @@ dependencies = [
  "serde_json",
  "serve",
  "sha2 0.10.9",
- "stdio",
+ "stdio 0.4.0",
  "tempfile",
 ]
 
@@ -1764,7 +1764,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
- "stdio",
+ "stdio 0.4.0",
 ]
 
 [[package]]
@@ -1775,7 +1775,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "stdio",
+ "stdio 0.4.0",
  "tokio",
 ]
 
@@ -1808,7 +1808,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "stdio",
+ "stdio 0.4.0",
  "tempfile",
  "tokio",
 ]
@@ -1821,7 +1821,7 @@ dependencies = [
  "deno_task_shell",
  "glob",
  "serde_json",
- "stdio",
+ "stdio 0.4.0",
  "tempfile",
  "tokio",
 ]
@@ -1834,7 +1834,7 @@ dependencies = [
  "deka-modules",
  "deka_host",
  "serde_json",
- "stdio",
+ "stdio 0.4.0",
 ]
 
 [[package]]
@@ -1924,7 +1924,7 @@ dependencies = [
  "sha2 0.10.9",
  "sha3",
  "simien_core",
- "stdio",
+ "stdio 0.4.0",
  "tempfile",
  "tokio",
  "tokio-stream",
@@ -2212,7 +2212,7 @@ dependencies = [
  "runtime",
  "runtime_core",
  "serde_json",
- "stdio",
+ "stdio 0.4.0",
  "tokio",
  "tracing",
  "transport",
@@ -4012,7 +4012,7 @@ dependencies = [
  "dcore",
  "runtime",
  "serde_json",
- "stdio",
+ "stdio 0.4.0",
  "tempfile",
 ]
 
@@ -5567,6 +5567,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "output"
+version = "0.61.0"
+dependencies = [
+ "dcore",
+ "serde",
+ "serde_json",
+ "stdio 0.5.0",
+]
+
+[[package]]
 name = "outref"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6094,7 +6104,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "stdio",
+ "stdio 0.4.0",
  "swc_common",
  "swc_ecma_ast",
  "swc_ecma_codegen",
@@ -6171,7 +6181,7 @@ dependencies = [
  "serve",
  "simien_core",
  "simien_error",
- "stdio",
+ "stdio 0.4.0",
  "swc_common",
  "swc_ecma_ast",
  "swc_ecma_codegen",
@@ -7090,6 +7100,7 @@ dependencies = [
  "engine",
  "flate2",
  "num_cpus",
+ "output",
  "permissions",
  "platform",
  "platform_server",
@@ -7102,7 +7113,8 @@ dependencies = [
  "serve",
  "server",
  "simien_core",
- "stdio",
+ "stdio 0.4.0",
+ "stdio 0.5.0",
  "tao",
  "tempfile",
  "tokio",
@@ -7121,7 +7133,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "stdio",
+ "stdio 0.4.0",
  "tempfile",
 ]
 
@@ -7482,7 +7494,7 @@ dependencies = [
  "serde_json",
  "serve",
  "sha2 0.10.9",
- "stdio",
+ "stdio 0.4.0",
  "tar",
  "tempfile",
  "tokio",
@@ -7780,6 +7792,24 @@ name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
+
+[[package]]
+name = "simien"
+version = "0.61.0"
+dependencies = [
+ "compile",
+ "dcore",
+ "dev",
+ "introspect",
+ "output",
+ "run",
+ "runtime",
+ "self_cmd",
+ "serde",
+ "serde_json",
+ "stdio 0.5.0",
+ "tempfile",
+]
 
 [[package]]
 name = "simien_boxed_error"
@@ -8406,6 +8436,12 @@ name = "stdio"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0b08920c7d4d4e798478f16e3b8aa92b17fef188aebb76d20e984e0315ea297"
+
+[[package]]
+name = "stdio"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c647d89b3b7ec9cbdb2703d888e3bc04b9ae11fc16433658e64314b873de68bd"
 
 [[package]]
 name = "strck"
@@ -10157,7 +10193,7 @@ dependencies = [
  "dcore",
  "run",
  "serde_json",
- "stdio",
+ "stdio 0.4.0",
 ]
 
 [[package]]

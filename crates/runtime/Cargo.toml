@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 server = { path = "../server" }
+output = { path = "../output" }
+stdio_new = { package = "stdio", version = "0.5.0" }
 deka-modules = "0.3.0"
 compiler = { path = "../compiler" }
 run = { path = "../run" }
