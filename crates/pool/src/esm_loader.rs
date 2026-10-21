@@ -132,18 +132,18 @@ impl PhpxEsmLoader {
         };
 
         // Eager project-root check: only official `@deka/*` packages may
-        // self-declare `host.kinds` in deka.json; an application root doing so
+        // self-declare `host.kinds` in simien.json; an application root doing so
         // is a compile error, not a silent grant.
         let (root_kinds, root_name) = read_manifest_host_kinds(&project_root);
         let root_kinds = match host_bridge::resolve_project_root_grants(
             &root_name,
-            &project_root.join("deka.json"),
+            &project_root.join("simien.json"),
             root_kinds.as_deref(),
         ) {
             Ok(kinds) => kinds,
             Err(err) => {
                 return Err(JsErrorBox::generic(format!(
-                    "{err}; deka.json 'host.kinds' is reserved for official @deka stdlib packages; \
+                    "{err}; simien.json 'host.kinds' is reserved for official @deka stdlib packages; \
                      apps acquire bridge authority only via the published grant table"
                 )));
             }
@@ -268,11 +268,11 @@ impl PhpxEsmLoader {
         }
 
         // Linked packages outside the project root (lazily compiled via
-        // `load_ds_source`): read their own deka.json for the name and treat
+        // `load_ds_source`): read their own simien.json for the name and treat
         // them as a dependency of this project.
         let package_root = path
             .ancestors()
-            .find(|ancestor| ancestor.join("deka.json").is_file())
+            .find(|ancestor| ancestor.join("simien.json").is_file())
             .map(Path::to_path_buf);
         if let Some(package_root) = package_root {
             if let Some(kinds) = self.package_kinds.borrow().get(&package_root) {
@@ -321,7 +321,7 @@ impl PhpxEsmLoader {
             return dependency_package_name(&root, &self.project_root);
         }
         path.ancestors()
-            .find(|ancestor| ancestor.join("deka.json").is_file())
+            .find(|ancestor| ancestor.join("simien.json").is_file())
             .and_then(|root| read_manifest_name(root))
             .unwrap_or_else(|| path.display().to_string())
     }

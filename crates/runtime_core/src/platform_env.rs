@@ -1,7 +1,7 @@
 //! Platform → tenant environment-variable injection.
 //!
 //! Tenant PHPX code must not see arbitrary host env vars. The runtime
-//! snapshots only names allowed by the resolved `deka.json` security
+//! snapshots only names allowed by the resolved `simien.json` security
 //! policy and injects those values into `$_SERVER`, `$_ENV`, and
 //! `process.env`. Missing `security.allow.env` fails closed.
 

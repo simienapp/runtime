@@ -102,11 +102,11 @@ fn print_diagnostic(diagnostic: &BridgeDiagnostic) {
     eprintln!("{diagnostic}");
 }
 
-/// Package name from the directory: `deka.json`'s `name` when present, else
+/// Package name from the directory: `simien.json`'s `name` when present, else
 /// the directory name (prefixed `@deka/` when unscoped, matching how the
 /// installer lays out `ds_modules/@deka/<name>`).
 fn package_name(dir: &Path) -> String {
-    let manifest = dir.join("deka.json");
+    let manifest = dir.join("simien.json");
     if let Ok(text) = std::fs::read_to_string(&manifest) {
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
             if let Some(name) = value.get("name").and_then(serde_json::Value::as_str) {

@@ -75,7 +75,7 @@ pub fn resolve_project_root(input_path: &Path) -> Result<PathBuf, String> {
 
     let mut nearest_manifest_root = None;
     for dir in start.ancestors() {
-        if dir.join("deka.json").is_file() {
+        if dir.join("simien.json").is_file() {
             let dir = dir.to_path_buf();
             if dir.join("deka.lock").is_file() {
                 return Ok(dir);
@@ -91,7 +91,7 @@ pub fn resolve_project_root(input_path: &Path) -> Result<PathBuf, String> {
     }
 
     Err(format!(
-        "deka run requires a deka.json project root (searched from {})",
+        "deka run requires a simien.json project root (searched from {})",
         input_path.display()
     ))
 }
@@ -150,12 +150,12 @@ mod tests {
     #[test]
     fn project_root_prefers_outer_lock_bearing_root_over_nested_package_manifest() {
         let tmp = tempfile::tempdir().expect("tmp");
-        std::fs::write(tmp.path().join("deka.json"), "{}").expect("root deka.json");
+        std::fs::write(tmp.path().join("simien.json"), "{}").expect("root simien.json");
         std::fs::write(tmp.path().join("deka.lock"), "{}").expect("root deka.lock");
 
         let package_dir = tmp.path().join(MODULES_DIR).join("@deka").join("payments");
         std::fs::create_dir_all(&package_dir).expect("package dir");
-        std::fs::write(package_dir.join("deka.json"), "{}").expect("package deka.json");
+        std::fs::write(package_dir.join("simien.json"), "{}").expect("package simien.json");
         let input = package_dir.join("index.ds");
         std::fs::write(&input, "<div />").expect("input");
 
@@ -166,11 +166,11 @@ mod tests {
     #[test]
     fn project_root_falls_back_to_nearest_manifest_when_no_lock_exists() {
         let tmp = tempfile::tempdir().expect("tmp");
-        std::fs::write(tmp.path().join("deka.json"), "{}").expect("root deka.json");
+        std::fs::write(tmp.path().join("simien.json"), "{}").expect("root simien.json");
 
         let package_dir = tmp.path().join(MODULES_DIR).join("@deka").join("payments");
         std::fs::create_dir_all(&package_dir).expect("package dir");
-        std::fs::write(package_dir.join("deka.json"), "{}").expect("package deka.json");
+        std::fs::write(package_dir.join("simien.json"), "{}").expect("package simien.json");
         let input = package_dir.join("index.ds");
         std::fs::write(&input, "<div />").expect("input");
 
@@ -182,6 +182,8 @@ mod tests {
     fn ensure_project_layout_accepts_scoped_stdlib_imports_installed_unscoped() {
         let tmp = tempfile::tempdir().expect("tmp");
         // Dependencies must be declared, not merely installed (deka#403).
+        // The DekaScript module gate (the published deka-modules crate) still
+        // reads deka.json; it goes when DekaScript is removed, not renamed.
         std::fs::write(
             tmp.path().join("deka.json"),
             r#"{"dependencies":{"@deka/http":"*","@deka/crypto":"*","@deka/time":"*"}}"#,
@@ -221,7 +223,7 @@ mod tests {
     #[test]
     fn external_module_root_exempts_stdlib_only() {
         let tmp = tempfile::tempdir().expect("tmp");
-        std::fs::write(tmp.path().join("deka.json"), r#"{"name":"tenant"}"#).expect("manifest");
+        std::fs::write(tmp.path().join("simien.json"), r#"{"name":"tenant"}"#).expect("manifest");
         std::fs::write(tmp.path().join("deka.lock"), "{}").expect("lock");
         let stdlib = tempfile::tempdir().expect("stdlib root");
 
@@ -260,7 +262,7 @@ mod tests {
         let tenant_root = platform_root.join("default");
         let modules = tenant_root.join(MODULES_DIR);
 
-        std::fs::write(platform_root.join("deka.json"), "{}").expect("platform manifest");
+        std::fs::write(platform_root.join("simien.json"), "{}").expect("platform manifest");
         std::fs::write(
             platform_root.join("deka.lock"),
             r#"{"lockfileVersion":1,"php":{"packages":{}}}"#,
@@ -268,7 +270,7 @@ mod tests {
         .expect("empty platform lock");
         std::fs::create_dir_all(modules.join("@tana/store")).expect("store module dir");
         std::fs::create_dir_all(modules.join("@deka/crypto")).expect("crypto module dir");
-        std::fs::write(tenant_root.join("deka.json"), "{}").expect("tenant manifest");
+        std::fs::write(tenant_root.join("simien.json"), "{}").expect("tenant manifest");
         std::fs::write(
             tenant_root.join("deka.lock"),
             r#"{"lockfileVersion":1,"php":{"packages":{}}}"#,
@@ -332,7 +334,7 @@ mod tests {
         // env-var bypass used to admit.
         let tmp = tempfile::tempdir().expect("tmp");
         std::fs::write(
-            tmp.path().join("deka.json"),
+            tmp.path().join("simien.json"),
             r#"{"name":"tenant","dependencies":{"@deka/crypto":"*"}}"#,
         )
         .expect("manifest");
@@ -361,7 +363,7 @@ mod tests {
         std::fs::create_dir_all(&tenant_b_root).expect("tenant B root");
 
         for root in [&tenant_a_root, &tenant_b_root] {
-            std::fs::write(root.join("deka.json"), "{}").expect("tenant manifest");
+            std::fs::write(root.join("simien.json"), "{}").expect("tenant manifest");
             std::fs::write(root.join("deka.lock"), "{}").expect("tenant lock");
         }
 

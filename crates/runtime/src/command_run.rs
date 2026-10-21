@@ -62,7 +62,7 @@ fn cli_arg_is_source_file(context: &Context) -> bool {
 
 struct PreparedRun {
     context: Context,
-    /// True when the entry was a loose `.ds`/`.dsx` (no deka.json anywhere
+    /// True when the entry was a loose `.ds`/`.dsx` (no simien.json anywhere
     /// above it) that we compiled into the user-global cache (deka#765).
     loose_file: bool,
 }
@@ -147,12 +147,12 @@ fn try_run_deka_script(context: &Context) -> Option<i32> {
     if first.contains('/') || first.contains('\\') || first.starts_with('.') {
         return None;
     }
-    let project_json = load_deka_json()?;
+    let project_json = load_simien_json()?;
     if has_task_named(&project_json, first) {
         stdio::error(
             "run",
             &format!(
-                "task `{}` is defined in deka.json; use `deka task {}` (tasks run in the CLI shell, not the runtime permission gate)",
+                "task `{}` is defined in simien.json; use `deka task {}` (tasks run in the CLI shell, not the runtime permission gate)",
                 first, first
             ),
         );
@@ -172,9 +172,9 @@ fn try_run_deka_script(context: &Context) -> Option<i32> {
     run_shell_command(&command).or(Some(1))
 }
 
-fn load_deka_json() -> Option<Value> {
+fn load_simien_json() -> Option<Value> {
     let cwd = std::env::current_dir().ok()?;
-    let path = cwd.join("deka.json");
+    let path = cwd.join("simien.json");
     let content = std::fs::read_to_string(path).ok()?;
     serde_json::from_str(&content).ok()
 }

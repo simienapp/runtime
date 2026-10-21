@@ -23,10 +23,10 @@ pub use serve::{
     generate_app_router_entry_source, resolve_app_router_index_html, write_app_router_entry,
 };
 /// Cookie whose value is AES-GCM AAD for deferred islands.
-/// `serve.sessionCookie` in deka.json; default `deka_sid`. Empty string
+/// `serve.sessionCookie` in simien.json; default `deka_sid`. Empty string
 /// disables session binding (anonymous AAD is just the component name).
 fn session_cookie_name(project_root: &Path) -> String {
-    let Ok(raw) = std::fs::read_to_string(project_root.join("deka.json")) else {
+    let Ok(raw) = std::fs::read_to_string(project_root.join("simien.json")) else {
         return "deka_sid".to_string();
     };
     let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) else {

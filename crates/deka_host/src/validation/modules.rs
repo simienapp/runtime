@@ -594,7 +594,7 @@ fn scan_wasm_modules(modules_root: &Path) -> HashSet<String> {
                 stack.push(path);
                 continue;
             }
-            if name == "deka.json" {
+            if name == "simien.json" {
                 if let Some(parent) = path.parent() {
                     if let Ok(rel) = parent.strip_prefix(modules_root) {
                         let rel = rel.to_string_lossy().replace('\\', "/");
@@ -1051,7 +1051,7 @@ fn resolve_wasm_target(
         ));
     }
 
-    let manifest_path = root_path.join("deka.json");
+    let manifest_path = root_path.join("simien.json");
     if !manifest_path.exists() {
         let help = available_wasm
             .and_then(|modules| format_available_modules(modules, "Available WASM modules: "));
@@ -1065,7 +1065,7 @@ fn resolve_wasm_target(
                 manifest_path.display()
             ),
             help.as_deref()
-                .unwrap_or("Add deka.json to the wasm module directory."),
+                .unwrap_or("Add simien.json to the wasm module directory."),
         ));
     }
 
@@ -1110,7 +1110,7 @@ fn validate_wasm_manifest(
                     target.manifest_path.display(),
                     err
                 ),
-                "Fix the JSON in deka.json.",
+                "Fix the JSON in simien.json.",
             ));
             return;
         }
@@ -1126,7 +1126,7 @@ fn validate_wasm_manifest(
             spec.column,
             spec.from.len().max(1),
             format!("Missing wasm module binary {}.", module_path.display()),
-            "Build the wasm module or update deka.json.",
+            "Build the wasm module or update simien.json.",
         ));
     }
 

@@ -37,7 +37,7 @@ pub struct MaterializedBuild {
 /// virtual build-value modules only when every executed entry validates
 /// successfully.
 ///
-/// `policy_json` is the project's resolved security policy (from deka.json
+/// `policy_json` is the project's resolved security policy (from simien.json
 /// plus CLI overrides); build entries execute under it — the existing
 /// permission system decides which host capabilities the build phase gets,
 /// with no `build.*` namespace (rfd#48).

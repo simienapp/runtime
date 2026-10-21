@@ -1,8 +1,8 @@
-//! Remediation hints and deka.json allow-list suggestions for security
+//! Remediation hints and simien.json allow-list suggestions for security
 //! denials (deka#746 F1) and the interactive `--allow` persistence path.
 //!
 //! Split out of `security.rs` (deka#391 file-size gate): hint wording,
-//! suggested rules, and the deka.json writer form one cohesive cluster that
+//! suggested rules, and the simien.json writer form one cohesive cluster that
 //! must stay in lockstep with enforcement semantics — `target_resolves_outside_project`
 //! deliberately reuses `super::security::normalize_path`, the same
 //! resolution `path_matches` applies.
@@ -48,7 +48,7 @@ pub(super) fn config_hint_for_request(capability: &str, target: Option<&str>) ->
     let path = format!("$.security.allow.{}", capability);
     let risk = risk_note_for_request(capability, &suggestion);
     Some(format!(
-        "deka.json path: {} rule: {}{} risk: {} patch:\n{}",
+        "simien.json path: {} rule: {}{} risk: {} patch:\n{}",
         path, suggestion, note, risk, patch
     ))
 }
@@ -73,7 +73,7 @@ fn outside_project_hint(capability: &str, target: &str, root: &std::path::Path) 
         .filter(|parent| !parent.is_empty())
         .unwrap_or_else(|| "/".to_string());
     format!(
-        "deka.json path: $.security.allow.{}  note: target {} is outside the project directory ({}); project-relative grants cannot allow it. decide: copy the target into the project and grant a ./ path, or allow the absolute path deliberately, e.g. security.allow.{} = [\"{}\"] — an absolute grant exposes everything beneath that path, so prefer the narrowest directory that works.",
+        "simien.json path: $.security.allow.{}  note: target {} is outside the project directory ({}); project-relative grants cannot allow it. decide: copy the target into the project and grant a ./ path, or allow the absolute path deliberately, e.g. security.allow.{} = [\"{}\"] — an absolute grant exposes everything beneath that path, so prefer the narrowest directory that works.",
         capability,
         target,
         root.display(),
@@ -261,7 +261,7 @@ fn patch_for_suggestion(capability: &str, suggestion: &str) -> Option<String> {
     Some(patch)
 }
 
-pub(super) fn update_deka_json_allow(capability: &str, target: Option<&str>) -> Result<(), String> {
+pub(super) fn update_simien_json_allow(capability: &str, target: Option<&str>) -> Result<(), String> {
     let target = target
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -272,7 +272,7 @@ pub(super) fn update_deka_json_allow(capability: &str, target: Option<&str>) -> 
     }
     let project_kind = project_kind();
     let root = project_root().ok_or("failed to determine project root")?;
-    let path = root.join("deka.json");
+    let path = root.join("simien.json");
     let mut doc = if path.exists() {
         let raw = std::fs::read_to_string(&path)
             .map_err(|err| format!("failed to read {}: {}", path.display(), err))?;
@@ -284,7 +284,7 @@ pub(super) fn update_deka_json_allow(capability: &str, target: Option<&str>) -> 
 
     let root_obj = doc
         .as_object_mut()
-        .ok_or("deka.json root must be an object")?;
+        .ok_or("simien.json root must be an object")?;
     let security = root_obj
         .entry("security")
         .or_insert_with(|| Value::Object(Map::new()));
@@ -340,7 +340,7 @@ pub(super) fn update_deka_json_allow(capability: &str, target: Option<&str>) -> 
     *entry = Value::Array(list.into_iter().map(Value::String).collect());
 
     let payload = serde_json::to_string_pretty(&doc)
-        .map_err(|err| format!("failed to serialize deka.json: {}", err))?;
+        .map_err(|err| format!("failed to serialize simien.json: {}", err))?;
     std::fs::write(&path, payload)
         .map_err(|err| format!("failed to write {}: {}", path.display(), err))?;
     Ok(())

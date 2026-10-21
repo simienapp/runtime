@@ -22,7 +22,7 @@ pub fn print_banner(url: &str) {
     let cwd = std::env::current_dir()
         .map(|path| path.display().to_string())
         .unwrap_or_else(|_| ".".to_string());
-    stdio::raw(&stdio::ascii("deka"));
+    stdio::raw(&stdio::ascii("simien"));
     stdio::raw("");
     stdio::raw(&format!("  {url}"));
     stdio::raw(&format!("  {cwd}"));
@@ -42,7 +42,7 @@ pub fn ensure_compiler_cache(handler_input: &str) -> Result<(), String> {
 fn project_root_from_handler(handler_path: &str) -> Option<PathBuf> {
     let mut current = Path::new(handler_path).parent()?;
     loop {
-        if current.join("deka.json").is_file() {
+        if current.join("simien.json").is_file() {
             return Some(current.to_path_buf());
         }
         current = current.parent()?;
@@ -57,7 +57,7 @@ mod tests {
     fn print_banner_includes_ascii_url_and_cwd() {
         let url = "http://localhost:9999";
         let cwd = std::env::current_dir().expect("cwd").display().to_string();
-        let art = stdio::ascii("deka");
+        let art = stdio::ascii("simien");
         assert!(art.contains('░') || art.contains('█') || art.len() > 4);
         assert!(format!("  {url}").contains("http://localhost:9999"));
         assert!(!cwd.trim().is_empty());

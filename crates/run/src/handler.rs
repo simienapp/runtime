@@ -244,7 +244,7 @@ mod tests {
         let configured = dir.join("main.phpx");
         fs::write(&explicit, "<?php echo 'simple';").expect("write explicit");
         fs::write(&configured, "<?php echo 'main';").expect("write configured");
-        fs::write(dir.join("deka.json"), r#"{"serve":{"entry":"main.phpx"}}"#).expect("write config");
+        fs::write(dir.join("simien.json"), r#"{"serve":{"entry":"main.phpx"}}"#).expect("write config");
 
         let resolved = resolve_handler_path(explicit.to_str().expect("path")).expect("resolve");
         let resolved_canon = resolved.path.canonicalize().expect("resolved canonicalize");
@@ -260,7 +260,7 @@ mod tests {
         let app_dir = dir.join("app");
         fs::create_dir_all(&app_dir).expect("mkdir app");
         fs::write(app_dir.join("page.phpx"), "<?php echo 'page';").expect("write page");
-        fs::write(dir.join("deka.json"), r#"{"serve":{"entry":"main.phpx"}}"#).expect("write config");
+        fs::write(dir.join("simien.json"), r#"{"serve":{"entry":"main.phpx"}}"#).expect("write config");
 
         let resolved = resolve_handler_path(dir.to_str().expect("path")).expect("resolve");
         let resolved_canon = resolved.path.canonicalize().expect("resolved canonicalize");
@@ -302,7 +302,7 @@ mod tests {
     // channel. A leftover file (e.g. from before the cutover) must be
     // ignored entirely -- not parsed, not a source of a hard error --
     // since run::handler delegates resolution to engine::config, which
-    // only reads deka.json now.
+    // only reads simien.json now.
     #[test]
     fn leftover_serve_json_is_ignored_not_read() {
         let dir = temp_dir("deka_handler_leftover_serve_json");
@@ -326,14 +326,14 @@ mod tests {
     #[test]
     fn app_router_resolution_does_not_materialize_a_cache_entry() {
         // QA finding: runtime_core::dist::is_source_app_router_project
-        // requires BOTH deka.json and app/page.dsx (or app/page.ds) --
+        // requires BOTH simien.json and app/page.dsx (or app/page.ds) --
         // an app/ directory with only a .phpx page never satisfies it, so
         // the fixture never entered the materializing branch this test
         // claims to guard (QA proved this by reverting the production fix
         // entirely and watching the test still pass). Use the real gate.
         let dir = temp_dir("deka_handler_app_router_readonly");
-        fs::write(dir.join("deka.json"), r#"{"name":"app-router-readonly-fixture"}"#)
-            .expect("write deka.json");
+        fs::write(dir.join("simien.json"), r#"{"name":"app-router-readonly-fixture"}"#)
+            .expect("write simien.json");
         let app_dir = dir.join("app");
         fs::create_dir_all(&app_dir).expect("mkdir app");
         fs::write(

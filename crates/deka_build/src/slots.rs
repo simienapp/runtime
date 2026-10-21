@@ -354,7 +354,7 @@ fn dev_project_root(handler_input: &str) -> Option<PathBuf> {
         input.parent()?.to_path_buf()
     };
     for dir in start.ancestors() {
-        if dir.join("deka.json").is_file() {
+        if dir.join("simien.json").is_file() {
             // Canonical: dsc echoes `./`-spelled inputs back into plan slot
             // paths, which then fail the manifest's project-relative match.
             return std::fs::canonicalize(dir)

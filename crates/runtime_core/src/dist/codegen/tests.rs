@@ -148,13 +148,13 @@ fn session_cookie_name_reads_serve_config() {
     let tmp = tmp_dir("sid_cfg");
     assert_eq!(session_cookie_name(&tmp), "deka_sid");
     std::fs::write(
-        tmp.join("deka.json"),
+        tmp.join("simien.json"),
         "{ \"serve\": { \"sessionCookie\": \"sid\" } }\n",
     )
     .unwrap();
     assert_eq!(session_cookie_name(&tmp), "sid");
     std::fs::write(
-        tmp.join("deka.json"),
+        tmp.join("simien.json"),
         "{ \"serve\": { \"sessionCookie\": \"\" } }\n",
     )
     .unwrap();

@@ -2,7 +2,7 @@
 //! definition of development and production authority.
 //!
 //! Deka has exactly two permission profiles, `dev` and `prod`, declared in
-//! `deka.json` under `permissions` and validated before anything compiles or
+//! `simien.json` under `permissions` and validated before anything compiles or
 //! executes. Both deny by default. `build {}` is not a third environment: it
 //! executes only through `permissions.dev.build`, and `permissions.prod.build`
 //! exists solely for manifest symmetry — it must be exactly `false` and can
@@ -192,7 +192,7 @@ const CAPABILITY_KEYS: [&str; 8] = [
 ];
 const BUILD_CAPABILITY_KEYS: [&str; 7] = ["read", "write", "net", "env", "db", "wasm", "import"];
 
-/// Parse the `permissions` block of a `deka.json` document.
+/// Parse the `permissions` block of a `simien.json` document.
 ///
 /// A manifest whose `permissions` object names a `dev` or `prod` profile is
 /// phase-aware and is validated strictly: unknown keys, malformed targets,

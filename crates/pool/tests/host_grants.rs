@@ -1,7 +1,7 @@
 //! RFD 27 host-grant acceptance tests (deka#755 chunk D).
 //!
 //! End-to-end through `IsolatePool` with real on-disk projects: a project
-//! root (`deka.json` + `deka.lock`) plus `.ds` entries compiled by the pinned
+//! root (`simien.json` + `deka.lock`) plus `.ds` entries compiled by the pinned
 //! `dsc` (0.8.1, see `scripts/dsc-version`). Every DekaScript grant case runs
 //! through the real pipeline — dsc emit → ESM loader preamble (per-module
 //! grant closure) → catalog gate → grant gate → host dispatch.
@@ -123,7 +123,7 @@ fn body_of(response: &pool::IsolateResponse) -> String {
 }
 
 /// Case 1 — workspace grant: a project root that IS an official `@deka/*`
-/// package self-declares `host.kinds` in deka.json and its `.ds` entry may
+/// package self-declares `host.kinds` in simien.json and its `.ds` entry may
 /// call the granted kind.
 #[tokio::test]
 async fn workspace_package_root_self_declares_grants() {
@@ -134,7 +134,7 @@ async fn workspace_package_root_self_declares_grants() {
     let project = tempfile::tempdir().expect("tempdir");
     write(
         project.path(),
-        "deka.json",
+        "simien.json",
         r#"{"name":"@deka/cryptotest","host":{"kinds":["crypto"]}}"#,
     );
     write(project.path(), "deka.lock", EMPTY_DEKA_LOCK);
@@ -175,7 +175,7 @@ async fn app_root_declaring_host_kinds_is_a_load_error() {
     let project = tempfile::tempdir().expect("tempdir");
     write(
         project.path(),
-        "deka.json",
+        "simien.json",
         r#"{"name":"my-app","host":{"kinds":["crypto"]}}"#,
     );
     write(project.path(), "deka.lock", EMPTY_DEKA_LOCK);
@@ -211,13 +211,13 @@ fn cryptofix_project() -> tempfile::TempDir {
     let project = tempfile::tempdir().expect("tempdir");
     write(
         project.path(),
-        "deka.json",
+        "simien.json",
         r#"{"name":"my-app","dependencies":{"@deka/cryptofix":"1.0.0"}}"#,
     );
     let dep = project.path().join("ds_modules/@deka/cryptofix");
     write(
         &dep,
-        "deka.json",
+        "simien.json",
         r#"{"name":"@deka/cryptofix","version":"1.0.0"}"#,
     );
     write(
@@ -371,7 +371,7 @@ export async fn app(req: string) Promise<string> {
 }
 
 /// Case 5 — a copied `host.kinds` manifest field buys nothing: a user package
-/// that merely copies the official manifest field into its deka.json still
+/// that merely copies the official manifest field into its simien.json still
 /// gets no bridge authority. The loader refuses to boot the graph ("not
 /// granted any host kinds"), identically with and without the field.
 #[tokio::test]
@@ -384,7 +384,7 @@ async fn user_package_manifest_host_kinds_confers_nothing() {
         let project = tempfile::tempdir().expect("tempdir");
         write(
             project.path(),
-            "deka.json",
+            "simien.json",
             r#"{"name":"my-app","dependencies":{"@user/evil":"1.0.0"}}"#,
         );
         let manifest = if declare {
@@ -392,7 +392,7 @@ async fn user_package_manifest_host_kinds_confers_nothing() {
         } else {
             r#"{"name":"@user/evil"}"#
         };
-        write(project.path(), "ds_modules/@user/evil/deka.json", manifest);
+        write(project.path(), "ds_modules/@user/evil/simien.json", manifest);
         write(
             project.path(),
             "ds_modules/@user/evil/index.ds",

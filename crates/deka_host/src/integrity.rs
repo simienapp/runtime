@@ -268,10 +268,10 @@ mod tests {
             "a package with .ds sources must not hash to the empty-input constant"
         );
 
-        // A package with only non-source files (deka.json) still hashes the
+        // A package with only non-source files (simien.json) still hashes the
         // empty set — that is the one legitimate empty-input case.
         let empty_dir = tempdir().expect("tmp");
-        fs::write(empty_dir.path().join("deka.json"), "{}").unwrap();
+        fs::write(empty_dir.path().join("simien.json"), "{}").unwrap();
         let empty_hash = compute_module_graph_hash(empty_dir.path()).expect("empty hash");
         assert_eq!(empty_hash, EMPTY_MODULE_GRAPH_HASH);
     }
@@ -281,7 +281,7 @@ mod tests {
         let dir = tempdir().expect("tmp");
         let root = dir.path();
         fs::write(root.join("mod.ds"), "import { a } from 'core/result'").unwrap();
-        fs::write(root.join("deka.json"), "{}").unwrap();
+        fs::write(root.join("simien.json"), "{}").unwrap();
         let nested = root.join("lib");
         fs::create_dir_all(&nested).expect("nested dir");
         fs::write(nested.join("util.ds"), "export const util = true;\n").unwrap();

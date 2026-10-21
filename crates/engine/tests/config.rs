@@ -32,7 +32,7 @@ fn file_input_routes_to_correct_handler() {
 fn directory_with_serve_entry_routes_to_correct_handler() {
     let dir = temp_dir("engine_test_serve");
     fs::write(dir.join("main.js"), "").unwrap();
-    fs::write(dir.join("deka.json"), r#"{"serve":{"entry":"main.js"}}"#).unwrap();
+    fs::write(dir.join("simien.json"), r#"{"serve":{"entry":"main.js"}}"#).unwrap();
     let resolved = resolve_handler_path(dir.to_str().unwrap()).unwrap();
     assert_eq!(
         resolved.path.canonicalize().unwrap(),
@@ -45,7 +45,7 @@ fn directory_with_serve_entry_routes_to_correct_handler() {
 fn directory_with_app_subdir_without_index_html_falls_back_to_static() {
     // The legacy "app/ folder exists → PHP mode" convention was removed with
     // the PHPX runtime pocket (RFD 24 §12). A directory is only an app-router
-    // project when it has deka.json + app/page.ds(x) (see
+    // project when it has simien.json + app/page.ds(x) (see
     // runtime_core::dist::is_source_app_router_project — the root
     // index.html is a build output, not a source requirement, deka#762);
     // anything else without an index file falls back to static directory
@@ -115,7 +115,7 @@ fn package_json_main_is_ignored_for_handler_resolution() {
 #[test]
 fn missing_entry_file_returns_error() {
     let dir = temp_dir("engine_test_missing_entry");
-    fs::write(dir.join("deka.json"), r#"{"serve":{"entry":"nonexistent.js"}}"#).unwrap();
+    fs::write(dir.join("simien.json"), r#"{"serve":{"entry":"nonexistent.js"}}"#).unwrap();
     let result = resolve_handler_path(dir.to_str().unwrap());
     if let Err(err) = result {
         assert!(err.contains("Entry file not found"));
@@ -173,7 +173,7 @@ fn authored_artifact_wins_without_consulting_source_config() {
     write_artifact(&dir);
     // If source configuration were consulted before dist/, this malformed
     // source file would only be a distraction. Artifact resolution succeeds.
-    fs::write(dir.join("deka.json"), "this is not JSON").unwrap();
+    fs::write(dir.join("simien.json"), "this is not JSON").unwrap();
     let resolved = resolve_handler_path(dir.to_str().unwrap()).unwrap();
     assert_eq!(
         resolved.path.canonicalize().unwrap(),
@@ -215,7 +215,7 @@ fn app_router_project_rejects_incompatible_serve_mode_at_startup() {
     fs::create_dir(dir.join("app")).unwrap();
     fs::write(dir.join("app").join("page.dsx"), "").unwrap();
     fs::write(dir.join("app").join("layout.dsx"), "").unwrap();
-    fs::write(dir.join("deka.json"), r#"{"serve": {"mode": "static"}}"#).unwrap();
+    fs::write(dir.join("simien.json"), r#"{"serve": {"mode": "static"}}"#).unwrap();
     let err = resolve_handler_path(dir.to_str().unwrap())
         .expect_err("static mode on an app-router project must fail to resolve");
     assert!(err.contains("app/"), "error should name the app/ directory: {err}");
@@ -234,12 +234,12 @@ fn app_router_project_defaults_to_php_mode_without_explicit_override() {
     // Companion to the override test above: with no `serve.mode` key at all,
     // an app-router project still resolves to `ServeMode::Php` (DekaScript
     // execution), matching what `deka init` relies on implicitly when a
-    // project's `deka.json` omits the key.
+    // project's `simien.json` omits the key.
     let dir = temp_dir("engine_test_app_router_mode_default");
     fs::create_dir(dir.join("app")).unwrap();
     fs::write(dir.join("app").join("page.dsx"), "").unwrap();
     fs::write(dir.join("app").join("layout.dsx"), "").unwrap();
-    fs::write(dir.join("deka.json"), r#"{"type": "serve"}"#).unwrap();
+    fs::write(dir.join("simien.json"), r#"{"type": "serve"}"#).unwrap();
     let resolved = resolve_handler_path(dir.to_str().unwrap()).unwrap();
     assert!(matches!(resolved.mode, engine::config::ServeMode::Php));
 }
@@ -252,7 +252,7 @@ fn app_router_project_accepts_explicit_ds_mode() {
     fs::create_dir(dir.join("app")).unwrap();
     fs::write(dir.join("app").join("page.dsx"), "").unwrap();
     fs::write(dir.join("app").join("layout.dsx"), "").unwrap();
-    fs::write(dir.join("deka.json"), r#"{"serve": {"mode": "ds"}}"#).unwrap();
+    fs::write(dir.join("simien.json"), r#"{"serve": {"mode": "ds"}}"#).unwrap();
     let resolved = resolve_handler_path(dir.to_str().unwrap()).unwrap();
     assert!(matches!(resolved.mode, engine::config::ServeMode::Php));
 }
@@ -260,7 +260,7 @@ fn app_router_project_accepts_explicit_ds_mode() {
 #[test]
 fn unrecognized_serve_mode_is_a_hard_error_not_a_silent_default() {
     // deka#1017's second finding: previously, ANY failure to deserialize
-    // `deka.json`'s `serve` block (most commonly an unrecognized `mode`
+    // `simien.json`'s `serve` block (most commonly an unrecognized `mode`
     // string — a typo) was caught, logged with `tracing::warn!` only, and
     // silently discarded — the whole `serve` config, not just the bad
     // field, quietly reverted to defaults. A typo that changes behavior
@@ -268,7 +268,7 @@ fn unrecognized_serve_mode_is_a_hard_error_not_a_silent_default() {
     // to close, so this must be a hard, propagated error instead.
     let dir = temp_dir("engine_test_serve_mode_typo");
     fs::write(dir.join("index.html"), "<html></html>").unwrap();
-    fs::write(dir.join("deka.json"), r#"{"serve": {"mode": "statc"}}"#).unwrap();
+    fs::write(dir.join("simien.json"), r#"{"serve": {"mode": "statc"}}"#).unwrap();
     let err = resolve_handler_path(dir.to_str().unwrap())
         .expect_err("an unrecognized serve.mode value must fail to resolve, not silently default");
     assert!(
@@ -282,7 +282,7 @@ fn leftover_serve_json_is_ignored_not_read() {
     // deka#1038: the separate serve.json file is no longer a config
     // channel at all. A leftover file (from before the cutover, or an
     // unrelated file that happens to share the name) must not be parsed —
-    // deka.json is the only source of `serve` config now.
+    // simien.json is the only source of `serve` config now.
     let dir = temp_dir("engine_test_leftover_serve_json");
     fs::write(dir.join("index.html"), "<html></html>").unwrap();
     fs::write(dir.join("serve.json"), r#"{"mode": "statc"}"#).unwrap();
@@ -295,7 +295,7 @@ fn leftover_serve_json_is_ignored_not_read() {
 #[test]
 fn serve_mode_js_is_accepted_as_a_php_alias() {
     // deka#1020 CI finding: the react-builtin CLI fixture
-    // (crates/cli/tests/fixtures/react-builtin/deka.json, introduced in
+    // (crates/cli/tests/fixtures/react-builtin/simien.json, introduced in
     // 08d5b0a4) has shipped with `"serve": {"mode": "js", "entry":
     // "index.js"}` for weeks. `"js"` was never a variant of *this*
     // `ServeMode` (only `serve::config::ServeMode`, a different enum in a
@@ -313,7 +313,7 @@ fn serve_mode_js_is_accepted_as_a_php_alias() {
     let dir = temp_dir("engine_test_serve_mode_js_alias");
     fs::write(dir.join("index.js"), "export default () => {}").unwrap();
     fs::write(
-        dir.join("deka.json"),
+        dir.join("simien.json"),
         r#"{"serve": {"mode": "js", "entry": "index.js"}}"#,
     )
     .unwrap();

@@ -144,7 +144,7 @@ async fn safe_returns_declared_type_and_failures_are_values() {
         return;
     }
     let project = tempfile::tempdir().expect("tempdir");
-    write(project.path(), "deka.json", r#"{"name":"@deka/catalogtest"}"#);
+    write(project.path(), "simien.json", r#"{"name":"@deka/catalogtest"}"#);
     write(project.path(), "deka.lock", EMPTY_DEKA_LOCK);
     write(
         project.path(),
@@ -214,18 +214,18 @@ export fn app(req: string) string {
     Ok(_) => "lossy",
     Err(_) => "err",
   }
-  const parsed: Result<string, string> = unsafe { deka.json.parse("{\"a\":1}") }
+  const parsed: Result<string, string> = unsafe { simien.json.parse("{\"a\":1}") }
   const parsedOk = match (parsed) {
     Ok(_) => "parsed",
     Err(_) => "err",
   }
-  const brokenJson: Result<string, string> = unsafe { deka.json.parse("{") }
+  const brokenJson: Result<string, string> = unsafe { simien.json.parse("{") }
   const brokenJsonOk = match (brokenJson) {
     Ok(_) => "fabricated",
     Err(_) => "err",
   }
-  const validJson: boolean = safe { deka.json.validate("{\"a\":1}") }
-  const invalidJson: boolean = safe { deka.json.validate("{") }
+  const validJson: boolean = safe { simien.json.validate("{\"a\":1}") }
+  const invalidJson: boolean = safe { simien.json.validate("{") }
   const before: number = safe { deka.time.now() }
   const nowOk = before > 0
   safe { deka.io.echo("catalog-echo-line") }
@@ -262,7 +262,7 @@ async fn catalog_is_not_published_on_global_this() {
         return;
     }
     let project = tempfile::tempdir().expect("tempdir");
-    write(project.path(), "deka.json", r#"{"name":"my-app"}"#);
+    write(project.path(), "simien.json", r#"{"name":"my-app"}"#);
     write(project.path(), "deka.lock", EMPTY_DEKA_LOCK);
     write(
         project.path(),
@@ -271,7 +271,7 @@ async fn catalog_is_not_published_on_global_this() {
   const probe: Result<string, string> = unsafe {
     typeof globalThis.deka === "undefined"
       ? "no-deka:no-deka"
-      : typeof globalThis.deka.bytes + ":" + typeof globalThis.deka.json
+      : typeof globalThis.deka.bytes + ":" + typeof globalThis.simien.json
       + ":" + typeof globalThis[Symbol.for("deka.host.internal")]
       + ":" + Object.isFrozen(globalThis[Symbol.for("deka.host.internal")])
   }
@@ -332,7 +332,7 @@ async fn closed_catalog_rejects_unknown_helpers_and_wrong_arity() {
         ),
     ] {
         let project = tempfile::tempdir().expect("tempdir");
-        write(project.path(), "deka.json", r#"{"name":"@deka/catalogneg"}"#);
+        write(project.path(), "simien.json", r#"{"name":"@deka/catalogneg"}"#);
         write(project.path(), "deka.lock", EMPTY_DEKA_LOCK);
         write(project.path(), "main.ds", source);
         let entry = project.path().join("main.ds");
@@ -370,7 +370,7 @@ async fn user_package_catalog_use_is_a_source_diagnostic() {
         ),
         (
             "user_unsafe",
-            "export fn app(req: string) string {\n  const r: Result<unknown, string> = unsafe { deka.json.parse(req) }\n  return \"x\"\n}\n",
+            "export fn app(req: string) string {\n  const r: Result<unknown, string> = unsafe { simien.json.parse(req) }\n  return \"x\"\n}\n",
             "stdlib-only",
         ),
         (
@@ -380,7 +380,7 @@ async fn user_package_catalog_use_is_a_source_diagnostic() {
         ),
     ] {
         let project = tempfile::tempdir().expect("tempdir");
-        write(project.path(), "deka.json", r#"{"name":"my-app"}"#);
+        write(project.path(), "simien.json", r#"{"name":"my-app"}"#);
         write(project.path(), "deka.lock", EMPTY_DEKA_LOCK);
         write(project.path(), "main.ds", source);
         let entry = project.path().join("main.ds");
@@ -413,11 +413,11 @@ async fn unofficial_dependency_catalog_use_is_rejected() {
     let project = tempfile::tempdir().expect("tempdir");
     write(
         project.path(),
-        "deka.json",
+        "simien.json",
         r#"{"name":"my-app","dependencies":{"@acme/evil":"1.0.0"}}"#,
     );
     let dep = project.path().join("ds_modules/@acme/evil");
-    write(&dep, "deka.json", r#"{"name":"@acme/evil","version":"1.0.0"}"#);
+    write(&dep, "simien.json", r#"{"name":"@acme/evil","version":"1.0.0"}"#);
     write(
         &dep,
         "index.ds",
@@ -463,11 +463,11 @@ async fn stdlib_dependency_safe_calls_serve_app_imports() {
     let project = tempfile::tempdir().expect("tempdir");
     write(
         project.path(),
-        "deka.json",
+        "simien.json",
         r#"{"name":"my-app","dependencies":{"@deka/bytestest":"1.0.0"}}"#,
     );
     let dep = project.path().join("ds_modules/@deka/bytestest");
-    write(&dep, "deka.json", r#"{"name":"@deka/bytestest","version":"1.0.0"}"#);
+    write(&dep, "simien.json", r#"{"name":"@deka/bytestest","version":"1.0.0"}"#);
     write(
         &dep,
         "index.ds",
@@ -512,7 +512,7 @@ async fn safe_helpers_do_not_throw_on_typed_edge_inputs() {
         return;
     }
     let project = tempfile::tempdir().expect("tempdir");
-    write(project.path(), "deka.json", r#"{"name":"@deka/catalogedge"}"#);
+    write(project.path(), "simien.json", r#"{"name":"@deka/catalogedge"}"#);
     write(project.path(), "deka.lock", EMPTY_DEKA_LOCK);
     write(
         project.path(),
@@ -578,7 +578,7 @@ async fn malformed_bytes_inputs_are_error_values_not_altered_bytes() {
         return;
     }
     let project = tempfile::tempdir().expect("tempdir");
-    write(project.path(), "deka.json", r#"{"name":"@deka/byteneg"}"#);
+    write(project.path(), "simien.json", r#"{"name":"@deka/byteneg"}"#);
     write(project.path(), "deka.lock", EMPTY_DEKA_LOCK);
     write(
         project.path(),
@@ -730,11 +730,11 @@ export fn from_base64(value: string) Option<bytes> {
     let project = tempfile::tempdir().expect("tempdir");
     write(
         project.path(),
-        "deka.json",
+        "simien.json",
         r#"{"name":"my-app","dependencies":{"@deka/bytes":"1.0.0"}}"#,
     );
     let dep = project.path().join("ds_modules/@deka/bytes");
-    write(&dep, "deka.json", r#"{"name":"@deka/bytes","version":"1.0.0"}"#);
+    write(&dep, "simien.json", r#"{"name":"@deka/bytes","version":"1.0.0"}"#);
     write(&dep, "index.ds", package_ds);
     pin_lock(project.path(), &dep, "@deka/bytes");
     write(
@@ -825,7 +825,7 @@ async fn emitted_catalog_js_runs_without_bootstrap_helpers() {
         return;
     }
     let project = tempfile::tempdir().expect("tempdir");
-    write(project.path(), "deka.json", r#"{"name":"@deka/catalogemitted"}"#);
+    write(project.path(), "simien.json", r#"{"name":"@deka/catalogemitted"}"#);
     write(project.path(), "deka.lock", EMPTY_DEKA_LOCK);
     write(project.path(), "main.ds", r#"
 export fn app(req: string) string {

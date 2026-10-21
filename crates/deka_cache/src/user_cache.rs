@@ -15,7 +15,7 @@
 //! 2. `~/.deka/cache`
 //!
 //! There is deliberately no `DEKA_CACHE_DIR` override: configuration comes
-//! from `deka.json` and deka/dsc carry zero environment overrides (deka#801).
+//! from `simien.json` and deka/dsc carry zero environment overrides (deka#801).
 //! An environment without a usable home directory is a defined error, not a
 //! panic.
 //!
@@ -37,7 +37,7 @@ use sha2::{Digest, Sha256};
 
 /// Advisory printed (through `stdio::note`, after everything else) when a
 /// loose file ran through the user cache instead of a project.
-pub const NOT_A_PROJECT_NOTE: &str = "not a deka project — initialize one with: deka init";
+pub const NOT_A_PROJECT_NOTE: &str = "not a Simien project (no simien.json) — start one with: simien db init";
 
 const LOOSE_DIR: &str = "loose";
 const META_FILE: &str = "meta.json";
@@ -94,7 +94,7 @@ pub fn resolve_user_cache_root() -> Result<PathBuf, String> {
     }
 }
 
-/// True when `path` is a `.ds` / `.dsx` file with no `deka.json` among its
+/// True when `path` is a `.ds` / `.dsx` file with no `simien.json` among its
 /// ancestors — the loose-file case this module exists for. Files inside a
 /// project and plain `.js` files keep their existing behavior.
 pub fn is_loose_source_file(path: &Path) -> bool {
@@ -112,7 +112,7 @@ fn find_project_root(path: &Path) -> Option<PathBuf> {
     let start = path.parent().unwrap_or(Path::new("."));
     start
         .ancestors()
-        .find(|dir| dir.join("deka.json").is_file())
+        .find(|dir| dir.join("simien.json").is_file())
         .map(Path::to_path_buf)
 }
 
@@ -597,7 +597,7 @@ mod tests {
         assert!(!is_loose_source_file(&js));
 
         let project = tempfile::tempdir().expect("project");
-        fs::write(project.path().join("deka.json"), "{}\n").expect("manifest");
+        fs::write(project.path().join("simien.json"), "{}\n").expect("manifest");
         let in_project = write_source(project.path(), "app.ds", "export const ok = true\n");
         assert!(!is_loose_source_file(&in_project));
     }

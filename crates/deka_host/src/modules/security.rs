@@ -1,6 +1,6 @@
 use super::security_hint::{
     config_hint_for_request, normalize_rel_like, project_kind, project_root,
-    rule_items_for_request, update_deka_json_allow,
+    rule_items_for_request, update_simien_json_allow,
 };
 use super::*;
 
@@ -15,7 +15,7 @@ pub fn security_policy_from_context() -> Result<SecurityPolicy, simien_core::err
     let Some(raw) = ::security::security_context::context_policy_json() else {
         return Err(core_err(
             "security policy missing: no per-execution security context is installed; \
-             the dispatch path failed to supply the resolved deka.json policy",
+             the dispatch path failed to supply the resolved simien.json policy",
         ));
     };
     security_policy_from_json_str(&raw)
@@ -415,11 +415,11 @@ fn prompt_grant(
                     .lock()
                     .map_err(|_| core_err("security prompt lock poisoned"))?;
                 grants.insert(key);
-                if let Err(err) = update_deka_json_allow(capability, target) {
-                    eprintln!("[security] note: failed to update deka.json: {}", err);
+                if let Err(err) = update_simien_json_allow(capability, target) {
+                    eprintln!("[security] note: failed to update simien.json: {}", err);
                 } else {
                     eprintln!(
-                        "[security] updated deka.json to allow {} on {}",
+                        "[security] updated simien.json to allow {} on {}",
                         capability,
                         target.unwrap_or("*")
                     );
@@ -498,7 +498,7 @@ fn classify_security_origin(capability: &str, target: Option<&str>) -> &'static 
                 || rel_str.starts_with("src/")
                 || rel_str.starts_with("public/")
                 || rel_str.starts_with("php_modules/")
-                || rel_str == "deka.json"
+                || rel_str == "simien.json"
                 || rel_str == "deka.lock"
             {
                 return "project-owned";

@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn project_root_grants_follow_rfd27_rules() {
-        let path = PathBuf::from("/proj/deka.json");
+        let path = PathBuf::from("/proj/simien.json");
         // Official workspace root may self-declare kinds.
         let official = resolve_project_root_grants("@deka/fs", &path, Some(&["fs".to_string()]));
         assert_eq!(official, Ok(vec!["fs".to_string()]));
@@ -203,7 +203,7 @@ mod tests {
             app,
             Err(GrantError::AppDeclaresHostKinds {
                 package: "my-app".to_string(),
-                path: "/proj/deka.json".to_string(),
+                path: "/proj/simien.json".to_string(),
             })
         );
         // App root without kinds is fine and grants nothing.
@@ -252,7 +252,7 @@ mod tests {
         // Root grant error propagates unchanged.
         let err = Err(GrantError::AppDeclaresHostKinds {
             package: "app".to_string(),
-            path: "/p/deka.json".to_string(),
+            path: "/p/simien.json".to_string(),
         });
         assert_eq!(granted_kind_names(&err, &table, &digests), err);
     }

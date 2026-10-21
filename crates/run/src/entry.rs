@@ -2,7 +2,7 @@
 //!
 //! Lookup order:
 //! 1. CLI arg if it is a `.ds` / `.dsx` / `.js` file that exists.
-//! 2. `deka.json` `entry`, then `main`, then `serve.entry` if set and exists.
+//! 2. `simien.json` `entry`, then `main`, then `serve.entry` if set and exists.
 //! 3. `app/` if it exists (`page.dsx`, `main.ds`, `index.ds`, or the directory).
 //! 4. `api/` if it exists (backend, no frontend).
 //! 5. `src/` — `src/main.ds`, `src/index.ds`, or a single top-level `.ds`.
@@ -101,7 +101,7 @@ pub fn resolve_entry(project_root: &Path, cli_arg: Option<&str>) -> Result<Resol
         });
     }
 
-    let manifest = load_deka_json(project_root);
+    let manifest = load_simien_json(project_root);
 
     if let Some(entry) = string_at(&manifest, &["entry"]) {
         let path = join_project(project_root, &entry);
@@ -233,8 +233,8 @@ fn join_project(project_root: &Path, raw: &str) -> PathBuf {
     }
 }
 
-fn load_deka_json(project_root: &Path) -> Option<Value> {
-    let content = fs::read_to_string(project_root.join("deka.json")).ok()?;
+fn load_simien_json(project_root: &Path) -> Option<Value> {
+    let content = fs::read_to_string(project_root.join("simien.json")).ok()?;
     serde_json::from_str(&content).ok()
 }
 
@@ -268,16 +268,16 @@ fn missing_entry_error(
         None => lines.push("  - a CLI .ds/.dsx/.js file".to_string()),
     }
     match string_at(manifest, &["entry"]) {
-        Some(entry) => lines.push(format!("  - deka.json \"entry\" (`{entry}`)")),
-        None => lines.push("  - deka.json \"entry\"".to_string()),
+        Some(entry) => lines.push(format!("  - simien.json \"entry\" (`{entry}`)")),
+        None => lines.push("  - simien.json \"entry\"".to_string()),
     }
     match string_at(manifest, &["main"]) {
-        Some(main) => lines.push(format!("  - deka.json \"main\" (`{main}`)")),
-        None => lines.push("  - deka.json \"main\"".to_string()),
+        Some(main) => lines.push(format!("  - simien.json \"main\" (`{main}`)")),
+        None => lines.push("  - simien.json \"main\"".to_string()),
     }
     match string_at(manifest, &["serve", "entry"]) {
-        Some(entry) => lines.push(format!("  - deka.json serve.entry (`{entry}`)")),
-        None => lines.push("  - deka.json serve.entry".to_string()),
+        Some(entry) => lines.push(format!("  - simien.json serve.entry (`{entry}`)")),
+        None => lines.push("  - simien.json serve.entry".to_string()),
     }
     lines.push("  - app/page.dsx, app/main.ds, app/index.ds (or the app/ directory)".to_string());
     lines.push("  - api/ (backend, no frontend)".to_string());
@@ -316,7 +316,7 @@ mod tests {
         let root = tmp.path();
         write(
             root,
-            "deka.json",
+            "simien.json",
             r#"{"entry":"from-entry.ds","main":"from-main.ds","serve":{"entry":"from-serve.ds"}}"#,
         );
         write(root, "from-entry.ds", "");
@@ -338,7 +338,7 @@ mod tests {
         let root = tmp.path();
         write(
             root,
-            "deka.json",
+            "simien.json",
             r#"{"entry":"from-entry.ds","main":"from-main.ds","serve":{"entry":"from-serve.ds"}}"#,
         );
         write(root, "from-entry.ds", "");
@@ -388,7 +388,7 @@ mod tests {
         let root = tmp.path();
         write(
             root,
-            "deka.json",
+            "simien.json",
             r#"{"entry":"absent-entry.ds","main":"from-main.ds","serve":{"entry":"from-serve.ds"}}"#,
         );
         write(root, "from-main.ds", "");
@@ -405,7 +405,7 @@ mod tests {
         let root = tmp.path();
         write(
             root,
-            "deka.json",
+            "simien.json",
             r#"{"entry":"absent-entry.ds","main":"absent.ds","serve":{"entry":"from-serve.ds"}}"#,
         );
         write(root, "from-serve.ds", "");
@@ -419,7 +419,7 @@ mod tests {
     fn serve_entry_wins_over_app() {
         let tmp = project();
         let root = tmp.path();
-        write(root, "deka.json", r#"{"serve":{"entry":"from-serve.ds"}}"#);
+        write(root, "simien.json", r#"{"serve":{"entry":"from-serve.ds"}}"#);
         write(root, "from-serve.ds", "");
         write(root, "app/page.dsx", "");
         let got = resolve(root, None);
@@ -573,8 +573,8 @@ mod tests {
         assert!(err.contains("could not resolve a run entry"), "{err}");
         assert!(err.contains("looked for:"), "{err}");
         assert!(err.contains("CLI .ds/.dsx/.js file"), "{err}");
-        assert!(err.contains("deka.json \"entry\""), "{err}");
-        assert!(err.contains("deka.json \"main\""), "{err}");
+        assert!(err.contains("simien.json \"entry\""), "{err}");
+        assert!(err.contains("simien.json \"main\""), "{err}");
         assert!(err.contains("serve.entry"), "{err}");
         assert!(err.contains("app/page.dsx"), "{err}");
         assert!(err.contains("api/"), "{err}");
@@ -587,7 +587,7 @@ mod tests {
         let root = tmp.path();
         write(
             root,
-            "deka.json",
+            "simien.json",
             r#"{"entry":"gone-entry.ds","main":"gone.ds","serve":{"entry":"also-gone.ds"}}"#,
         );
         let err = resolve_entry(root, Some("dev")).unwrap_err();
