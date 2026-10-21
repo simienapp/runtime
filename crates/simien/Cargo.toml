@@ -1,0 +1,29 @@
+[package]
+name = "simien"
+version.workspace = true
+edition = "2024"
+description = "The simien CLI (also installed as `s`): the runtime, packages, and the project's dev loop"
+publish = false
+
+[[bin]]
+name = "simien"
+path = "src/main.rs"
+
+[[bin]]
+name = "s"
+path = "src/bin/s.rs"
+
+[dependencies]
+dcore = { path = "../dcore" }
+stdio = "0.4.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+run = { path = "../run" }
+runtime = { path = "../runtime" }
+dev = { path = "../dev", features = ["dev-server"] }
+introspect = { path = "../introspect" }
+compile = { path = "../compile" }
+self_cmd = { path = "../self_cmd" }
+
+[dev-dependencies]
+tempfile = "3.23.0"
