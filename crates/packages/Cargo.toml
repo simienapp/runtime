@@ -1,0 +1,36 @@
+[package]
+name = "packages"
+version.workspace = true
+edition = "2024"
+description = "npm packages for Simien: install, add, remove and the rest, on the simien_npm crates"
+publish = false
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+dcore = { path = "../dcore" }
+output = { path = "../output" }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "http2"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+stdio = "0.5.0"
+tokio = { workspace = true }
+url = "2"
+simien_cache_dir = "0.1.1"
+simien_error = "0.1.1"
+simien_lockfile = "0.1.1"
+simien_npm = "0.1.1"
+simien_npm_cache = "0.1.1"
+simien_npm_installer = "0.1.2"
+simien_npmrc = "0.1.1"
+simien_package_json = "0.1.1"
+simien_resolver = "0.1.2"
+simien_semver = "0.1.1"
+simien_sys_traits = { version = "0.1.1", features = ["real", "getrandom", "libc", "winapi"] }
+
+[dev-dependencies]
+base64 = "0.22"
+flate2 = "1.0"
+sha2 = "0.10"
+tar = "0.4"
+tempfile = "3.23.0"
