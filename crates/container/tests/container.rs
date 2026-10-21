@@ -137,3 +137,27 @@ fn logs_pass_service_tail_and_follow_and_stream_each_line() {
         ["logs simien-my-shop postgres --tail 5 --follow --nopretty"]
     );
 }
+
+#[test]
+fn update_pulls_through_a_private_description_and_reports_what_was_replaced() {
+    let (fake, project) = project(
+        r#"pull) echo '{"event":"pull","image":"addiscorp/zega:0.2.0"}'; echo '{"event":"replace","service":"zega"}'; echo '{"ok":true,"images":[{"image":"addiscorp/zega:0.2.0","id":"sha256:b"}],"replaced":["zega"]}' ;;"#,
+    );
+    let mut events = Vec::new();
+    let pulled = stack::pull(&project, |event| events.push(event["event"].as_str().unwrap().to_string()))
+        .unwrap();
+    assert_eq!(pulled.replaced, ["zega"]);
+    assert_eq!(pulled.images[0].id, "sha256:b");
+    assert_eq!(events, ["pull", "replace"]);
+    let file = fake.root.join(".simien/kebele.json");
+    assert_eq!(calls(&fake), [format!("pull {} --nopretty", file.display())]);
+}
+
+#[test]
+fn update_with_an_old_kebele_says_which_version_it_needs() {
+    let (_fake, project) = project(
+        r#"pull) echo '{"ok":false,"error":{"message":"error: unknown command '"'"'pull'"'"'"}}' >&2; exit 1 ;;"#,
+    );
+    let error = stack::pull(&project, |_| {}).unwrap_err();
+    assert!(error.contains("kebele 0.10"), "{error}");
+}
