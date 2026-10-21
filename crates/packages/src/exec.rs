@@ -5,6 +5,10 @@
 //! Simien doesn't run Node programs. A native binary or a script with its
 //! own interpreter runs directly; a JavaScript program runs with bun, or
 //! node when there is no bun, and is an error when there is neither.
+//!
+//! Every program runs in the sandbox (APS 3): it reads everything but
+//! secrets, writes only the project, has the network, and sees no
+//! credentials, unless Simien's pre-approved list grants the package more.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -32,6 +36,8 @@ pub enum Kind {
 #[derive(Debug, Serialize)]
 pub struct Program {
     pub package: String,
+    /// The package's folder (its package.json, with any `permissions`).
+    pub package_dir: PathBuf,
     pub bin: String,
     pub path: PathBuf,
     pub kind: Kind,
@@ -43,14 +49,21 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn command(&self, args: &[String]) -> anyhow::Result<Command> {
+    /// The sandbox it runs in, for a project at `project`. Keep it until the
+    /// program ends.
+    pub fn sandbox(&self, project: &Path) -> anyhow::Result<crate::sandbox::Prepared> {
+        let places = crate::sandbox::Places::detect(project, None)?;
+        crate::sandbox::for_x(&places, &self.package, &self.package_dir)
+    }
+
+    pub fn command(&self, sandbox: &gelada::Sandbox, args: &[String]) -> anyhow::Result<Command> {
         let mut command = match &self.runner {
             Some(runner) => {
-                let mut command = Command::new(runner);
+                let mut command = sandbox.command(runner)?;
                 command.arg(&self.path);
                 command
             }
-            None => Command::new(&self.path),
+            None => sandbox.command(&self.path)?,
         };
         command.args(args);
         let mut path = self.bin_dirs.clone();
@@ -158,6 +171,7 @@ fn find(node_modules: &Path, name: &str) -> anyhow::Result<Option<Program>> {
     };
     Ok(Some(Program {
         package: name.to_string(),
+        package_dir: node_modules.join(name),
         bin,
         path,
         kind,

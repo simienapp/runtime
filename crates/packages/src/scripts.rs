@@ -3,6 +3,10 @@
 //! Node programs, and most install scripts are Node programs, so they run
 //! through the user's shell with their own `node`; when there is no `node`
 //! but there is `bun`, a `node` shim pointing at bun goes first on PATH.
+//!
+//! Every script runs in the sandbox (APS 3): it writes only its own package
+//! folder, has no network and sees no credentials, unless Simien's
+//! pre-approved list grants the package more.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -17,7 +21,10 @@ use simien_semver::package::PackageReq;
 const PHASES: [&str; 3] = ["preinstall", "install", "postinstall"];
 
 #[derive(Debug)]
-pub struct ScriptsExecutor;
+pub struct ScriptsExecutor {
+    /// Where declared-but-unapproved permissions are reported.
+    pub pending: std::sync::Arc<std::sync::Mutex<Vec<crate::sandbox::Pending>>>,
+}
 
 #[async_trait::async_trait(?Send)]
 impl LifecycleScriptsExecutor for ScriptsExecutor {
@@ -40,12 +47,27 @@ impl LifecycleScriptsExecutor for ScriptsExecutor {
             } else {
                 package.init_cwds.iter().map(PathBuf::as_path).collect()
             };
+            let name = package.package.id.nv.name.as_str();
+            let project = options
+                .root_node_modules_dir_path
+                .parent()
+                .unwrap_or(options.root_node_modules_dir_path);
+            let places = crate::sandbox::Places::detect(project, Some(&package.package_folder))?;
+            let prepared =
+                crate::sandbox::for_install(&places, name, &package.package_folder)?;
+            let prepared_note = prepared.failure_note(name);
+            let sandbox = prepared.sandbox;
+            if let Some(pending) = &prepared.pending
+                && let Ok(mut all) = self.pending.lock()
+            {
+                all.push(pending.clone());
+            }
             for init_cwd in cwds {
                 for phase in PHASES {
                     let Some(script) = package.scripts.get(phase) else {
                         continue;
                     };
-                    let status = shell(script)
+                    let status = shell(&sandbox, script)?
                         .current_dir(&package.package_folder)
                         .env("PATH", &path)
                         .env("INIT_CWD", init_cwd)
@@ -61,8 +83,9 @@ impl LifecycleScriptsExecutor for ScriptsExecutor {
                         })?;
                     if !status.success() {
                         bail!(
-                            "{}: `{script}` ({phase}) failed with {status}",
-                            package.package.id.nv
+                            "{}: `{script}` ({phase}) failed with {status}; {}",
+                            package.package.id.nv,
+                            prepared_note
                         );
                     }
                 }
@@ -73,16 +96,16 @@ impl LifecycleScriptsExecutor for ScriptsExecutor {
     }
 }
 
-fn shell(script: &str) -> Command {
-    if cfg!(windows) {
-        let mut command = Command::new("cmd");
-        command.args(["/d", "/s", "/c", script]);
-        command
+/// `script` through the shell, in `sandbox`.
+fn shell(sandbox: &gelada::Sandbox, script: &str) -> anyhow::Result<Command> {
+    let (program, flags): (&str, &[&str]) = if cfg!(windows) {
+        ("cmd", &["/d", "/s", "/c"])
     } else {
-        let mut command = Command::new("sh");
-        command.args(["-c", script]);
-        command
-    }
+        ("sh", &["-c"])
+    };
+    let mut command = sandbox.command(program)?;
+    command.args(flags).arg(script);
+    Ok(command)
 }
 
 pub(crate) fn on_path(program: &str) -> Option<PathBuf> {
