@@ -22,6 +22,11 @@ fn main() {
         inbox_capacity: 1024,
         max_busy: Some(std::time::Duration::from_secs(30)),
         on_event: Some(std::sync::Arc::new(|event| eprintln!("{event:?}"))),
+        // Default-deny: the example app needs no capabilities.
+        security: pool::ExecutionSecurity {
+            policy_json: security::security_policy::policy_to_json(&Default::default()).to_string(),
+            no_prompt: true,
+        },
     })
     .unwrap_or_else(|err| panic!("{err}"));
     println!("listening on {} with {isolates} isolates", server.addr);

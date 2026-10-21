@@ -523,6 +523,8 @@ pub fn serve_warm(context: &Context) -> Result<(), String> {
             entry.display()
         ));
     }
+    let resolved_security = resolve_security_policy_for_serve(context, false)?;
+    stdio_log::log("security", &resolved_security.summary);
     let mut serve_options = pool::validation::ServeOptions::default();
     apply_cli_serve_overrides(context, &mut serve_options);
     let port = serve_options.port.unwrap_or(8530);
@@ -536,6 +538,10 @@ pub fn serve_warm(context: &Context) -> Result<(), String> {
         inbox_capacity: 1024,
         max_busy: Some(MAX_BUSY),
         on_event: Some(std::sync::Arc::new(move |event| report_server_event(event, globals))),
+        security: pool::ExecutionSecurity {
+            policy_json: resolved_security.policy_json,
+            no_prompt: !resolved_security.prompt_enabled,
+        },
     })?;
     let url = format!("http://localhost:{}", server.addr.port());
     output::event(

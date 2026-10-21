@@ -60,12 +60,17 @@ pub(crate) fn enforce_dynamic_policy(modules: &HashMap<PathBuf, String>) -> Resu
     let mut paths: Vec<&PathBuf> = modules.keys().collect();
     paths.sort();
     for path in paths {
-        let source = &modules[path];
-        let name = path.to_string_lossy();
-        crate::validation::validate_dynamic_code_from_security_context(source, &name)
-            .map_err(|err| JsErrorBox::generic(format!("{DEKA_VALIDATION_ERROR_MARKER}{err}")))?;
+        enforce_dynamic_policy_on(path, &modules[path])?;
     }
     Ok(())
+}
+
+/// The same check for one JavaScript or TypeScript module, as the loader
+/// reads it: a `.js`/`.ts` entry never goes through the DekaScript graph
+/// above, so without this `dynamic=false` was printed and not enforced.
+pub(crate) fn enforce_dynamic_policy_on(path: &Path, source: &str) -> Result<(), JsErrorBox> {
+    crate::validation::validate_dynamic_code_from_security_context(source, &path.to_string_lossy())
+        .map_err(|err| JsErrorBox::generic(format!("{DEKA_VALIDATION_ERROR_MARKER}{err}")))
 }
 
 pub fn ensure_project_layout(

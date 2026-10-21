@@ -141,15 +141,16 @@ fn resolved_policies_deny_every_capability_by_default() {
             matches!(scope.db, RuleList::None),
             "{phase:?}: db must deny by default"
         );
+        // Like Deno: code may load wasm and evaluate code by default.
         assert!(
-            matches!(scope.wasm, RuleList::None),
-            "{phase:?}: wasm must deny by default"
+            matches!(scope.wasm, RuleList::All),
+            "{phase:?}: wasm is allowed by default, as in Deno"
         );
+        assert!(scope.dynamic, "{phase:?}: dynamic code is allowed by default, as in Deno");
         assert!(
             matches!(scope.run, RuleList::None),
             "{phase:?}: run is removed and must stay empty"
         );
-        assert!(!scope.dynamic, "{phase:?}: dynamic is removed");
         assert!(
             policy.deny == security::security_policy::SecurityScope::default(),
             "{phase:?}: phase-aware profiles express deny-by-default, not deny rules"
@@ -253,7 +254,8 @@ fn dev_build_false_denies_the_build_phase_everything() {
     }));
     let policy = perms.resolve(ExecutionPhase::DevBuild, Path::new("/work/project"));
     assert!(matches!(policy.allow.read, RuleList::None));
-    assert!(matches!(policy.allow.wasm, RuleList::None));
+    // wasm isn't a capability that can be withheld (Deno doesn't gate it).
+    assert!(matches!(policy.allow.wasm, RuleList::All));
     let perms = must_parse(serde_json::json!({
         "permissions": { "dev": { "read": true } }
     }));

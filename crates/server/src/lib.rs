@@ -58,6 +58,10 @@ pub struct ServerOptions {
     pub max_busy: Option<Duration>,
     /// Told when an isolate is replaced. The server prints nothing itself.
     pub on_event: Option<Arc<dyn Fn(Event) + Send + Sync>>,
+    /// The project's resolved security policy. Every isolate thread installs
+    /// it before loading the app, so module loading and every request run
+    /// under it; enforcement fails closed without one.
+    pub security: pool::ExecutionSecurity,
 }
 
 /// Something the server did on its own.
@@ -95,6 +99,7 @@ struct Shared {
     capacity: usize,
     max_busy: Option<Duration>,
     on_event: Option<Arc<dyn Fn(Event) + Send + Sync>>,
+    security: pool::ExecutionSecurity,
     epoch: Instant,
     slots: Vec<Slot>,
 }
@@ -141,6 +146,7 @@ pub fn start(options: ServerOptions) -> Result<Server, String> {
         capacity: options.inbox_capacity,
         max_busy: options.max_busy,
         on_event: options.on_event,
+        security: options.security,
         epoch: Instant::now(),
         slots: (0..isolates)
             .map(|_| Slot {
@@ -349,6 +355,13 @@ fn serve_isolate(
 ) -> Result<(), String> {
     let slot = &shared.slots[index];
     let entry = shared.entry.clone();
+    // Everything on this thread, loading included, runs under the policy.
+    let _security = security::security_context::set_security_context(
+        security::security_context::SecurityContext {
+            policy_json: Some(shared.security.policy_json.clone()),
+            no_prompt: shared.security.no_prompt,
+        },
+    );
     let tokio = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

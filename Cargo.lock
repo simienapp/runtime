@@ -8410,6 +8410,7 @@ version = "0.61.0"
 dependencies = [
  "pool",
  "reqwest",
+ "security",
  "serde",
  "simien_core",
  "simien_http",

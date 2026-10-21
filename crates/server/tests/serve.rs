@@ -46,6 +46,7 @@ fn start(isolates: usize) -> (tempfile::TempDir, std::net::SocketAddr) {
         inbox_capacity: 128,
         max_busy: None,
         on_event: None,
+        security: default_policy(),
     })
     .expect("start");
     let addr = server.addr;
@@ -148,6 +149,7 @@ fn a_request_stuck_in_javascript_does_not_take_the_isolate_down() {
         inbox_capacity: 128,
         max_busy: Some(Duration::from_millis(300)),
         on_event: Some(std::sync::Arc::new(move |event| seen.lock().unwrap().push(event))),
+        security: default_policy(),
     })
     .expect("start");
     let base = format!("http://{}", server.addr);
@@ -195,6 +197,7 @@ fn an_app_that_never_finishes_loading_fails_to_start() {
             inbox_capacity: 8,
             max_busy: Some(Duration::from_millis(300)),
             on_event: None,
+            security: default_policy(),
         });
         let _ = done.send(started.err());
     });
@@ -203,4 +206,42 @@ fn an_app_that_never_finishes_loading_fails_to_start() {
         .expect("start must give up, not hang")
         .expect("start must fail");
     assert!(error.contains("took longer than"), "{error}");
+}
+
+/// Simien's default policy: default-deny, nothing granted.
+fn default_policy() -> pool::ExecutionSecurity {
+    pool::ExecutionSecurity {
+        policy_json: security::security_policy::policy_to_json(&Default::default()).to_string(),
+        no_prompt: true,
+    }
+}
+
+/// The warm server loads the app under the project's policy: when it denies
+/// dynamic code, an app that evaluates code from a string doesn't start.
+#[test]
+fn the_warm_server_loads_the_app_under_the_projects_policy() {
+    let dir = tempfile::tempdir().expect("app dir");
+    let entry = dir.path().join("app.js");
+    std::fs::write(
+        &entry,
+        "const n = eval(\"1 + 1\");\nexport default { fetch: () => new Response(String(n)) };\n",
+    )
+    .expect("write app");
+    let mut policy = security::security_policy::SecurityPolicy::default();
+    policy.deny.dynamic = true;
+    let started = server::start(ServerOptions {
+        addr: "127.0.0.1:0".parse().expect("addr"),
+        entry,
+        project_root: dir.path().to_path_buf(),
+        isolates: 1,
+        inbox_capacity: 8,
+        max_busy: None,
+        on_event: None,
+        security: pool::ExecutionSecurity {
+            policy_json: security::security_policy::policy_to_json(&policy).to_string(),
+            no_prompt: true,
+        },
+    });
+    let error = started.err().expect("the app must not start");
+    assert!(error.contains("eval is disabled by the security policy"), "{error}");
 }
