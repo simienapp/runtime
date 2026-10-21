@@ -36,7 +36,7 @@ fn every_wintertc_global_exists_and_works() {
 
     let port = free_port();
     let _server = Server(
-        Command::new(env!("CARGO_BIN_EXE_cli"))
+        Command::new(env!("CARGO_BIN_EXE_simien"))
             .args(["serve", "app.js", "--port", &port.to_string()])
             .current_dir(dir.path())
             .env("HOME", home.path())

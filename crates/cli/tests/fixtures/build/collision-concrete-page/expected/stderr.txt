@@ -1,1 +1,0 @@
-[build] route collision: `/posts/hello` from route `/posts/[slug]` collides with route `/posts/hello`

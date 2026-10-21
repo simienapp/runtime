@@ -1,3 +1,0 @@
-export fn HelloBadge() ReactNode {
-  return <p id="desktop-island">React island</p>
-}

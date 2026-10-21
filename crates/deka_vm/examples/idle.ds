@@ -1,1 +1,0 @@
-import {delay} from "vm:host"; async fn main() Promise<string> {return await delay(1000,"done");}

@@ -1,4 +1,0 @@
-import { echo } from "../index.ds"
-
-echo("hello")
-echo("" + 3)

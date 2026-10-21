@@ -2,13 +2,9 @@ use deka_cli_core::{CommandSpec, Context, ParamSpec, Registry, SubcommandSpec};
 
 mod doctor;
 mod fetch;
-#[cfg(feature = "self-update")]
-pub mod monitor;
 mod pairing;
 mod targets;
 mod test;
-#[cfg(feature = "self-update")]
-pub mod update;
 
 const DOCTOR: SubcommandSpec = SubcommandSpec {
     name: "doctor",
@@ -24,20 +20,6 @@ const FETCH: SubcommandSpec = SubcommandSpec {
     handler: fetch::cmd,
 };
 
-// deka#992: self-update is deferred until closer to MVP. `monitor` and
-// `update` (and the SubcommandSpec entries below that register them) only
-// exist when the `self-update` feature is on -- a default build must not
-// mention a command it did not compile in (the dev-server-feature-gated-out
-// incident is exactly the shape of bug this guards against). See
-// `update/mod.rs` and `pm::releases` for what is preserved behind the flag.
-#[cfg(feature = "self-update")]
-const MONITOR: SubcommandSpec = SubcommandSpec {
-    name: "monitor",
-    summary: "run the long-running self-update daemon",
-    aliases: &[],
-    handler: monitor::cmd,
-};
-
 const TEST: SubcommandSpec = SubcommandSpec {
     name: "test",
     summary: "run internal deka compatibility and content tests",
@@ -45,17 +27,6 @@ const TEST: SubcommandSpec = SubcommandSpec {
     handler: test::cmd,
 };
 
-#[cfg(feature = "self-update")]
-const UPDATE: SubcommandSpec = SubcommandSpec {
-    name: "update",
-    summary: "update deka components",
-    aliases: &[],
-    handler: update::cmd,
-};
-
-#[cfg(feature = "self-update")]
-const SUBCOMMANDS: &[SubcommandSpec] = &[DOCTOR, FETCH, MONITOR, TEST, UPDATE];
-#[cfg(not(feature = "self-update"))]
 const SUBCOMMANDS: &[SubcommandSpec] = &[DOCTOR, FETCH, TEST];
 
 const COMMAND: CommandSpec = CommandSpec {

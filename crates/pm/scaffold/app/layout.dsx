@@ -1,7 +1,0 @@
-interface LayoutProps {
-  children: ReactNode
-}
-
-export fn Layout(props: LayoutProps) ReactNode {
-  return <main>{props.children}</main>
-}

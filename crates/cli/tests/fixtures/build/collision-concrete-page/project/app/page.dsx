@@ -1,3 +1,0 @@
-export fn Page() {
-  return <section><h1>Deka App</h1><p>Project initialized.</p></section>
-}

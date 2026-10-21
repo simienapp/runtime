@@ -1,6 +1,6 @@
 # Every pull request and every push to main: the runtime builds, lints clean
 # where it is held to that, and its tests pass, including a served app that
-# checks the WinterTC Minimum Common API (crates/cli/tests/web_apis.rs).
+# checks the WinterTC Minimum Common API (crates/simien/tests/web_apis.rs).
 # Releases get their own workflow later.
 name: CI
 on:
@@ -50,7 +50,7 @@ jobs:
       - name: Test
         run: cargo test --locked -p web_host -p server -p simien -p output -p container -p project -p packages -p schema -p check -p platform_server -p pool
       - name: Web APIs in a served app
-        run: cargo test --locked -p cli --test web_apis
+        run: cargo test --locked -p simien --test web_apis
       - run: sccache --show-stats
 
   # simien dev's schema sync and database loop against a real local stack: Docker (on the

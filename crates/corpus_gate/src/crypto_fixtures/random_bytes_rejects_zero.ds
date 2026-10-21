@@ -1,6 +1,0 @@
-import { echo } from "io"
-import { random_bytes } from "crypto"
-echo(match (random_bytes(0)) {
-  Ok(v) => "ok",
-  Err(e) => "err",
-})

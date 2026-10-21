@@ -1,8 +1,0 @@
-export fn Page() ReactNode {
-  return (
-    <section>
-      <h1>Islands</h1>
-      <p>theme and newsletter</p>
-    </section>
-  )
-}

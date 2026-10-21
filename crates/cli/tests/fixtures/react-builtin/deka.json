@@ -1,6 +1,0 @@
-{
-  "name": "react-builtin",
-  "type": "serve",
-  "serve": { "mode": "js", "entry": "index.js" },
-  "security": { "prompt": false }
-}

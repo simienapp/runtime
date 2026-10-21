@@ -1,8 +1,0 @@
-interface PageProps { slug: string }
-struct PostParam { slug: string }
-export const staticParams: Array<PostParam> = build {
-    return Ok([PostParam{slug:"hello"}, PostParam{slug:"world"}])
-}
-export fn Page(props: PageProps) {
-    return <article><h1>{props.slug}</h1></article>;
-}

@@ -1,8 +1,0 @@
-fn main() number {
-    let total = 0;
-    for (let i = 0; i < 100000; i += 1) {
-        const record = { values: [i, i + 1], name: "temporary", value: i };
-        total += record.value;
-    }
-    return total;
-}

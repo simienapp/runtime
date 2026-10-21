@@ -1,9 +1,0 @@
-export fn App() {
-    const name = "Sam";
-
-    return (
-        <view>
-            <p>Hello, {name}!</p>
-        </view>
-    );
-}

@@ -1,5 +1,0 @@
-This application runs DekaScript bytecode in the experimental Rust VM and uses
-the existing native renderer. Tauri bundler creates its macOS application bundle.
-There is no WebView, V8, React, compiler or packaging tool in the shipped app.
-
-This is a locally ad-hoc signed development demo, not a notarized public release.

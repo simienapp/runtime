@@ -1,7 +1,0 @@
-export fn Page() ReactNode {
-  return (
-    <section>
-      <h1 id="desktop-hello">Hello from Deka desktop</h1>
-    </section>
-  )
-}

@@ -1,9 +1,0 @@
-export fn App() {
-    // This is a note for the person reading the code.
-    // The computer skips these two lines.
-    return (
-        <view>
-            <p>My first program</p>
-        </view>
-    );
-}

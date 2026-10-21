@@ -1,6 +1,0 @@
-import { useState } from "@js/react"
-
-export fn probe() string {
-  const [label, setLabel] = useState("ssr")
-  return label
-}

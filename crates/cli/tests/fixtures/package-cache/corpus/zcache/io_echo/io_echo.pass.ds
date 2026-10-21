@@ -1,3 +1,0 @@
-import { echo } from "io"
-
-echo("cache-ok")
