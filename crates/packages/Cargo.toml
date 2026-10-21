@@ -28,6 +28,7 @@ simien_npmrc = "0.1.1"
 simien_package_json = "0.1.1"
 simien_resolver = "0.1.2"
 simien_semver = "0.1.1"
+tempfile = "3.23.0"
 simien_sys_traits = { version = "0.1.1", features = ["real", "getrandom", "libc", "winapi"] }
 
 [dev-dependencies]

@@ -4,12 +4,22 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Context as _;
-use dcore::{CommandSpec, Context, FlagSpec, Registry};
+use dcore::{CommandSpec, Context, FlagSpec, ParamSpec, Registry};
 use output::{Globals, SimienError};
 use serde_json::{Map, Value, json};
 use simien_semver::package::PackageReq;
 
 use crate::{OpenOptions, Project};
+
+const INIT: CommandSpec = CommandSpec {
+    owner: "packages",
+    name: "init",
+    category: "project",
+    summary: "start an app from a template (--template minimal|default|shop|blog, or gild:|github:|gitlab:<owner>/<repo>[/<path>]); default: default",
+    aliases: &[],
+    subcommands: &[],
+    handler: init,
+};
 
 const INSTALL: CommandSpec = CommandSpec {
     owner: "packages",
@@ -112,6 +122,11 @@ pub const X: CommandSpec = CommandSpec {
 };
 
 pub fn register(registry: &mut Registry) {
+    registry.add_command(INIT);
+    registry.add_param(ParamSpec {
+        name: "--template",
+        description: "init: the template (minimal, default, shop, blog, or gild:|github:|gitlab:<owner>/<repo>[/<path>][#<ref>], or a folder)",
+    });
     registry.add_command(INSTALL);
     registry.add_command(ADD);
     registry.add_command(REMOVE);
@@ -159,6 +174,49 @@ fn run(context: &Context, command: impl AsyncFnOnce(&Context, PathBuf) -> anyhow
         output::failure(&failure, globals);
         std::process::exit(1);
     }
+}
+
+/// `simien init [--template <template>] [<folder>]`: copies the template into
+/// the folder (the current one when none is named), installs its packages,
+/// and says what to run next. Starts nothing.
+fn init(context: &Context) {
+    run(context, async |context, here| {
+        let globals = Globals::of(context);
+        let spec = context
+            .args
+            .params
+            .get("--template")
+            .map(String::as_str)
+            .unwrap_or(crate::template::DEFAULT_TEMPLATE);
+        let folder = match context.args.positionals.first() {
+            Some(name) => here.join(name),
+            None => here.clone(),
+        };
+        let created = crate::template::create(spec, &folder)?;
+        let report = Project::open(&created.folder, OpenOptions::default()).await?.install().await?;
+        let next = if created.folder == here {
+            "simien dev".to_string()
+        } else {
+            format!("cd {} && simien dev", context.args.positionals[0])
+        };
+        output::result(
+            &json!({
+                "ok": true,
+                "name": created.name,
+                "folder": created.folder,
+                "template": created.template,
+                "installed": report.packages,
+                "next": next,
+            }),
+            globals,
+            || {
+                stdio::success(&format!("created {} from {}", created.name, created.template));
+                stdio::info("packages", &format!("{} installed", report.packages));
+                stdio::next_step("start it", &next);
+            },
+        );
+        Ok(())
+    });
 }
 
 fn install(context: &Context) {
