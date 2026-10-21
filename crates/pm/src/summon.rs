@@ -15,10 +15,14 @@ use std::{
     path::{Component, Path},
     time::Duration,
 };
-use swc_common::{FileName, SourceMap, sync::Lrc};
-use swc_ecma_ast::*;
-use swc_ecma_parser::{Parser, StringInput, Syntax, lexer::Lexer};
-use swc_ecma_visit::{Visit, VisitWith};
+use oxc_allocator::Allocator;
+use oxc_ast::ast::{
+    Argument, CallExpression, ExportAllDeclaration, ExportFromDeclaration, Expression,
+    ImportDeclaration, ImportExpression, Program, TSExternalModuleReference, TSImportType,
+};
+use oxc_ast_visit::{Visit, walk};
+use oxc_parser::Parser;
+use oxc_span::SourceType;
 
 mod jsr;
 
@@ -366,44 +370,49 @@ struct Imports {
     specs: BTreeSet<String>,
     unknown: bool,
 }
-impl Visit for Imports {
-    fn visit_ts_external_module_ref(&mut self, n: &TsExternalModuleRef) {
-        self.specs
-            .insert(n.expr.value.to_string_lossy().into_owned());
+impl Imports {
+    fn of(program: &Program) -> Self {
+        let mut imports = Self::default();
+        imports.visit_program(program);
+        imports
     }
-    fn visit_ts_import_type(&mut self, n: &TsImportType) {
-        self.specs
-            .insert(n.arg.value.to_string_lossy().into_owned());
-        n.visit_children_with(self);
+}
+impl<'a> Visit<'a> for Imports {
+    fn visit_ts_external_module_reference(&mut self, n: &TSExternalModuleReference<'a>) {
+        self.specs.insert(n.expression.value.to_string());
     }
-    fn visit_import_decl(&mut self, n: &ImportDecl) {
-        self.specs
-            .insert(n.src.value.to_string_lossy().into_owned());
+    fn visit_ts_import_type(&mut self, n: &TSImportType<'a>) {
+        self.specs.insert(n.source.value.to_string());
+        walk::walk_ts_import_type(self, n);
     }
-    fn visit_named_export(&mut self, n: &NamedExport) {
-        if let Some(src) = &n.src {
-            self.specs.insert(src.value.to_string_lossy().into_owned());
+    fn visit_import_declaration(&mut self, n: &ImportDeclaration<'a>) {
+        self.specs.insert(n.source.value.to_string());
+    }
+    fn visit_export_from_declaration(&mut self, n: &ExportFromDeclaration<'a>) {
+        self.specs.insert(n.source.value.to_string());
+    }
+    fn visit_export_all_declaration(&mut self, n: &ExportAllDeclaration<'a>) {
+        self.specs.insert(n.source.value.to_string());
+    }
+    fn visit_import_expression(&mut self, n: &ImportExpression<'a>) {
+        match &n.source {
+            Expression::StringLiteral(s) => {
+                self.specs.insert(s.value.to_string());
+            }
+            _ => self.unknown = true,
         }
+        walk::walk_import_expression(self, n);
     }
-    fn visit_export_all(&mut self, n: &ExportAll) {
-        self.specs
-            .insert(n.src.value.to_string_lossy().into_owned());
-    }
-    fn visit_call_expr(&mut self, n: &CallExpr) {
-        if matches!(&n.callee, Callee::Import(_))
-            || matches!(&n.callee, Callee::Expr(e) if matches!(e.as_ref(), Expr::Ident(i) if i.sym == *"require"))
-        {
-            if let Some(ExprOrSpread { spread: None, expr }) = n.args.first() {
-                if let Expr::Lit(Lit::Str(s)) = expr.as_ref() {
-                    self.specs.insert(s.value.to_string_lossy().into_owned());
-                } else {
-                    self.unknown = true;
+    fn visit_call_expression(&mut self, n: &CallExpression<'a>) {
+        if matches!(&n.callee, Expression::Identifier(i) if i.name == "require") {
+            match n.arguments.first() {
+                Some(Argument::StringLiteral(s)) => {
+                    self.specs.insert(s.value.to_string());
                 }
-            } else {
-                self.unknown = true;
+                _ => self.unknown = true,
             }
         }
-        n.visit_children_with(self);
+        walk::walk_call_expression(self, n);
     }
 }
 
@@ -424,22 +433,12 @@ fn validate_graph(project: &Path, vendor: &Path, entry: &Path, all_modules: bool
             continue;
         }
         let source = fs::read_to_string(&path)?;
-        let cm: Lrc<SourceMap> = Default::default();
-        let fm = cm.new_source_file(FileName::Real(path.clone()).into(), source);
-        let mut parser = Parser::new_from(Lexer::new(
-            Syntax::Es(Default::default()),
-            Default::default(),
-            StringInput::from(&*fm),
-            None,
-        ));
-        let module = parser
-            .parse_module()
-            .map_err(|e| anyhow!("{}: invalid JavaScript: {:?}", path.display(), e.kind()))?;
-        if !parser.take_errors().is_empty() {
-            bail!("{}: invalid JavaScript", path.display());
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, &source, SourceType::mjs()).parse();
+        if let Some(error) = parsed.diagnostics.errors().next() {
+            bail!("{}: invalid JavaScript: {error}", path.display());
         }
-        let mut imports = Imports::default();
-        module.visit_with(&mut imports);
+        let imports = Imports::of(&parsed.program);
         if imports.unknown {
             missing.insert(
                 "<non-literal dynamic import/require: use explicit module specifiers>".to_string(),

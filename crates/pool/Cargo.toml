@@ -23,13 +23,14 @@ deka-stdio = { version = "0.4.0", package = "stdio" }
 runtime_core = { path = "../runtime_core" }
 
 # Validation + restricted SWC minify for vendored React (deka#954)
-swc_common = { workspace = true }
-swc_ecma_ast = { workspace = true }
-swc_ecma_parser = { workspace = true, features = ["typescript"] }
-swc_ecma_visit = { workspace = true }
-swc_ecma_codegen = "21.0.0"
-swc_ecma_minifier = "42.0.0"
-swc_ecma_transforms_base = "34.0.0"
+oxc_allocator = "0.152.0"
+oxc_ast = "0.152.0"
+oxc_ast_visit = "0.152.0"
+oxc_codegen = "0.152.0"
+oxc_diagnostics = "0.152.0"
+oxc_minifier = "0.152.0"
+oxc_parser = "0.152.0"
+oxc_span = "0.152.0"
 
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls"] }
 deka-validation = { version = "0.2", features = ["wasm"] }

@@ -1,30 +1,27 @@
-//! Restricted SWC minify for vendored production React CJS.
+//! Restricted minify for vendored production React CJS, with oxc.
 //!
 //! React 19's npm `*.production.js` files are dev-stripped but not minified.
 //! Islands emit (`inline_into`) and the ESM wrappers both run those bytes
 //! through this pass so `deka serve` and `deka build` ship the same payload.
 //!
-//! Compress is off. The deleted bundler's four SWC 42.x opt-outs
-//! (`crates/bundler/src/optimizer.rs`, deka#750 / phpx lineage) plus
-//! `collapse_vars = false` still emit invalid JS on React 19.1.1
-//! production CJS (`typeof x = expr`, `a || b = c`, `cond ? a, b : c`).
-//! Those paths are not all flag-gated. Do not re-enable compress blindly.
-//! Mangle + compact codegen is the SWC minify that stays valid.
+//! Compress is off: mangle plus compact codegen only. That is what the swc
+//! version this replaced ran, after swc's compressor emitted invalid JS on
+//! React 19.1.1 production CJS (`typeof x = expr`, `a || b = c`,
+//! `cond ? a, b : c`); the tests below pin those shapes. Turn compress on
+//! only once every file in vendor/react-prod/cjs still passes
+//! `minified_vendor_parses_in_node`.
 
-use std::path::PathBuf;
 use std::sync::OnceLock;
 
-use swc_common::sync::Lrc;
-use swc_common::{FileName, GLOBALS, Globals, Mark, SourceMap};
-use swc_ecma_ast::{EsVersion, Program};
-use swc_ecma_codegen::{Emitter, text_writer::JsWriter};
-use swc_ecma_minifier::optimize;
-use swc_ecma_minifier::option::{ExtraOptions, MangleOptions, MinifyOptions};
-use swc_ecma_parser::{EsSyntax, Parser, StringInput, Syntax, lexer::Lexer};
+use oxc_allocator::Allocator;
+use oxc_codegen::{Codegen, CodegenOptions};
+use oxc_minifier::{MangleOptions, Minifier, MinifierOptions};
+use oxc_parser::Parser;
+use oxc_span::SourceType;
 
 pub fn cached(name: &'static str, source: &'static str) -> &'static str {
     fn init(name: &'static str, source: &'static str) -> String {
-        // Isolate worker stacks are too small for SWC on react-dom-client
+        // Isolate worker stacks are too small for a parser on react-dom-client
         // (~500KB AST in debug). Minify on a dedicated thread.
         let (tx, rx) = std::sync::mpsc::channel();
         std::thread::Builder::new()
@@ -95,103 +92,28 @@ fn leading_comments(source: &str) -> String {
 }
 
 fn minify_script(name: &str, source: &str) -> Result<String, String> {
-    let cm: Lrc<SourceMap> = Default::default();
-    let fm = cm.new_source_file(
-        FileName::Real(PathBuf::from(name)).into(),
-        source.to_string(),
-    );
-    let syntax = Syntax::Es(EsSyntax {
-        jsx: false,
-        export_default_from: false,
-        import_attributes: false,
-        ..Default::default()
-    });
-    let lexer = Lexer::new(syntax, EsVersion::Es2022, StringInput::from(&*fm), None);
-    let mut parser = Parser::new_from(lexer);
-    let script = parser
-        .parse_script()
-        .map_err(|err| format!("failed to parse {name} for minify: {err:?}"))?;
-    let globals = Globals::new();
-    let script = GLOBALS.set(&globals, || {
-        let top_level_mark = Mark::new();
-        let unresolved_mark = Mark::new();
-        let mut program = Program::Script(script);
-        program.mutate(swc_ecma_transforms_base::resolver(
-            unresolved_mark,
-            top_level_mark,
-            false,
-        ));
-        minify_program(program, cm.clone(), unresolved_mark, top_level_mark)
-    });
-    match script {
-        Program::Script(script) => emit_script_compact(&script, cm),
-        Program::Module(_) => Err(format!("minifier returned a module for {name}")),
+    let allocator = Allocator::default();
+    let parsed = Parser::new(&allocator, source, SourceType::script()).parse();
+    if let Some(error) = parsed.diagnostics.errors().next() {
+        return Err(format!("failed to parse {name} for minify: {error}"));
     }
-}
-
-fn minify_program(
-    program: Program,
-    cm: Lrc<SourceMap>,
-    unresolved_mark: Mark,
-    top_level_mark: Mark,
-) -> Program {
-    // Compress is off on purpose. The four bundler opt-outs
-    // (conditionals/bools, sequences=0, inline=0, if_return=false) plus
-    // collapse_vars=false still leave un-gated SWC 42.x miscompiles on
-    // React 19.1.1 production CJS:
-    //
-    //  - compress/optimize/collapse_vars.rs: `typeof x = expr`
-    //  - compress/optimize/conditionals.rs `compress_if_stmt_as_cond`:
-    //    `if (foo); else bar = baz` => `foo || bar = baz` (not gated)
-    //  - compress/optimize/if_return.rs: `cond ? stmt, expr : alt`
-    //    still fires with if_return=false
-    //
-    // Re-enable compress only after those emit valid JS on every file in
-    // vendor/react-prod/cjs (see `minified_vendor_parses_in_node`).
-    //
+    let mut program = parsed.program;
     // CJS exports are property assignments (`exports.useState = …`), so
     // top-level mangling is safe: string identities on `exports` survive.
-    let minify_options = MinifyOptions {
-        compress: None,
+    let minified = Minifier::new(MinifierOptions {
         mangle: Some(MangleOptions {
             top_level: Some(true),
             ..Default::default()
         }),
+        compress: None,
         ..Default::default()
-    };
-    optimize(
-        program,
-        cm,
-        None,
-        None,
-        &minify_options,
-        &ExtraOptions {
-            unresolved_mark,
-            top_level_mark,
-            mangle_name_cache: None,
-        },
-    )
-}
-
-fn emit_script_compact(
-    script: &swc_ecma_ast::Script,
-    cm: Lrc<SourceMap>,
-) -> Result<String, String> {
-    let mut cfg = swc_ecma_codegen::Config::default();
-    cfg.minify = true;
-    let mut buf = Vec::new();
-    {
-        let mut emitter = Emitter {
-            cfg,
-            comments: None,
-            cm: cm.clone(),
-            wr: JsWriter::new(cm, "", &mut buf, None),
-        };
-        emitter
-            .emit_script(script)
-            .map_err(|err| format!("failed to emit minified JavaScript: {err}"))?;
-    }
-    String::from_utf8(buf).map_err(|err| format!("minified JavaScript was not UTF-8: {err}"))
+    })
+    .minify(&allocator, &mut program);
+    Ok(Codegen::new()
+        .with_options(CodegenOptions::minify())
+        .with_scoping(minified.scoping)
+        .build(&program)
+        .code)
 }
 
 #[cfg(test)]

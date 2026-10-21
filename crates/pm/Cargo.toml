@@ -28,13 +28,15 @@ semver = "1.0"
 tokio = { version = "1.35", features = ["rt-multi-thread", "macros", "sync", "net"] }
 deka_host = { path = "../deka_host", default-features = false, features = ["runtime"] }
 
-swc_ecma_codegen = "21.0.0"
-swc_ecma_transforms_base = "34.0.0"
-swc_ecma_transforms_typescript = "37.0.0"
-swc_common.workspace = true
-swc_ecma_ast.workspace = true
-swc_ecma_parser.workspace = true
-swc_ecma_visit.workspace = true
+oxc_allocator = "0.152.0"
+oxc_ast = "0.152.0"
+oxc_ast_visit = "0.152.0"
+oxc_codegen = "0.152.0"
+oxc_parser = "0.152.0"
+oxc_semantic = "0.152.0"
+oxc_span = "0.152.0"
+oxc_str = "0.152.0"
+oxc_transformer = "0.152.0"
 flate2 = "1.0"
 tar = "0.4"
 

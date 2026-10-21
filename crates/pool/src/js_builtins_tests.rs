@@ -276,13 +276,15 @@ fn minified_vendor_parses_in_node() {
 }
 
 #[test]
-fn minified_hashes_lock_swc_output() {
+fn minified_hashes_lock_output() {
     let hashes = parse_hash_file(MINIFIED_HASHES);
     assert_eq!(
         hashes.len(),
         VENDOR_CJS.len(),
         "MINIFIED-HASHES must list every vendor CJS file"
     );
+    let mut stale = Vec::new();
+    let mut lines = Vec::new();
     for (name, source) in VENDOR_CJS {
         let minified = crate::js_minify::cached(name, source);
         assert!(
@@ -296,12 +298,17 @@ fn minified_hashes_lock_swc_output() {
             source.len()
         );
         let got = sha256_hex(minified);
-        let expected = hashes.get(name).copied().unwrap_or("");
-        assert_eq!(
-            expected, got,
-            "{name}: MINIFIED-HASHES must match SWC minify output (got {got})"
-        );
+        if hashes.get(name).copied() != Some(got.as_str()) {
+            stale.push(*name);
+        }
+        lines.push(format!("{got}  {name}"));
     }
+    // All of them at once, so a deliberate minifier change is one paste.
+    assert!(
+        stale.is_empty(),
+        "MINIFIED-HASHES doesn't match the minifier's output for {stale:?}; the current hashes are:\n{}",
+        lines.join("\n")
+    );
 }
 
 #[test]

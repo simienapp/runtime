@@ -1,9 +1,9 @@
-# sha256 of SWC-minified CJS (mangle + compact emit; see crates/pool/src/js_minify.rs)
+# sha256 of oxc-minified CJS (mangle + compact emit; see crates/pool/src/js_minify.rs)
 # Pristine upstream hashes live in HASHES.
-c6a0bbd6e3d51f6b82c19607da445206fe648aa0a343bdc1f06d6de318fd7285  react.production.js
-86010d09d2cbfdb95f6c88225817868d0d433e6a7588605616d51252969fc1de  react-jsx-runtime.production.js
-1b6be29189b9cfd8d2e402af84b20bfee6bd8b0e871873cd9d42c7ff367a3dcb  react-dom.production.js
-9ef4a998a3eec3a813c24b522d672ae9d7e83fb96efdcd0f7b150588a17e8eb4  react-dom-client.production.js
-385024c9f8f3987e7d231c582523e743e4a717994a07f9489f86730a7cbb8ec1  scheduler.production.js
-d64b972d76013cfd13d0d423ad59d27d709ab717ea5920831ce90b9716d2dbe6  react-dom-server-legacy.browser.production.js
-27cf778133e69c7ad606c9138300ebee612681421bdd1ca10ba1fcdcb95cb30a  react-dom-server.edge.production.js
+d02bcdfafb10010a6dd5b8c155d0700b21cccb598867c01f2d5e46a1ffb05e0c  react.production.js
+7070b4b191f15fe24eed9d048bcb690515f0c1188abd847114bcc3a91866834a  react-jsx-runtime.production.js
+9971e932b18ac1d335dd7fec70710489eddca373f08433fb282339003788a7f9  react-dom.production.js
+5fb3da65423c3e8153af32115229770e360ec4a6e9204698b97b94feead4c66f  react-dom-client.production.js
+7dd3d0bfc8dd7c56c7f82ee90e832eb3a80f5bf313a23610d2efdf217d1940d9  scheduler.production.js
+cc6317077bd18fae6d9278f2a0bd147ea4a7a16f7e5a85c0ddf63eeebb7a49b2  react-dom-server-legacy.browser.production.js
+dea107bb7acd8f7c06028ff9e0932364ab26fcae1e24e6ed3fb9b618d23a0f03  react-dom-server.edge.production.js
