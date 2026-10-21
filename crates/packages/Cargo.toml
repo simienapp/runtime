@@ -6,8 +6,7 @@ description = "npm packages for Simien: install, add, remove and the rest, on th
 publish = false
 
 [dependencies]
-# Until gelada 0.1.0 is on crates.io.
-gelada = { git = "https://github.com/addiscorp/gelada", rev = "55328f0" }
+gelada = "0.1"
 anyhow = "1"
 async-trait = "0.1"
 dcore = { path = "../dcore" }
