@@ -1,0 +1,16 @@
+[package]
+name = "container"
+version.workspace = true
+edition = "2024"
+description = "simien container: the project's local Postgres (with pg_zega) and Zega, run by kebele"
+publish = false
+
+[dependencies]
+dcore = { path = "../dcore" }
+output = { path = "../output" }
+stdio = "0.5.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+tempfile = "3.23.0"
