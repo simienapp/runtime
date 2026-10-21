@@ -1,5 +1,9 @@
-//! A Simien project: the folder with simien.json (`name`, `ports`), and
-//! `.simien/`, where its local secrets live (never committed).
+//! A Simien project: the folder with simien.json (`name`, `ports`), its
+//! schema in `simien/schema.ts`, the files Simien generates into
+//! `simien/_generated/`, and `.simien/`, where its local secrets live
+//! (never committed). Also `simien init`, which makes one.
+
+pub mod init;
 
 use std::path::{Path, PathBuf};
 
@@ -52,6 +56,16 @@ impl Project {
             }),
             _ => Err(format!("{CONFIG} needs name and ports.postgres / ports.zega")),
         }
+    }
+
+    /// `simien/schema.ts`.
+    pub fn schema_file(&self) -> PathBuf {
+        self.root.join("simien").join("schema.ts")
+    }
+
+    /// `simien/_generated`.
+    pub fn generated_dir(&self) -> PathBuf {
+        self.root.join("simien").join("_generated")
     }
 
     /// `.simien`: local secrets, readable only by the user.
@@ -112,4 +126,27 @@ pub fn write_private(file: &Path, text: &str) -> Result<(), String> {
     }
     #[cfg(not(unix))]
     std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))
+}
+
+/// Types for `simien/schema.ts`'s import of "@simien/client/schema", so a
+/// project type-checks before @simien/client is installed. They describe
+/// exactly the schema language the schema engine reads.
+pub const SCHEMA_TYPES: &str = include_str!("schema.d.ts");
+
+/// Writes `simien/_generated/schema.d.ts` if its text changed; returns
+/// whether it did.
+pub fn write_schema_types(generated_dir: &Path) -> Result<bool, String> {
+    write_if_changed(&generated_dir.join("schema.d.ts"), SCHEMA_TYPES)
+}
+
+/// Writes `text` to `file` unless it already holds exactly that.
+pub fn write_if_changed(file: &Path, text: &str) -> Result<bool, String> {
+    if std::fs::read_to_string(file).ok().as_deref() == Some(text) {
+        return Ok(false);
+    }
+    if let Some(dir) = file.parent() {
+        std::fs::create_dir_all(dir).map_err(|err| format!("{}: {err}", dir.display()))?;
+    }
+    std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))?;
+    Ok(true)
 }

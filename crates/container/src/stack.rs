@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::project::{Project, write_private};
+use project::{Project, write_private};
 
 /// The images this simien pins.
 pub const POSTGRES_IMAGE: &str = "addiscorp/pg_zega:0.1";
