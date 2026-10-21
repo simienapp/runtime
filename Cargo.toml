@@ -35,6 +35,7 @@ members = [
   "crates/project",
   "crates/schema",
   "crates/schema_sync",
+  "crates/devloop",
   "crates/check",
     "crates/engine",
     "crates/deka_host",

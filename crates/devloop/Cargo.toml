@@ -1,0 +1,18 @@
+[package]
+name = "devloop"
+version.workspace = true
+edition = "2024"
+description = "simien dev's database side: the local stack and schema sync, started when the project gets a schema and kept in step with schema.ts and the database"
+publish = false
+
+[dependencies]
+container = { path = "../container" }
+notify = { workspace = true }
+postgres = "0.19"
+project = { path = "../project" }
+schema_sync = { path = "../schema_sync" }
+serde_json = "1.0"
+
+[dev-dependencies]
+schema_sync = { path = "../schema_sync" }
+tempfile = "3.23.0"

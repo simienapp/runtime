@@ -24,7 +24,7 @@ fn project(answers: &str) -> (Fake, Project) {
     let root = dir.path().to_path_buf();
     std::fs::write(
         root.join("simien.json"),
-        r#"{ "name": "My Shop", "ports": { "postgres": 54330, "zega": 54331 } }"#,
+        r#"{ "name": "My Shop", "db": { "ports": { "postgres": 54330, "zega": 54331 } } }"#,
     )
     .unwrap();
     let bin = root.join("node_modules/.bin");
@@ -58,7 +58,7 @@ fn the_project_is_found_from_below_and_named_for_docker() {
     let (fake, project) = project("");
     assert_eq!(project.root, fake.root);
     assert_eq!(stack::stack_name(&project), "simien-my-shop");
-    assert_eq!(project.ports.postgres, 54330);
+    assert_eq!(project.ports().unwrap().postgres, 54330);
 }
 
 #[test]
@@ -160,4 +160,15 @@ fn update_with_an_old_kebele_says_which_version_it_needs() {
     );
     let error = stack::pull(&project, |_| {}).unwrap_err();
     assert!(error.contains("kebele 0.10"), "{error}");
+}
+
+#[test]
+fn a_project_without_a_db_section_has_no_stack_and_says_how_to_add_one() {
+    let (fake, _) = project("");
+    std::fs::write(fake.root.join("simien.json"), r#"{ "name": "My Shop" }"#).unwrap();
+    let project = Project::open(&fake.root).unwrap();
+    assert!(project.database.is_none());
+    let error = stack::describe(&project).unwrap_err();
+    assert!(error.contains("run `simien db init`"), "{error}");
+    assert_eq!(calls(&fake), Vec::<String>::new());
 }

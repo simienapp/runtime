@@ -181,7 +181,7 @@ fn should_ignore_watch_path(path: &FsPath) -> bool {
     // Generated/transient paths that should not trigger HMR loops.
     if normalized
         .split('/')
-        .any(|seg| matches!(seg, ".cache" | "node_modules" | "target" | ".git"))
+        .any(|seg| matches!(seg, ".cache" | "node_modules" | "target" | ".git" | ".simien"))
         || normalized.ends_with("/ds_modules")
         || normalized.ends_with("/php_modules")
     {
@@ -189,4 +189,19 @@ fn should_ignore_watch_path(path: &FsPath) -> bool {
     }
 
     false
+}
+
+#[cfg(test)]
+mod ignore_tests {
+    use super::should_ignore_watch_path;
+    use std::path::Path;
+
+    #[test]
+    fn simien_state_does_not_reload_the_app() {
+        // Local secrets and kebele's stack file, written when simien dev starts the stack.
+        assert!(should_ignore_watch_path(Path::new("/app/.simien/postgres_password")));
+        assert!(should_ignore_watch_path(Path::new("/app/.simien/kebele.json")));
+        assert!(!should_ignore_watch_path(Path::new("/app/simien/schema.ts")));
+        assert!(!should_ignore_watch_path(Path::new("/app/src/index.ts")));
+    }
 }

@@ -24,7 +24,7 @@ pub fn database_url(project: &Project) -> Result<String, String> {
     Ok(format!(
         "postgres://postgres:{}@127.0.0.1:{}/postgres",
         project.secret("postgres_password")?,
-        project.ports.postgres
+        project.ports()?.postgres
     ))
 }
 

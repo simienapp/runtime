@@ -1,4 +1,4 @@
-//! tsrs on a real `simien init` project: the same cases as the TypeScript
+//! tsrs on a real `simien db init` project: the same cases as the TypeScript
 //! CLI's check tests, so both report identically.
 
 use std::path::Path;
@@ -11,7 +11,7 @@ static CWD: Mutex<()> = Mutex::new(());
 
 fn project() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    project::init::make(dir.path(), Some("check"), Some("54390"), false).unwrap();
+    project::db::make(dir.path(), Some("check"), Some("54390"), false).unwrap();
     project::write_schema_types(&dir.path().join("simien/_generated")).unwrap();
     dir
 }
