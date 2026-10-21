@@ -6,6 +6,7 @@
 use dcore::{FlagSpec, ParamSpec, ParseErrorKind, Registry, RegistryBuilder};
 
 mod dev_database;
+mod dev_vite;
 pub mod help;
 
 pub use output::banner;
@@ -187,6 +188,13 @@ pub fn run() -> i32 {
 
     // Lives as long as `dev` serves.
     let _database = (command.name == "dev").then(|| dev_database::start(globals)).flatten();
+
+    // A Vite app (a Tana app) is served in development by Vite itself.
+    if command.name == "dev"
+        && let Some(root) = std::env::current_dir().ok().as_deref().and_then(dev_vite::app_root)
+    {
+        return dev_vite::run(&root, context.args.params.get("--port").map(String::as_str), globals);
+    }
 
     match args.commands.get(1) {
         None => (command.handler)(&context),

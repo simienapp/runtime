@@ -16,6 +16,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 stdio = "0.5.0"
 tokio = { workspace = true }
+libc = "0.2"
 url = "2"
 simien_cache_dir = "0.1.1"
 simien_error = "0.1.1"
@@ -30,6 +31,7 @@ simien_semver = "0.1.1"
 simien_sys_traits = { version = "0.1.1", features = ["real", "getrandom", "libc", "winapi"] }
 
 [dev-dependencies]
+libc = "0.2"
 base64 = "0.22"
 flate2 = "1.0"
 sha2 = "0.10"

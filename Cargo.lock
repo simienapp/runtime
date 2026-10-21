@@ -4829,6 +4829,7 @@ dependencies = [
  "dcore",
  "flate2",
  "gelada",
+ "libc",
  "output",
  "reqwest",
  "serde",
