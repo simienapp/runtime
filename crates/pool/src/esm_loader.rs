@@ -389,6 +389,12 @@ impl PhpxEsmLoader {
     }
 
     fn resolve_path(&self, specifier: &str, referrer: &str) -> Result<ModuleSpecifier, JsErrorBox> {
+        if let Some(url) = crate::carve_outs::resolve(specifier) {
+            return Ok(url);
+        }
+        if let Some(message) = crate::carve_outs::refusal(specifier) {
+            return Err(JsErrorBox::generic(message));
+        }
         if let Some(url) = crate::js_builtins::resolve_specifier(specifier) {
             return Ok(url);
         }
@@ -504,6 +510,14 @@ impl PhpxEsmLoader {
     }
 
     fn load_source(&self, specifier: &ModuleSpecifier) -> Result<ModuleSource, JsErrorBox> {
+        if let Some(source) = crate::carve_outs::source(specifier) {
+            return Ok(ModuleSource::new(
+                ModuleType::JavaScript,
+                ModuleSourceCode::String(source.to_string().into()),
+                specifier,
+                None,
+            ));
+        }
         if specifier == &self.wrapper_specifier {
             let wrapper = self.wrapper_source();
             return Ok(ModuleSource::new(

@@ -7,7 +7,8 @@
 // only pays for the APIs its app uses. `console` stays the runtime's own.
 
 import { core, primordials } from "ext:core/mod.js";
-const { SafeArrayIterator } = primordials;
+import { AsyncLocalStorage } from "ext:simien_globals/async_hooks.js";
+const { ObjectDefineProperty, ObjectFreeze, SafeArrayIterator, SymbolFor } = primordials;
 
 const event = core.loadExtScript("ext:simien_web/02_event.js");
 const { DOMException } = core.loadExtScript("ext:simien_web/01_dom_exception.js");
@@ -169,3 +170,13 @@ const minimumCommonApi = {
 };
 
 core.defineGlobalProperties(globalThis, minimumCommonApi);
+
+// Node APIs carved out for the framework (Simien APS 2). They aren't globals:
+// the module loader serves `node:async_hooks` as a module that reads this
+// slot, so only that one specifier, with only these exports, resolves.
+ObjectDefineProperty(globalThis, SymbolFor("simien.carve-out:node:async_hooks"), {
+  value: ObjectFreeze({ __proto__: null, AsyncLocalStorage }),
+  enumerable: false,
+  writable: false,
+  configurable: false,
+});
