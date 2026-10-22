@@ -14,6 +14,7 @@ const WINTERTC = [
 ]
 
 const checks = {
+  async simienGlobal() { return typeof Simien === 'object' && /^\d+\.\d+\.\d+/.test(Simien.version) && Object.isFrozen(Simien) && typeof Deno === 'undefined'; },
   async setTimeout() { const t0 = performance.now(); await new Promise((r) => setTimeout(r, 20)); return performance.now() - t0 >= 15; },
   async structuredClone() { const v = structuredClone({ a: [1, { b: new Date(0) }] }); return v.a[1].b instanceof Date && v.a[0] === 1; },
   async base64() { return btoa('simien') === 'c2ltaWVu' && atob('c2ltaWVu') === 'simien'; },

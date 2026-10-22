@@ -7,7 +7,8 @@
 // only pays for the APIs its app uses. `console` stays the runtime's own.
 
 import { core, primordials } from "ext:core/mod.js";
-const { SafeArrayIterator } = primordials;
+import { op_simien_version } from "ext:core/ops";
+const { ObjectFreeze, SafeArrayIterator } = primordials;
 
 const event = core.loadExtScript("ext:simien_web/02_event.js");
 const { DOMException } = core.loadExtScript("ext:simien_web/01_dom_exception.js");
@@ -166,6 +167,13 @@ const minimumCommonApi = {
   setTimeout: core.propWritableLazyLoaded((m) => m.setTimeout, loadTimers),
   self: core.propGetterOnly(() => globalThis),
   navigator: core.propNonEnumerable({ userAgent: USER_AGENT }),
+  // Simien's own namespace, where Simien-only APIs (and redirects for code
+  // written against Deno's) go; never a `Deno` global (Sami, 22 Oct). Only
+  // `version` for now: what else belongs here is designed later.
+  Simien: core.propNonEnumerable(ObjectFreeze({
+    __proto__: null,
+    version: op_simien_version(),
+  })),
 };
 
 core.defineGlobalProperties(globalThis, minimumCommonApi);
