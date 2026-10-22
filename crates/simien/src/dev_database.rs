@@ -33,6 +33,7 @@ fn print(event: &Value, globals: Globals) {
                 stdio::info("Zega", &text("zega"));
                 stdio::log("watch", &format!("{} (Ctrl+C to stop)", text("file")));
             }
+            "data" => stdio::info("Data", &format!("{} (simien:db in dev)", text("url"))),
             "synced" => {
                 stdio::success("synced");
                 for change in event["changes"].as_array().into_iter().flatten() {

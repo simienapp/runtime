@@ -1,4 +1,4 @@
-import { defineEdge, defineSchema, defineTable, v } from "@simien/client/schema"
+import { defineEdge, defineSchema, defineTable, v } from "simien:schema"
 
 export default defineSchema({
   users: defineTable({

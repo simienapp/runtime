@@ -58,7 +58,7 @@ fn the_generated_schema_types_catch_mistakes_in_schema_ts() {
     let dir = project();
     std::fs::write(
         dir.path().join("simien/schema.ts"),
-        "import { defineSchema, defineTable, v } from \"@simien/client/schema\"\n\nexport default defineSchema({\n  users: defineTable({ name: v.strin() }),\n})\n",
+        "import { defineSchema, defineTable, v } from \"simien:schema\"\n\nexport default defineSchema({\n  users: defineTable({ name: v.strin() }),\n})\n",
     )
     .unwrap();
     let report = check(dir.path());

@@ -276,7 +276,7 @@ fn expression_span(expression: &Expression) -> Span {
 mod tests {
     use super::*;
 
-    const SAMPLE: &str = r#"import { defineSchema, defineTable, defineEdge, v } from "@simien/client/schema"
+    const SAMPLE: &str = r#"import { defineSchema, defineTable, defineEdge, v } from "simien:schema"
 
 export default defineSchema({
   users: defineTable({ name: v.string(), email: v.optional(v.string()), age: v.int() }),

@@ -26,7 +26,7 @@ impl Drop for Stack {
 fn write_schema(project: &Project, body: &str) {
     std::fs::write(
         project.schema_file(),
-        format!("import {{ defineEdge, defineSchema, defineTable, v }} from \"@simien/client/schema\"\n\nexport default defineSchema({{\n{body}\n}})\n"),
+        format!("import {{ defineEdge, defineSchema, defineTable, v }} from \"simien:schema\"\n\nexport default defineSchema({{\n{body}\n}})\n"),
     )
     .unwrap();
 }

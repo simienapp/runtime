@@ -1693,9 +1693,12 @@ name = "devloop"
 version = "0.61.0"
 dependencies = [
  "container",
+ "data",
+ "httparse",
  "notify",
  "postgres",
  "project",
+ "schema",
  "schema_sync",
  "serde_json",
  "tempfile",
