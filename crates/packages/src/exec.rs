@@ -41,7 +41,7 @@ pub struct Program {
     pub bin: String,
     pub path: PathBuf,
     pub kind: Kind,
-    /// bun or node for a JavaScript program; none for the others.
+    /// node or bun for a JavaScript program; none for the others.
     pub runner: Option<PathBuf>,
     /// Folders to put first on PATH: the node_modules/.bin it was found in.
     #[serde(skip)]
@@ -246,21 +246,35 @@ fn kind_of(head: &[u8], path: &Path) -> Kind {
     }
 }
 
-/// bun, else node, for a Node program.
+/// node, else bun, for a Node program (APS 2). Node is what packages and
+/// frameworks target: on Bun 1.4.0, vinext's Server Actions never run in dev
+/// (#44).
 fn runner(package: &str) -> anyhow::Result<PathBuf> {
-    crate::scripts::on_path("bun")
-        .or_else(|| crate::scripts::on_path("node"))
-        .with_context(|| {
-            format!(
-                "{package} is a Node.js program and Simien doesn't run Node programs; \
-                 install bun (https://bun.sh) or node to run it"
-            )
-        })
+    pick_runner(crate::scripts::on_path).with_context(|| {
+        format!(
+            "{package} is a Node.js program and Simien doesn't run Node programs; \
+             install node (https://nodejs.org) or bun to run it"
+        )
+    })
+}
+
+fn pick_runner(on_path: impl Fn(&str) -> Option<PathBuf>) -> Option<PathBuf> {
+    on_path("node").or_else(|| on_path("bun"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn node_programs_run_with_node_before_bun() {
+        let found = |names: &'static [&'static str]| {
+            move |program: &str| names.contains(&program).then(|| PathBuf::from(format!("/bin/{program}")))
+        };
+        assert_eq!(pick_runner(found(&["bun", "node"])), Some(PathBuf::from("/bin/node")));
+        assert_eq!(pick_runner(found(&["bun"])), Some(PathBuf::from("/bin/bun")));
+        assert_eq!(pick_runner(found(&[])), None);
+    }
 
     #[test]
     fn tells_programs_apart_by_their_first_bytes() {
