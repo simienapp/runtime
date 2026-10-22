@@ -41,8 +41,23 @@ impl Invocation {
         let mut rules = Rules::default();
         let script = loop {
             let arg = argv.next().context("no program to run")?;
-            if !rules.take_arg(&arg, &mut argv)? {
-                break arg;
+            if rules.take_arg(&arg, &mut argv)? {
+                continue;
+            }
+            // A program that starts another like it (fork(), spawn of
+            // process.execPath) passes Node's own options first; Simien has
+            // none of them to apply, so they're skipped, values included.
+            match arg.as_str() {
+                "-e" | "--eval" | "-p" | "--print" => {
+                    bail!("{arg}: Simien runs Node programs from files only")
+                }
+                "-r" | "--require" | "--import" | "--loader" | "--experimental-loader" | "-C"
+                | "--conditions" | "--title" | "--input-type" | "--env-file" => {
+                    argv.next();
+                }
+                "--" => break argv.next().context("no program to run")?,
+                flag if flag.starts_with('-') => {}
+                _ => break arg,
             }
         };
         Ok(Self {
@@ -87,11 +102,27 @@ fn modules_root(package_dir: &Path) -> PathBuf {
 
 simien_core::extension!(
     simien_node_program,
-    options = { permissions: PermissionsContainer },
+    options = { permissions: PermissionsContainer, ipc: Option<simien_node::ChildPipeFd> },
     state = |state, options| {
         state.put(options.permissions);
+        if let Some(ipc) = options.ipc {
+            state.put(ipc);
+        }
     },
 );
+
+/// The channel a parent made with `fork()`: Node's own handshake, the
+/// descriptor in `NODE_CHANNEL_FD` and its format in
+/// `NODE_CHANNEL_SERIALIZATION_MODE`, which `process.send` and
+/// `process.on("message")` then use.
+fn forked_channel() -> Option<simien_node::ChildPipeFd> {
+    let fd = std::env::var("NODE_CHANNEL_FD").ok()?.parse::<i64>().ok()?;
+    let serialization = std::env::var("NODE_CHANNEL_SERIALIZATION_MODE")
+        .ok()
+        .and_then(|mode| mode.parse().ok())
+        .unwrap_or(simien_node::ops::ipc::ChildIpcSerialization::Json);
+    Some(simien_node::ChildPipeFd(fd, serialization))
+}
 
 /// Runs the program to its end; its exit code.
 pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
@@ -108,13 +139,26 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
     let exit_code = simien_os::ExitCode::default();
 
     let policy = Arc::new(policy::SandboxPolicy::new(&invocation.rules));
-    let mut extensions = vec![simien_node_program::init(PermissionsContainer::new(policy.clone()))];
+    let mut extensions = vec![simien_node_program::init(
+        PermissionsContainer::new(policy.clone()),
+        forked_channel(),
+    )];
     extensions.extend(web_host::web(simien_fetch::PermissionsContainer::new(policy)));
     extensions.extend(simien_node_runtime::extensions(
         Some(&program),
         main.clone(),
         BootstrapOptions {
             args: invocation.args,
+            // A child it starts with process.execPath runs as this one does:
+            // the same project and sandbox rules, its own grant checked again.
+            exec_args: [
+                packages::exec::NODE_PROGRAM_COMMAND.to_string(),
+                "--project".to_string(),
+                invocation.project.display().to_string(),
+            ]
+            .into_iter()
+            .chain(invocation.rules.to_args())
+            .collect(),
             ..Default::default()
         },
         exit_code.clone(),
@@ -162,6 +206,13 @@ mod tests {
         );
         assert_eq!(invocation.script, PathBuf::from("cli.js"));
         assert_eq!(invocation.args, vec!["--write".to_string()], "the program's own args are left alone");
+        // Node's options before the script, as fork() passes them.
+        let argv = ["--project", "/p", "--no-warnings", "--require", "./hook.js", "--max-old-space-size=512", "w.js", "-x"]
+            .map(String::from);
+        let invocation = Invocation::parse(argv.into_iter()).unwrap();
+        assert_eq!(invocation.script, PathBuf::from("w.js"));
+        assert_eq!(invocation.args, vec!["-x".to_string()]);
+        assert!(Invocation::parse(["--project", "/p", "-e", "1"].map(String::from).into_iter()).is_err());
     }
 
     #[test]
