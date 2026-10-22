@@ -6,6 +6,7 @@ description = "Runs a Node program granted dangerouslyUseNode on Simien's Node l
 
 [dependencies]
 anyhow = "1"
+libc = "0.2"
 packages = { path = "../packages" }
 serde_json = "1"
 simien_core.workspace = true
