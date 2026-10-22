@@ -113,6 +113,17 @@ pub fn build_registry() -> Registry {
 
 /// Dispatches argv; returns the exit code (2 for a usage mistake).
 pub fn run() -> i32 {
+    // Simien's Node runner (packages::exec): not a command people type.
+    let mut raw = std::env::args().skip(1);
+    if raw.next().as_deref() == Some(packages::exec::NODE_PROGRAM_COMMAND) {
+        return match node_program::Invocation::parse(raw).and_then(node_program::run) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("simien: {error:#}");
+                1
+            }
+        };
+    }
     let registry = build_registry();
     let index = dcore::help::build_ownership_index(&register_fns());
     let (argv, passthrough) = split_passthrough(&registry, std::env::args().skip(1).collect());

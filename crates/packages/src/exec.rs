@@ -2,9 +2,12 @@
 //! node_modules when it is installed there, otherwise from a folder of its
 //! own next to the package cache.
 //!
-//! Simien doesn't run Node programs. A native binary or a script with its
-//! own interpreter runs directly; a JavaScript program runs with bun, or
-//! node when there is no bun, and is an error when there is neither.
+//! A native binary or a script with its own interpreter runs directly. A
+//! Node program runs on Simien itself (`s __node-program`, its Node layer)
+//! when the package is granted `dangerouslyUseNode` (APS 2: Simien's
+//! pre-approved list, or the project's simien.json); without the grant it is
+//! refused, and the message says how to grant it. Simien never calls out to
+//! node or bun.
 //!
 //! Every program runs in the sandbox (APS 3): it reads everything but
 //! secrets, writes only the project, has the network, and sees no
@@ -32,6 +35,17 @@ pub enum Kind {
     JavaScript,
 }
 
+/// What runs a Node program: Simien's own binary, with the arguments that
+/// put it in its Node runner before the program's path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Runner {
+    pub program: PathBuf,
+    pub args: Vec<String>,
+}
+
+/// The hidden command Simien runs a granted Node program with.
+pub const NODE_PROGRAM_COMMAND: &str = "__node-program";
+
 /// The program to run and how.
 #[derive(Debug, Serialize)]
 pub struct Program {
@@ -41,8 +55,8 @@ pub struct Program {
     pub bin: String,
     pub path: PathBuf,
     pub kind: Kind,
-    /// node or bun for a JavaScript program; none for the others.
-    pub runner: Option<PathBuf>,
+    /// Simien's Node runner for a JavaScript program; none for the others.
+    pub runner: Option<Runner>,
     /// Folders to put first on PATH: the node_modules/.bin it was found in.
     #[serde(skip)]
     pub bin_dirs: Vec<PathBuf>,
@@ -59,8 +73,8 @@ impl Program {
     pub fn command(&self, sandbox: &gelada::Sandbox, args: &[String]) -> anyhow::Result<Command> {
         let mut command = match &self.runner {
             Some(runner) => {
-                let mut command = sandbox.command(runner)?;
-                command.arg(&self.path);
+                let mut command = sandbox.command(&runner.program)?;
+                command.args(&runner.args).arg(&self.path);
                 command
             }
             None => sandbox.command(&self.path)?,
@@ -86,7 +100,7 @@ pub async fn resolve(root: &Path, spec: &str, cache_root: Option<PathBuf>) -> an
         for dir in root.ancestors() {
             let node_modules = dir.join("node_modules");
             if let Some(program) = find(&node_modules, &name)? {
-                return Ok(program);
+                return with_runner(root, program);
             }
         }
     }
@@ -120,8 +134,35 @@ pub async fn resolve(root: &Path, spec: &str, cache_root: Option<PathBuf>) -> an
     .await?
     .install()
     .await?;
-    find(&dir.join("node_modules"), &name)?
-        .with_context(|| format!("{name} has no program to run (its package.json has no \"bin\")"))
+    let program = find(&dir.join("node_modules"), &name)?
+        .with_context(|| format!("{name} has no program to run (its package.json has no \"bin\")"))?;
+    with_runner(root, program)
+}
+
+/// A Node program gets Simien's runner when `project` grants its package
+/// `dangerouslyUseNode`; otherwise it is refused.
+fn with_runner(project: &Path, mut program: Program) -> anyhow::Result<Program> {
+    if program.kind != Kind::JavaScript {
+        return Ok(program);
+    }
+    if !crate::sandbox::uses_node(project, &program.package)? {
+        bail!(
+            "{package} is a Node program, and Simien runs Node programs only for packages \
+             granted dangerouslyUseNode (APS 2); to run it, {approval}",
+            package = program.package,
+            approval = crate::sandbox::uses_node_approval(&program.package),
+        );
+    }
+    let program_path = std::env::current_exe().context("Simien's own binary")?;
+    program.runner = Some(Runner {
+        program: program_path,
+        args: vec![
+            NODE_PROGRAM_COMMAND.to_string(),
+            "--project".to_string(),
+            project.display().to_string(),
+        ],
+    });
+    Ok(program)
 }
 
 /// The folder `spec` is installed into: `<cache>/../x/<spec>`, beside the
@@ -165,17 +206,13 @@ fn find(node_modules: &Path, name: &str) -> anyhow::Result<Option<Program>> {
         return Ok(None);
     }
     let kind = kind(&path)?;
-    let runner = match kind {
-        Kind::JavaScript => Some(runner(name)?),
-        Kind::Native | Kind::Script => None,
-    };
     Ok(Some(Program {
         package: name.to_string(),
         package_dir: node_modules.join(name),
         bin,
         path,
         kind,
-        runner,
+        runner: None,
         bin_dirs: vec![bin_dir],
     }))
 }
@@ -246,34 +283,44 @@ fn kind_of(head: &[u8], path: &Path) -> Kind {
     }
 }
 
-/// node, else bun, for a Node program (APS 2). Node is what packages and
-/// frameworks target: on Bun 1.4.0, vinext's Server Actions never run in dev
-/// (#44).
-fn runner(package: &str) -> anyhow::Result<PathBuf> {
-    pick_runner(crate::scripts::on_path).with_context(|| {
-        format!(
-            "{package} is a Node.js program and Simien doesn't run Node programs; \
-             install node (https://nodejs.org) or bun to run it"
-        )
-    })
-}
-
-fn pick_runner(on_path: impl Fn(&str) -> Option<PathBuf>) -> Option<PathBuf> {
-    on_path("node").or_else(|| on_path("bun"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn program(package: &str, kind: Kind) -> Program {
+        Program {
+            package: package.to_string(),
+            package_dir: PathBuf::from("/p/node_modules").join(package),
+            bin: package.to_string(),
+            path: PathBuf::from("/p/node_modules/.bin").join(package),
+            kind,
+            runner: None,
+            bin_dirs: Vec::new(),
+        }
+    }
+
     #[test]
-    fn node_programs_run_with_node_before_bun() {
-        let found = |names: &'static [&'static str]| {
-            move |program: &str| names.contains(&program).then(|| PathBuf::from(format!("/bin/{program}")))
-        };
-        assert_eq!(pick_runner(found(&["bun", "node"])), Some(PathBuf::from("/bin/node")));
-        assert_eq!(pick_runner(found(&["bun"])), Some(PathBuf::from("/bin/bun")));
-        assert_eq!(pick_runner(found(&[])), None);
+    fn node_programs_run_on_simien_only_when_granted() {
+        let project = tempfile::tempdir().unwrap();
+        let vite = with_runner(project.path(), program("vite", Kind::JavaScript)).unwrap();
+        assert_eq!(
+            vite.runner,
+            Some(Runner {
+                program: std::env::current_exe().unwrap(),
+                args: vec![
+                    NODE_PROGRAM_COMMAND.to_string(),
+                    "--project".to_string(),
+                    project.path().display().to_string(),
+                ],
+            })
+        );
+        let refused = with_runner(project.path(), program("left-pad", Kind::JavaScript)).unwrap_err();
+        let message = refused.to_string();
+        assert!(message.contains("dangerouslyUseNode"), "{message}");
+        assert!(message.contains(r#""left-pad": { "dangerouslyUseNode": true }"#), "{message}");
+        // Not a Node program: nothing to grant.
+        let native = with_runner(project.path(), program("esbuild", Kind::Native)).unwrap();
+        assert_eq!(native.runner, None);
     }
 
     #[test]

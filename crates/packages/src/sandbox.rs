@@ -47,6 +47,9 @@ pub struct Preapproved {
     pub install: Option<Grant>,
     /// For `simien x <package>`.
     pub x: Option<Grant>,
+    /// Node's APIs for the package's programs (APS 2).
+    #[serde(default, rename = "dangerouslyUseNode")]
+    pub dangerously_use_node: bool,
 }
 
 impl Grant {
@@ -141,12 +144,52 @@ pub fn approved(project: &Path, package: &str) -> anyhow::Result<Option<Grant>> 
     };
     let json: serde_json::Value =
         serde_json::from_str(&text).with_context(|| format!("{}", path.display()))?;
-    let Some(grant) = json.get("packagePermissions").and_then(|all| all.get(package)) else {
+    let Some(entry) = json.get("packagePermissions").and_then(|all| all.get(package)) else {
         return Ok(None);
     };
-    serde_json::from_value(grant.clone())
-        .map(Some)
-        .with_context(|| format!("{}: packagePermissions.{package}", path.display()))
+    let (grant, _) = split_entry(entry)
+        .with_context(|| format!("{}: packagePermissions.{package}", path.display()))?;
+    Ok(Some(grant))
+}
+
+/// A simien.json `packagePermissions` entry: its grant, and whether it
+/// grants `dangerouslyUseNode` (only `true` is accepted, as in the list).
+fn split_entry(entry: &serde_json::Value) -> anyhow::Result<(Grant, bool)> {
+    let mut entry = entry.clone();
+    let uses_node = match entry.as_object_mut().and_then(|e| e.remove("dangerouslyUseNode")) {
+        None => false,
+        Some(serde_json::Value::Bool(true)) => true,
+        Some(other) => bail!("dangerouslyUseNode is true or left out, not {other}"),
+    };
+    Ok((serde_json::from_value(entry)?, uses_node))
+}
+
+/// Whether `package`'s programs get Node's APIs (APS 2): Simien's
+/// pre-approved list or the project's simien.json grants
+/// `dangerouslyUseNode`.
+pub fn uses_node(project: &Path, package: &str) -> anyhow::Result<bool> {
+    if preapproved(package).is_some_and(|entry| entry.dangerously_use_node) {
+        return Ok(true);
+    }
+    let path = project.join("simien.json");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return Ok(false);
+    };
+    let json: serde_json::Value =
+        serde_json::from_str(&text).with_context(|| format!("{}", path.display()))?;
+    match json.get("packagePermissions").and_then(|all| all.get(package)) {
+        Some(entry) => Ok(split_entry(entry)
+            .with_context(|| format!("{}: packagePermissions.{package}", path.display()))?
+            .1),
+        None => Ok(false),
+    }
+}
+
+/// How to grant `package` Node's APIs, for a refusal's message.
+pub fn uses_node_approval(package: &str) -> String {
+    format!(
+        r#"add to simien.json: "packagePermissions": {{ "{package}": {{ "dangerouslyUseNode": true }} }}"#
+    )
 }
 
 #[derive(Debug, Deserialize)]
@@ -377,5 +420,27 @@ mod tests {
         let puppeteer = preapproved("puppeteer").unwrap();
         assert!(puppeteer.install.unwrap().write.contains(&"$CACHE/puppeteer".to_string()));
         assert!(preapproved("left-pad").is_none());
+    }
+
+    #[test]
+    fn node_is_granted_by_the_list_or_simien_json_only() {
+        let project = tempfile::tempdir().unwrap();
+        assert!(uses_node(project.path(), "vite").unwrap(), "vite is on the list");
+        assert!(!uses_node(project.path(), "prettier").unwrap());
+        std::fs::write(
+            project.path().join("simien.json"),
+            r#"{ "packagePermissions": { "prettier": { "dangerouslyUseNode": true, "net": ["a.example"] } } }"#,
+        )
+        .unwrap();
+        assert!(uses_node(project.path(), "prettier").unwrap());
+        // The rest of the entry is still its grant.
+        let grant = approved(project.path(), "prettier").unwrap().unwrap();
+        assert_eq!(grant.net, vec!["a.example".to_string()]);
+        std::fs::write(
+            project.path().join("simien.json"),
+            r#"{ "packagePermissions": { "prettier": { "dangerouslyUseNode": false } } }"#,
+        )
+        .unwrap();
+        assert!(uses_node(project.path(), "prettier").is_err(), "only true is accepted");
     }
 }

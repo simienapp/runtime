@@ -75,13 +75,25 @@ simien_core::extension!(
     deps = [simien_webidl, simien_web, simien_fetch, simien_crypto],
     esm_entry_point = "ext:simien_globals/globals.js",
     esm = [dir "js", "globals.js"],
-    state = |state| {
-        state.put(PermissionsContainer::new(Arc::new(RuntimeNetPolicy)));
+    options = { fetch_permissions: PermissionsContainer },
+    state = |state, options| {
+        state.put(options.fetch_permissions);
     },
 );
 
-/// The extensions for one isolate, in dependency order.
+/// The extensions for one app isolate, in dependency order: the web APIs,
+/// with fetch() asking the runtime's `net` allowlist, and the framework
+/// carve-outs (APS 2).
 pub fn extensions() -> Vec<Extension> {
+    let mut extensions = web(PermissionsContainer::new(Arc::new(RuntimeNetPolicy)));
+    extensions.push(carve_outs::simien_carve_outs::init());
+    extensions
+}
+
+/// The web APIs and their globals alone, with fetch() asking
+/// `fetch_permissions`: what a Node program's isolate starts from (its
+/// `node:*` modules are Node's own, not the carve-outs).
+pub fn web(fetch_permissions: PermissionsContainer) -> Vec<Extension> {
     vec![
         simien_webidl::simien_webidl::init(),
         simien_web::simien_web::init(simien_web::BlobStore::default_arc(), None),
@@ -90,7 +102,6 @@ pub fn extensions() -> Vec<Extension> {
             user_agent: concat!("Simien/", env!("CARGO_PKG_VERSION")).to_string(),
             ..Default::default()
         }),
-        simien_globals::init(),
-        carve_outs::simien_carve_outs::init(),
+        simien_globals::init(fetch_permissions),
     ]
 }

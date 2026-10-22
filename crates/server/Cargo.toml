@@ -6,8 +6,8 @@ description = "Serves a fetch-handler app with one warm isolate per core, each s
 
 [dependencies]
 simien_core.workspace = true
-simien_http = "0.1.1"
-simien_websocket = "0.1.1"
+simien_http = "0.2.0"
+simien_websocket = "0.2.0"
 tokio = { workspace = true }
 web_host = { path = "../web_host" }
 pool = { path = "../pool" }
