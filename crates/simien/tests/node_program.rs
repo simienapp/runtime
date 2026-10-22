@@ -127,6 +127,75 @@ fn a_node_program_writes_only_where_its_sandbox_does() {
     assert!(!home.path().join("outside.txt").exists());
 }
 
+/// When `simien` dies in a way it can't pass on (SIGKILL here), the Node
+/// program it started stops too instead of running on with no parent.
+#[cfg(unix)]
+#[test]
+fn a_node_program_stops_when_simien_is_killed() {
+    let project = tempfile::tempdir().expect("project");
+    let home = tempfile::tempdir().expect("fake home");
+    fs::write(
+        project.path().join("simien.json"),
+        r#"{ "packagePermissions": { "probe": { "dangerouslyUseNode": true } } }"#,
+    )
+    .expect("simien.json");
+    let package = project.path().join("node_modules/probe");
+    fs::create_dir_all(&package).expect("package dir");
+    fs::write(
+        package.join("package.json"),
+        r#"{ "name": "probe", "version": "1.0.0", "bin": "cli.js" }"#,
+    )
+    .expect("package.json");
+    fs::write(
+        package.join("cli.js"),
+        r#"#!/usr/bin/env node
+        require("node:fs").writeFileSync("probe.pid", String(process.pid));
+        setInterval(() => {}, 1000);
+        "#,
+    )
+    .expect("cli.js");
+    let bin = project.path().join("node_modules/.bin");
+    fs::create_dir_all(&bin).expect(".bin");
+    std::os::unix::fs::symlink("../probe/cli.js", bin.join("probe")).expect("link");
+
+    let mut simien = Command::new(env!("CARGO_BIN_EXE_simien"))
+        .args(["x", "probe"])
+        .current_dir(project.path())
+        .env("HOME", home.path())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .expect("start simien x");
+    let pid_file = project.path().join("probe.pid");
+    let started = std::time::Instant::now();
+    let probe: i32 = loop {
+        if let Some(pid) = fs::read_to_string(&pid_file).ok().and_then(|text| text.parse().ok()) {
+            break pid;
+        }
+        assert!(started.elapsed() < std::time::Duration::from_secs(60), "the program never started");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    };
+    // The program this test started; stopped below whatever happens.
+    struct Stop(i32);
+    impl Drop for Stop {
+        fn drop(&mut self) {
+            unsafe { libc::kill(self.0, libc::SIGKILL) };
+        }
+    }
+    let _stop = Stop(probe);
+
+    simien.kill().expect("SIGKILL simien");
+    simien.wait().expect("reap simien");
+    let killed = std::time::Instant::now();
+    while unsafe { libc::kill(probe, 0) } == 0 {
+        assert!(
+            killed.elapsed() < std::time::Duration::from_secs(10),
+            "the program (pid {probe}) is still running 10 s after simien was killed"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+}
+
 /// A program that starts another like it (`spawn(process.execPath)`,
 /// `fork()`) gets a Simien Node program again, under the same sandbox rules.
 #[cfg(unix)]
