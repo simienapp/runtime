@@ -138,18 +138,46 @@ checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
 
 [[package]]
 name = "asn1-rs"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f6fd5ddaf0351dff5b8da21b2fb4ff8e08ddd02857f0bf69c47639106c0fff0"
+dependencies = [
+ "asn1-rs-derive 0.4.0",
+ "asn1-rs-impl 0.1.0",
+ "displaydoc",
+ "nom",
+ "num-traits",
+ "rusticata-macros",
+ "thiserror 1.0.69",
+ "time",
+]
+
+[[package]]
+name = "asn1-rs"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7f43a50ac4fdca5df8e885c21b835997f0a1cdee65494a6847694a98652d9d8"
 dependencies = [
- "asn1-rs-derive",
- "asn1-rs-impl",
+ "asn1-rs-derive 0.6.0",
+ "asn1-rs-impl 0.2.0",
  "displaydoc",
  "nom",
  "num-traits",
  "rusticata-macros",
  "thiserror 2.0.20",
  "time",
+]
+
+[[package]]
+name = "asn1-rs-derive"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "726535892e8eae7e70657b4c8ea93d26b8553afb1ce617caee529ef96d7dee6c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+ "synstructure 0.12.6",
 ]
 
 [[package]]
@@ -161,7 +189,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
- "synstructure",
+ "synstructure 0.13.2",
+]
+
+[[package]]
+name = "asn1-rs-impl"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2777730b2039ac0f95f093556e61b6d26cebed5393ca6f152717777cec3a42ed"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -1281,7 +1320,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0b1fab2ae45819af2d0731d60f2afe17227ebb1a1538a236da84c93e9a60162"
 dependencies = [
  "dispatch2",
- "nix",
+ "nix 0.31.3",
  "windows-sys 0.61.2",
 ]
 
@@ -1605,11 +1644,25 @@ dependencies = [
 
 [[package]]
 name = "der-parser"
+version = "8.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbd676fbbab537128ef0278adb5576cf363cff6aa22a7b24effe97347cfab61e"
+dependencies = [
+ "asn1-rs 0.5.2",
+ "displaydoc",
+ "nom",
+ "num-bigint 0.4.8",
+ "num-traits",
+ "rusticata-macros",
+]
+
+[[package]]
+name = "der-parser"
 version = "10.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07da5016415d5a3c4dd39b11ed26f915f52fc4e0dc197d87908bc916e51bc1a6"
 dependencies = [
- "asn1-rs",
+ "asn1-rs 0.7.2",
  "displaydoc",
  "nom",
  "num-bigint 0.4.8",
@@ -4125,6 +4178,18 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "nix"
+version = "0.30.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
+dependencies = [
+ "bitflags 2.13.2",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
+]
+
+[[package]]
+name = "nix"
 version = "0.31.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
@@ -4397,11 +4462,20 @@ dependencies = [
 
 [[package]]
 name = "oid-registry"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9bedf36ffb6ba96c2eb7144ef6270557b52e54b20c0a8e1eb2ff99a6c6959bff"
+dependencies = [
+ "asn1-rs 0.5.2",
+]
+
+[[package]]
+name = "oid-registry"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12f40cff3dde1b6087cc5d5f5d4d65712f34016a03ed60e9c08dcc392736b5b7"
 dependencies = [
- "asn1-rs",
+ "asn1-rs 0.7.2",
 ]
 
 [[package]]
@@ -5962,7 +6036,7 @@ dependencies = [
  "ring",
  "rustls-pki-types",
  "time",
- "x509-parser",
+ "x509-parser 0.18.1",
  "yasna",
 ]
 
@@ -6794,6 +6868,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
+name = "signal-hook"
+version = "0.3.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d881a16cf4426aa584979d30bd82cb33429027e42122b169753d6ef1085ed6e2"
+dependencies = [
+ "libc",
+ "signal-hook-registry",
+]
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6930,9 +7014,9 @@ dependencies = [
 
 [[package]]
 name = "simien_core"
-version = "0.1.1"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2635320748926cb81e1acbce96b7ef83f86f9b5a9547ec4f0125fc950d79fb3"
+checksum = "353e01502ddd58ca8c86255adbd05432a5cd28c75797dd50335ffa4fc4cc5031"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -6955,13 +7039,13 @@ dependencies = [
  "simien_ops",
  "simien_path_util",
  "simien_serde_v8",
+ "simien_sys_traits",
  "simien_unsync",
  "simien_v8",
  "simien_wasm_dep_analyzer",
  "smallvec",
  "sourcemap",
  "static_assertions",
- "sys_traits",
  "thiserror 2.0.20",
  "tokio",
  "url",
@@ -6971,9 +7055,9 @@ dependencies = [
 
 [[package]]
 name = "simien_crypto"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c218e2bbf19411a9770c3c633e87f8037dd068cd08ed963d922281692453fd9c"
+checksum = "857b39c47ecb8925ae90a8f31112f6816a83e4f2be0a7b16ae90b644992b3862"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -7052,10 +7136,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "simien_fetch"
-version = "0.1.1"
+name = "simien_features"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b82dba4b4040665333c5a162a092597060d28c53a89dec95c97b04645ac9456"
+checksum = "a63a7fb4e9e6c9fa54065f4cb63b0a0b287e4b40bab2a37c09771c3f335ce135"
+dependencies = [
+ "simien_core",
+]
+
+[[package]]
+name = "simien_fetch"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d399f5be9f4df9ae103103a5e14d7744eb0ea27b33e361bbd73201491d0c4833"
 dependencies = [
  "async-compression",
  "base64 0.22.1",
@@ -7089,9 +7182,9 @@ dependencies = [
 
 [[package]]
 name = "simien_http"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aff9a8c0ea8054e632a7086243d6733960a7ae4a6be5de783527560733b8ad4"
+checksum = "68e6ab54c079ac9bfdf8a676ae7279031bb04436b6be99933992ad0956407a7d"
 dependencies = [
  "async-compression",
  "async-trait",
@@ -7191,18 +7284,32 @@ dependencies = [
 
 [[package]]
 name = "simien_net"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c94fb7c913322871be460b71a60f818ebeff963fb53424ba799cceddfce77170"
+checksum = "22f89b77422eb2d4dc8fccdf70c2aa1d5361bbd67e8e2eb8bbaaca368b0b1da7"
 dependencies = [
+ "hickory-proto",
+ "hickory-resolver",
+ "libc",
+ "log",
  "pin-project",
+ "quinn",
  "rustls-tokio-stream",
+ "serde",
+ "sha2 0.10.9",
  "simien_core",
  "simien_error",
+ "simien_features",
+ "simien_permissions",
+ "simien_signals",
  "simien_tls",
  "socket2 0.5.10",
  "thiserror 2.0.20",
  "tokio",
+ "tokio-vsock",
+ "url",
+ "web-transport-proto",
+ "x509-parser 0.15.1",
 ]
 
 [[package]]
@@ -7404,10 +7511,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "simien_resolver"
-version = "0.1.2"
+name = "simien_permissions"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74e13aaed2b0858f714b921b5b1052ea47db75ef659ef9ed55ab8f73a2bf7887"
+checksum = "c7075f7e1d2342c6bb1428104cf36215b9e77fb5d1b240d26ad1e093409f57de"
+dependencies = [
+ "nix 0.30.1",
+ "simien_error",
+ "simien_sys_traits",
+ "thiserror 2.0.20",
+ "which 8.0.6",
+]
+
+[[package]]
+name = "simien_resolver"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc59d6f8fdee1313800b74707e4eab515e69a4fcd76d81a66ea40baa0f601d0b"
 dependencies = [
  "anyhow",
  "async-once-cell",
@@ -7479,6 +7599,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "simien_signals"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41dc2c1748a372fc868a3897cf9aa01523af38d4ee77b917692733932d88d88e"
+dependencies = [
+ "libc",
+ "signal-hook",
+ "thiserror 2.0.20",
+ "tokio",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "simien_sys_traits"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7516,9 +7649,9 @@ dependencies = [
 
 [[package]]
 name = "simien_tls"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57a800ba2c0e151e06844a3423bcea0be42a0b765f5342b2447ec0eab08c09cb"
+checksum = "eb4df000b58580459c028e31ef38f57564583294e3dd00d483fc9670e47ea50a"
 dependencies = [
  "log",
  "rustls",
@@ -7531,7 +7664,7 @@ dependencies = [
  "simien_native_certs",
  "thiserror 2.0.20",
  "tokio",
- "webpki-roots 0.26.11",
+ "webpki-roots 1.0.10",
 ]
 
 [[package]]
@@ -7598,9 +7731,9 @@ dependencies = [
 
 [[package]]
 name = "simien_websocket"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb7ed8fe4f4f4844ec3e53600517b7154ee72b68ded0f1e865827acbb7772e62"
+checksum = "b674e2e0998c3ef1bd88a8e02111c3a685b6a7b02928313ffa8e7f8187d2df81"
 dependencies = [
  "bytes",
  "fastwebsockets",
@@ -7917,29 +8050,21 @@ dependencies = [
 
 [[package]]
 name = "synstructure"
-version = "0.13.2"
+version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2"
+checksum = "f36bdaa60a83aca3921b5259d5400cbf5e90fc51931376a9bd4a0eb79aa7210f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 1.0.109",
+ "unicode-xid",
 ]
 
 [[package]]
-name = "sys_traits"
-version = "0.1.28"
+name = "synstructure"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88826d6169418c98e8bc52a43f79d50907dfa3e87ba5161930d42c6f980b35ee"
-dependencies = [
- "sys_traits_macros",
-]
-
-[[package]]
-name = "sys_traits_macros"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "181f22127402abcf8ee5c83ccd5b408933fec36a6095cf82cda545634692657e"
+checksum = "728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -9015,6 +9140,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
 
 [[package]]
+name = "unicode-xid"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
+
+[[package]]
 name = "universal-hash"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9099,7 +9230,7 @@ dependencies = [
  "miniz_oxide 0.8.9",
  "paste",
  "temporal_capi",
- "which",
+ "which 6.0.3",
 ]
 
 [[package]]
@@ -9148,7 +9279,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ba782755fc073877e567c2253c0be48e4aa9a254c232d36d3985dfae0bd5205"
 dependencies = [
  "libc",
- "nix",
+ "nix 0.31.3",
 ]
 
 [[package]]
@@ -9298,6 +9429,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "web-transport-proto"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "974fa1e325e6cc5327de8887f189a441fcff4f8eedcd31ec87f0ef0cc5283fbc"
+dependencies = [
+ "bytes",
+ "http",
+ "thiserror 2.0.20",
+ "url",
+]
+
+[[package]]
 name = "web_host"
 version = "0.61.0"
 dependencies = [
@@ -9428,6 +9571,12 @@ dependencies = [
  "rustix 0.38.44",
  "winsafe",
 ]
+
+[[package]]
+name = "which"
+version = "8.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bae2f2b2b816647a1cab1acc91f5bd20812d53cb344382635ec2181940c8034f"
 
 [[package]]
 name = "whoami"
@@ -10078,16 +10227,33 @@ dependencies = [
 
 [[package]]
 name = "x509-parser"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7069fba5b66b9193bd2c5d3d4ff12b839118f6bcbef5328efafafb5395cf63da"
+dependencies = [
+ "asn1-rs 0.5.2",
+ "data-encoding",
+ "der-parser 8.2.0",
+ "lazy_static",
+ "nom",
+ "oid-registry 0.6.1",
+ "rusticata-macros",
+ "thiserror 1.0.69",
+ "time",
+]
+
+[[package]]
+name = "x509-parser"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d43b0f71ce057da06bc0851b23ee24f3f86190b07203dd8f567d0b706a185202"
 dependencies = [
- "asn1-rs",
+ "asn1-rs 0.7.2",
  "data-encoding",
- "der-parser",
+ "der-parser 10.0.0",
  "lazy_static",
  "nom",
- "oid-registry",
+ "oid-registry 0.8.1",
  "ring",
  "rusticata-macros",
  "thiserror 2.0.20",
@@ -10156,7 +10322,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
- "synstructure",
+ "synstructure 0.13.2",
 ]
 
 [[package]]
@@ -10197,7 +10363,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
- "synstructure",
+ "synstructure 0.13.2",
 ]
 
 [[package]]
