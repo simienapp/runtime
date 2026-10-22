@@ -1,7 +1,7 @@
 //! `simien dev` in a Vite app (a Tana app, on vinext): Vite's dev server does
-//! the serving, run like `simien x vite dev` (sandboxed, on the user's bun or
-//! node), next to Simien's database loop (Tana APS 2). Production is the
-//! built server bundle, served by Simien itself.
+//! the serving, run like `simien x vite dev` (sandboxed, on Simien's own Node
+//! layer, granted dangerouslyUseNode), next to Simien's database loop (Tana
+//! APS 2). Production is the built server bundle, served by Simien itself.
 
 use std::path::{Path, PathBuf};
 

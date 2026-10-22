@@ -21,6 +21,7 @@ check = { path = "../check" }
 dcore = { path = "../dcore" }
 output = { path = "../output" }
 packages = { path = "../packages" }
+node_program = { path = "../node_program" }
 stdio = "0.5.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -30,6 +31,9 @@ dev = { path = "../dev", features = ["dev-server"] }
 introspect = { path = "../introspect" }
 compile = { path = "../compile" }
 self_cmd = { path = "../self_cmd" }
+
+[build-dependencies]
+simien_napi = "0.1.1"
 
 [dev-dependencies]
 reqwest = { version = "0.13", features = ["blocking", "json"] }
