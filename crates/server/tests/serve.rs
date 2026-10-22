@@ -147,7 +147,9 @@ fn a_request_stuck_in_javascript_does_not_take_the_isolate_down() {
         // One isolate: while it spins, nothing else is served.
         isolates: 1,
         inbox_capacity: 128,
-        max_busy: Some(Duration::from_millis(300)),
+        // The limit also covers loading the app, which takes a few hundred
+        // ms on a busy machine: at 300ms a reload could be cut off too.
+        max_busy: Some(Duration::from_secs(2)),
         on_event: Some(std::sync::Arc::new(move |event| seen.lock().unwrap().push(event))),
         security: default_policy(),
     })

@@ -112,7 +112,7 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
             extensions,
             ..Default::default()
         });
-        let lifecycle = simien_node_runtime::bootstrap(&mut runtime, "node")
+        let lifecycle = simien_node_runtime::bootstrap(&mut runtime, "node", env!("CARGO_PKG_VERSION"))
             .map_err(|error| anyhow::anyhow!("{error}"))?;
         lifecycle
             .run(&mut runtime, &exit_code, &main, None)
