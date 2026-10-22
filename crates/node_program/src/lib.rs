@@ -93,8 +93,29 @@ simien_core::extension!(
     },
 );
 
+/// Stops the program (SIGTERM, so its own shutdown runs) when the `simien`
+/// that started it is gone. `simien` passes on SIGTERM, SIGINT and SIGHUP,
+/// but when it dies any other way (SIGKILL, SIGALRM, a crash) the program
+/// would otherwise keep running with nothing to stop it. The process is
+/// handed to a new parent when its own ends; a sleeping thread notices.
+fn stop_with_parent() {
+    #[cfg(unix)]
+    {
+        // SAFETY: getppid and kill have no preconditions.
+        let parent = unsafe { libc::getppid() };
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            if unsafe { libc::getppid() } != parent {
+                unsafe { libc::kill(libc::getpid(), libc::SIGTERM) };
+                return;
+            }
+        });
+    }
+}
+
 /// Runs the program to its end; its exit code.
 pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
+    stop_with_parent();
     let (package, package_dir) = package_of(&invocation.script)?;
     if !packages::sandbox::uses_node(&invocation.project, &package)? {
         bail!(
