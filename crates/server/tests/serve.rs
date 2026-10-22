@@ -285,3 +285,76 @@ fn the_warm_server_has_the_framework_carve_outs() {
     assert_eq!(body["keys"], serde_json::json!(["platform", "env"]));
     assert_eq!(body["env"], "undefined", "the default policy reads no variable");
 }
+
+/// An app whose packages are in node_modules: `files` are (path, text),
+/// `links` are (link, target) symlinks, as an install makes them.
+fn start_app(
+    files: &[(&str, &str)],
+    links: &[(&str, &str)],
+) -> Result<(tempfile::TempDir, std::net::SocketAddr), String> {
+    let dir = tempfile::tempdir().expect("app dir");
+    for (path, text) in files {
+        let path = dir.path().join(path);
+        fs::create_dir_all(path.parent().expect("parent")).expect("folders");
+        fs::write(path, text).expect("write");
+    }
+    #[cfg(unix)]
+    for (link, target) in links {
+        std::os::unix::fs::symlink(dir.path().join(target), dir.path().join(link)).expect("link");
+    }
+    let server = server::start(ServerOptions {
+        addr: "127.0.0.1:0".parse().expect("addr"),
+        entry: dir.path().join("app.js"),
+        project_root: dir.path().to_path_buf(),
+        isolates: 1,
+        inbox_capacity: 128,
+        max_busy: None,
+        on_event: None,
+        security: default_policy(),
+    })
+    .map_err(|err| err.to_string())?;
+    let addr = server.addr;
+    std::mem::forget(server);
+    Ok((dir, addr))
+}
+
+#[cfg(unix)]
+#[test]
+fn an_app_imports_packages_from_node_modules() {
+    let store = "node_modules/.simien/greet@1.0.0/node_modules";
+    let (_dir, addr) = start_app(&[
+        (
+            "app.js",
+            r#"import { greet } from "greet";
+            export default { fetch: () => new Response(greet("simien")) };"#,
+        ),
+        (
+            &format!("{store}/greet/package.json"),
+            r#"{ "name": "greet", "exports": { ".": { "node": "./node.js", "worker": "./worker.js" } } }"#,
+        ),
+        (&format!("{store}/greet/node.js"), r#"export const greet = () => "the node build";"#),
+        (
+            &format!("{store}/greet/worker.js"),
+            r#"import { upper } from "shout"; export const greet = (who) => upper(`hello ${who}`);"#,
+        ),
+        (&format!("{store}/shout/package.json"), r#"{ "name": "shout", "main": "index.js" }"#),
+        (&format!("{store}/shout/index.js"), "export const upper = (s) => s.toUpperCase();"),
+        ("simien.json", "{}"),
+    ],
+    // Installed as Simien installs: node_modules/greet links into the store,
+    // where greet's own dependency sits beside it.
+    &[("node_modules/greet", &format!("{store}/greet"))])
+    .expect("start");
+    let body = client().get(format!("http://{addr}/")).send().expect("request").text().expect("body");
+    assert_eq!(body, "HELLO SIMIEN", "the worker build, with its own dependency");
+}
+
+#[test]
+fn a_bare_node_module_name_is_still_a_node_module() {
+    let error = start_app(&[
+        ("app.js", r#"import os from "os"; export default { fetch: () => new Response(os.platform()) };"#),
+        ("simien.json", "{}"),
+    ], &[])
+    .expect_err("os is refused");
+    assert!(error.contains("node:os isn't available"), "{error}");
+}
