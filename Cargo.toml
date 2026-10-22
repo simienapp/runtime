@@ -28,6 +28,7 @@ members = [
   "crates/carve_outs",
   "crates/schema",
   "crates/schema_sync",
+  "crates/data",
   "crates/devloop",
   "crates/check",
     "crates/engine",
