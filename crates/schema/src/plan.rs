@@ -9,7 +9,7 @@
 
 use serde::Serialize;
 
-use crate::model::{Edge, Field, ID, SOURCE, Schema, TARGET, Table};
+use crate::model::{Edge, Field, ID, SOURCE, Schema, TARGET, Table, UPDATED_AT};
 
 /// A check run before the migration: if `sql` returns true, the migration stops with `error`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -48,10 +48,46 @@ fn column(field: &Field) -> String {
     format!("{} {}{null}", quote(&field.name), field.ty.sql())
 }
 
-fn create_table(table: &Table) -> String {
+/// The time now in milliseconds since 1970, UTC: the transaction's time, so
+/// every row a transaction writes carries the same stamp.
+const NOW_MS: &str = "(extract(epoch from now()) * 1000)::bigint";
+
+/// One function serves every table's `updated_at` trigger.
+const TOUCH: &str = "simien_touch";
+
+fn stamp(name: &str) -> String {
+    format!("{} bigint NOT NULL DEFAULT {NOW_MS}", quote(name))
+}
+
+/// The table, its timestamps and their trigger, and pg_zega tracking unless it's a log.
+fn create_table(table: &Table) -> Vec<String> {
     let mut columns = vec![format!("{} bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY", quote(ID))];
     columns.extend(table.fields.iter().map(column));
-    format!("CREATE TABLE {} ({})", quote(&table.name), columns.join(", "))
+    columns.extend(table.stamps().iter().map(|s| stamp(s)));
+    let mut statements = vec![format!("CREATE TABLE {} ({})", quote(&table.name), columns.join(", "))];
+    statements.extend(touch(table));
+    if !table.is_log() {
+        statements.push(track(&table.name));
+    }
+    statements
+}
+
+/// `updated_at` follows every update, however it's made (the data API, psql, a migration tool).
+fn touch(table: &Table) -> Vec<String> {
+    if !table.stamps().contains(&UPDATED_AT) {
+        return Vec::new();
+    }
+    vec![
+        format!(
+            "CREATE OR REPLACE FUNCTION {TOUCH}() RETURNS trigger LANGUAGE plpgsql AS \
+             $$ BEGIN NEW.{} := {NOW_MS}; RETURN NEW; END $$",
+            quote(UPDATED_AT)
+        ),
+        format!(
+            "CREATE OR REPLACE TRIGGER {TOUCH} BEFORE UPDATE ON {} FOR EACH ROW EXECUTE FUNCTION {TOUCH}()",
+            quote(&table.name)
+        ),
+    ]
 }
 
 fn create_edge(edge: &Edge) -> String {
@@ -88,6 +124,11 @@ fn single_rename<'a, T>(removed: &[&'a T], added: &[&'a T], matches: impl Fn(&T,
 const ONE_AT_A_TIME: &str = "If this was a rename, change one thing per save: rename first, then edit.";
 
 pub fn plan(current: &Schema, desired: &Schema) -> Plan {
+    plan_stamped(current, desired, &[])
+}
+
+/// `plan`, also giving each table in `unstamped` the timestamp columns it lacks.
+pub fn plan_stamped(current: &Schema, desired: &Schema, unstamped: &[String]) -> Plan {
     let mut plan = Plan::default();
     let mut reload_all = false;
     let mut reload: Vec<String> = Vec::new();
@@ -133,8 +174,7 @@ pub fn plan(current: &Schema, desired: &Schema) -> Plan {
     // New tables come before anything that could point at them.
     for table in added.iter().filter(|t| table_rename.is_none_or(|(_, new)| new.name != t.name)) {
         plan.changes.push(format!("add table {}", table.name));
-        plan.statements.push(create_table(table));
-        plan.statements.push(track(&table.name));
+        plan.statements.extend(create_table(table));
     }
 
     // Fields of tables that exist on both sides. Guards use the names as they are now.
@@ -144,7 +184,20 @@ pub fn plan(current: &Schema, desired: &Schema) -> Plan {
             _ => new.name.clone(),
         };
         let Some(old) = current.table(&old_name) else { continue };
-        if fields(&mut plan, &old_name, &new.name, &new.name, &old.fields, &new.fields) {
+        let mut reloads = fields(&mut plan, &old_name, &new.name, &new.name, &old.fields, &new.fields);
+        if unstamped.contains(&old_name) {
+            // Existing rows get the time of this migration; Zega reloads them so
+            // its nodes carry the new required fields too.
+            plan.changes.push(format!("add timestamps to {}", new.name));
+            for name in new.stamps() {
+                plan.statements
+                    .push(format!("ALTER TABLE {} ADD COLUMN IF NOT EXISTS {}", quote(&new.name), stamp(name)));
+            }
+            plan.statements.extend(touch(new));
+            reloads = true;
+        }
+        // A log table isn't in Zega, so there is nothing to reload.
+        if reloads && !new.is_log() {
             reload.push(new.name.clone());
         }
     }
@@ -325,10 +378,12 @@ mod tests {
             &Schema::default(),
             &schema(r#"users: defineTable({ name: v.string() }), liked: defineEdge("users", "users")"#),
         );
+        // The timestamp trigger is checked on real data in schema_sync's tests.
+        let tables: Vec<&String> = plan.statements.iter().filter(|s| !s.contains("simien_touch")).collect();
         assert_eq!(
-            plan.statements,
+            tables,
             [
-                r#"CREATE TABLE "users" ("_id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, "name" text NOT NULL)"#,
+                r#"CREATE TABLE "users" ("_id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, "name" text NOT NULL, "created_at" bigint NOT NULL DEFAULT (extract(epoch from now()) * 1000)::bigint, "updated_at" bigint NOT NULL DEFAULT (extract(epoch from now()) * 1000)::bigint)"#,
                 "SELECT zega.track('users')",
                 r#"CREATE TABLE "ze_liked" ("source" bigint NOT NULL REFERENCES "users" ("_id") ON DELETE CASCADE, "target" bigint NOT NULL REFERENCES "users" ("_id") ON DELETE CASCADE, PRIMARY KEY ("source", "target"))"#,
                 "SELECT zega.track('ze_liked')",

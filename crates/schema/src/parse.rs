@@ -19,7 +19,7 @@ use oxc_parser::Parser;
 use oxc_span::{SourceType, Span};
 use serde::Serialize;
 
-use crate::model::{EDGE_PREFIX, Edge, Field, Schema, Table, Type, invalid_name, reserved_field};
+use crate::model::{EDGE_PREFIX, Edge, Field, LOG_PREFIX, Schema, Table, Type, invalid_name, reserved_field};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ParseError {
@@ -116,6 +116,15 @@ pub fn parse(text: &str) -> Result<Schema, ParseError> {
                 return Err(source.at(
                     span,
                     format!("edge `{}` points at `{end}`, which isn't a table in this schema", edge.name),
+                ));
+            }
+            if end.starts_with(LOG_PREFIX) {
+                return Err(source.at(
+                    entries.span,
+                    format!(
+                        "edge `{}` points at `{end}`, a log table; log tables aren't in the graph, so edges can't reach them",
+                        edge.name
+                    ),
                 ));
             }
         }
@@ -318,6 +327,16 @@ export default defineSchema({
 
         let error = parse("export default defineSchema({ users: defineTable({ id: v.int() }) })").unwrap_err();
         assert!(error.message.contains("reserved"), "{}", error.message);
+
+        let error =
+            parse("export default defineSchema({ users: defineTable({ created_at: v.int() }) })").unwrap_err();
+        assert!(error.message.contains("reserved"), "{}", error.message);
+
+        let error = parse(
+            "export default defineSchema({ users: defineTable({}), log_visits: defineTable({}), saw: defineEdge(\"users\", \"log_visits\") })",
+        )
+        .unwrap_err();
+        assert!(error.message.contains("a log table"), "{}", error.message);
 
         let error = parse("export default defineSchema({ Users: defineTable({}) })").unwrap_err();
         assert!(error.message.contains("lowercase"), "{}", error.message);

@@ -53,7 +53,7 @@ pub fn plan_from(schema_ts: &str, catalog: &Catalog) -> Result<Planned, PlanErro
         }
     }
     Ok(Planned {
-        plan: plan::plan(&read.schema, &desired),
+        plan: plan::plan_stamped(&read.schema, &desired, &read.unstamped),
         data_model: print::data_model(&desired),
         current: read.schema,
         schema: desired,

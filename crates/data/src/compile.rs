@@ -2,7 +2,7 @@
 //! operator and value is checked against the schema here; a name reaches the
 //! SQL only after it was found in the schema, and every value is a parameter.
 
-use schema::model::{Field, ID, Schema, Table, Type};
+use schema::model::{CREATED_AT, Field, ID, Schema, Table, Type, UPDATED_AT};
 use schema::plan::quote;
 use serde_json::{Map, Value};
 
@@ -118,14 +118,30 @@ impl Column<'_> {
     }
 }
 
+/// The columns the database sets, as `(API name, Postgres name)`: the key and
+/// the timestamps (milliseconds since 1970, UTC).
+fn system(table: &Table) -> impl Iterator<Item = (&'static str, &'static str)> {
+    std::iter::once((PUBLIC_ID, ID)).chain(table.stamps().iter().map(|stamp| match *stamp {
+        CREATED_AT => ("createdAt", CREATED_AT),
+        UPDATED_AT => ("updatedAt", UPDATED_AT),
+        other => unreachable!("an unknown stamp column {other}"),
+    }))
+}
+
+fn set_by_database(table: &Table, name: &str) -> Option<DataError> {
+    system(table)
+        .any(|(public, _)| public == name)
+        .then(|| invalid(format!("{}.{name} is set by the database", table.name)))
+}
+
 fn column<'t>(table: &'t Table, name: &str) -> Result<Column<'t>, DataError> {
-    if name == PUBLIC_ID {
+    if let Some((public, sql)) = system(table).find(|(public, _)| *public == name) {
         return Ok(Column {
-            sql: ID,
-            public: PUBLIC_ID,
+            sql,
+            public,
             ty: Type::Int,
             optional: false,
-            label: format!("{}.{PUBLIC_ID}", table.name),
+            label: format!("{}.{public}", table.name),
         });
     }
     table
@@ -152,7 +168,8 @@ fn selected(column: &Column) -> String {
 
 /// Every field of `table`, `id` first.
 fn returning(table: &Table) -> String {
-    std::iter::once(format!("{} AS {}", quote(ID), quote(PUBLIC_ID)))
+    system(table)
+        .map(|(public, sql)| format!("{} AS {}", quote(sql), quote(public)))
         .chain(table.fields.iter().map(|f| quote(&f.name)))
         .collect::<Vec<_>>()
         .join(", ")
@@ -373,8 +390,8 @@ fn insert(table: &Table, rows: &[Value], params: &mut Vec<Param>) -> Result<Stri
         })
         .collect::<Result<Vec<_>, _>>()?;
     for object in &objects {
-        if object.contains_key(PUBLIC_ID) {
-            return Err(invalid(format!("{}.id is set by the database", table.name)));
+        if let Some(refused) = object.keys().find_map(|name| set_by_database(table, name)) {
+            return Err(refused);
         }
         for name in object.keys() {
             column(table, name)?;
@@ -450,8 +467,8 @@ fn assignments(
     values
         .iter()
         .map(|(name, value)| {
-            if name == PUBLIC_ID {
-                return Err(invalid(format!("{}.id is set by the database", table.name)));
+            if let Some(refused) = set_by_database(table, name) {
+                return Err(refused);
             }
             let c = column(table, name)?;
             let target = quote(c.sql);
