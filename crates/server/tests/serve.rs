@@ -245,8 +245,83 @@ fn the_warm_server_loads_the_app_under_the_projects_policy() {
         },
     });
     let error = started.err().expect("the app must not start");
-    assert!(error.contains("eval is disabled by the security policy"), "{error}");
+    assert!(error.contains("Code generation from strings disallowed"), "{error}");
+    assert!(error.contains(r#""allow": { "dynamic": true }"#), "says how to allow it: {error}");
 }
+
+fn start_denying_dynamic(files: &[(&str, &str)]) -> Result<(tempfile::TempDir, std::net::SocketAddr), String> {
+    let dir = tempfile::tempdir().expect("app dir");
+    for (path, text) in files {
+        std::fs::write(dir.path().join(path), text).expect("write");
+    }
+    let mut policy = security::security_policy::SecurityPolicy::default();
+    policy.deny.dynamic = true;
+    let server = server::start(ServerOptions {
+        addr: "127.0.0.1:0".parse().expect("addr"),
+        entry: dir.path().join("app.js"),
+        project_root: dir.path().to_path_buf(),
+        isolates: 1,
+        inbox_capacity: 8,
+        max_busy: None,
+        on_event: None,
+        security: pool::ExecutionSecurity {
+            policy_json: security::security_policy::policy_to_json(&policy).to_string(),
+            no_prompt: true,
+        },
+    })?;
+    let addr = server.addr;
+    std::mem::forget(server);
+    Ok((dir, addr))
+}
+
+/// `deny.dynamic` holds when code runs, not by scanning source (#33): code
+/// that never runs (a bundle's dead branch) doesn't keep the app from
+/// starting; `eval` (aliased too) and a computed `import()` are refused when
+/// they run; a fixed `import()` is part of the module graph and loads.
+#[test]
+fn dynamic_code_is_refused_when_it_runs() {
+    let (_dir, addr) = start_denying_dynamic(&[
+        (
+            "app.js",
+            r#"
+            import { base } from "./runtime.js";
+            function never() { return false; }
+            if (never()) { eval("1"); await import("./" + "never.js"); }
+            const attempt = async (f) => { try { return `ran: ${await f()}`; } catch (e) { return `${e.name}: ${e.message}`; } };
+            export default {
+              async fetch(request) {
+                switch (new URL(request.url).pathname) {
+                  case "/eval": { const indirect = eval; return new Response(await attempt(() => indirect("1 + 1"))); }
+                  case "/function": return new Response(await attempt(() => new Function("return 2")()));
+                  case "/computed": { const name = "other"; return new Response(await attempt(async () => (await import(`./${name}.js`)).value)); }
+                  case "/fixed": return new Response(await attempt(async () => (await import("./mod.js")).value));
+                  case "/graph": return new Response(await attempt(async () => (await import("./chunk.js")).total));
+                }
+                return new Response(`up ${base}`);
+              },
+            };
+            "#,
+        ),
+        ("mod.js", "export const value = 42;"),
+        ("other.js", "export const value = 7;"),
+        ("runtime.js", "export const base = 1;"),
+        // A chunk reached by import() that imports back from the app module,
+        // as a bundle's chunks import from its entry: deno_core then resolves
+        // the app module's own static imports as dynamic ones, and they must
+        // still load.
+        ("chunk.js", r#"import app from "./app.js"; import { value } from "./mod.js"; export { value as again } from "./mod.js"; export const total = app && value + 1;"#),
+    ])
+    .expect("an app whose dead branches hold dynamic code starts");
+    let get = |path: &str| client().get(format!("http://{addr}{path}")).send().expect("request").text().expect("body");
+    assert_eq!(get("/"), "up 1");
+    assert!(get("/eval").starts_with("EvalError: Code generation from strings disallowed"), "{}", get("/eval"));
+    assert!(get("/function").starts_with("EvalError: Code generation from strings disallowed"), "{}", get("/function"));
+    let computed = get("/computed");
+    assert!(computed.contains("Dynamic import of a computed specifier") && computed.contains("simien.json"), "{computed}");
+    assert_eq!(get("/fixed"), "ran: 42");
+    assert_eq!(get("/graph"), "ran: 43");
+}
+
 
 /// The warm server's isolates get the framework's carve-outs (Simien APS 2):
 /// `node:async_hooks` resolves, and `process` has only `platform` and a

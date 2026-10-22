@@ -4,7 +4,8 @@ pub mod handler_validator;
 
 pub use error_analysis::analyze_runtime_error;
 pub use handler_validator::{
-    PoolWorkers, ServeOptions, validate_dynamic_code, validate_dynamic_code_from_security_context,
+    PoolWorkers, ServeOptions, dynamic_allowed, dynamic_allowed_from_security_context, named_imports,
+    validate_dynamic_code, validate_dynamic_code_from_security_context,
 };
 
 pub fn format_runtime_syntax_error(
@@ -65,4 +66,26 @@ fn parse_number_prefix(value: &str) -> Option<usize> {
         return None;
     }
     digits.parse().ok()
+}
+
+/// Whether V8 may generate code from strings (`eval`, `new Function` and
+/// every alias of them) in `runtime`'s context: false when the policy denies
+/// dynamic code, so they're refused when they run (#33), not by scanning.
+pub fn allow_code_generation_from_strings(runtime: &mut simien_core::JsRuntime, allow: bool) {
+    let context = runtime.main_context();
+    simien_core::scope!(scope, runtime);
+    simien_core::v8::Local::new(scope, context).set_allow_generation_from_strings(allow);
+}
+
+/// V8's refusal of `eval` / `new Function` doesn't say why or how to allow
+/// it; this says both. Other errors are returned as they are.
+pub fn explain_code_generation_refusal(error: String) -> String {
+    if error.contains("Code generation from strings disallowed") {
+        format!(
+            "{error} (eval and new Function are disabled by the security policy; to allow them, \
+             set \"security\": {{ \"allow\": {{ \"dynamic\": true }} }} in simien.json)"
+        )
+    } else {
+        error
+    }
 }

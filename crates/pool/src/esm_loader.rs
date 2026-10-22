@@ -59,6 +59,8 @@ use transforms::{append_entry_footer, prepend_host_bindings, prepend_import_meta
 #[derive(Clone)]
 pub struct PhpxEsmLoader {
     project_root: PathBuf,
+    /// The fixed `import()` paths of each loaded JavaScript module (#33).
+    dynamic: Rc<RefCell<policy::DynamicImports>>,
     /// Explicit stdlib root for a stdlib-only tenant. This is intentionally
     /// distinct from `project_root`; ordinary projects pass their own root.
     module_root: Option<PathBuf>,
@@ -178,6 +180,7 @@ impl PhpxEsmLoader {
         let source_override = import_meta::resolve_source_override();
 
         let loader = Self {
+            dynamic: Rc::default(),
             project_root,
             module_root,
             dsc,
@@ -326,11 +329,13 @@ impl PhpxEsmLoader {
             .unwrap_or_else(|| path.display().to_string())
     }
 
-    /// A JavaScript or TypeScript module from disk, held to the resolved
-    /// `security.allow.dynamic` policy before it reaches V8.
+    /// A JavaScript or TypeScript module from disk, its fixed `import()`
+    /// paths noted for the `security.allow.dynamic` policy (#33).
     fn load_js_source(&self, path: &Path) -> Result<ModuleSourceCode, JsErrorBox> {
         let text = std::fs::read_to_string(path).map_err(|err| JsErrorBox::from_err(err))?;
-        policy::enforce_dynamic_policy_on(path, &text)?;
+        if let Ok(url) = ModuleSpecifier::from_file_path(path) {
+            self.dynamic.borrow_mut().note(url.as_str(), path, &text)?;
+        }
         Ok(ModuleSourceCode::String(text.into()))
     }
 
@@ -643,8 +648,12 @@ impl ModuleLoader for PhpxEsmLoader {
         &self,
         specifier: &str,
         referrer: &str,
-        _kind: ResolutionKind,
+        kind: ResolutionKind,
     ) -> Result<ModuleSpecifier, JsErrorBox> {
+        // The entry wrapper is the loader's own code, not the app's.
+        if matches!(kind, ResolutionKind::DynamicImport) && referrer != self.wrapper_specifier.as_str() {
+            self.dynamic.borrow_mut().check(specifier, referrer)?;
+        }
         self.resolve_path(specifier, referrer)
     }
 

@@ -87,6 +87,18 @@ impl WorkerThread {
             started_at: Instant::now(),
         };
 
+        // `security.deny.dynamic`: V8 refuses eval / new Function when they
+        // run (#33). Set for each request: an isolate may serve requests
+        // under different policies.
+        match crate::validation::dynamic_allowed_from_security_context() {
+            Ok(allowed) => crate::validation::allow_code_generation_from_strings(&mut isolate.runtime, allowed),
+            Err(err) => {
+                isolate.active_requests = 0;
+                isolate.state = IsolateState::Idle;
+                return (ExecutionOutcome::Err(err), ExecutionProfile::empty());
+            }
+        }
+
         // Bootstrap on first use (load Web APIs polyfills if needed)
         if !isolate.bootstrapped {
             let bootstrap_start = Instant::now();
@@ -1321,7 +1333,7 @@ impl WorkerThread {
                         isolate.active_requests = 0;
                         isolate.state = IsolateState::Idle;
                         return (
-                            ExecutionOutcome::Err(format!("Failed to load module: {}", err)),
+                            ExecutionOutcome::Err(crate::validation::explain_code_generation_refusal(format!("Failed to load module: {}", err))),
                             ExecutionProfile::empty(),
                         );
                     }
@@ -1335,7 +1347,7 @@ impl WorkerThread {
                     isolate.active_requests = 0;
                     isolate.state = IsolateState::Idle;
                     return (
-                        ExecutionOutcome::Err(format!("Module event loop failed: {}", err)),
+                        ExecutionOutcome::Err(crate::validation::explain_code_generation_refusal(format!("Module event loop failed: {}", err))),
                         ExecutionProfile::empty(),
                     );
                 }
@@ -1343,7 +1355,7 @@ impl WorkerThread {
                     isolate.active_requests = 0;
                     isolate.state = IsolateState::Idle;
                     return (
-                        ExecutionOutcome::Err(format!("Module evaluation failed: {}", err)),
+                        ExecutionOutcome::Err(crate::validation::explain_code_generation_refusal(format!("Module evaluation failed: {}", err))),
                         ExecutionProfile::empty(),
                     );
                 }
