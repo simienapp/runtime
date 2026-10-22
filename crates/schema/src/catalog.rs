@@ -5,7 +5,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::{EDGE_PREFIX, Edge, Field, ID, SOURCE, Schema, TARGET, Table, Type, invalid_name, reserved_field};
+use crate::model::{
+    CREATED_AT, EDGE_PREFIX, Edge, Field, ID, SOURCE, Schema, TARGET, Table, Type, UPDATED_AT, invalid_name,
+    reserved_field,
+};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,6 +57,9 @@ pub struct Unmanaged {
 pub struct Read {
     pub schema: Schema,
     pub unmanaged: Vec<Unmanaged>,
+    /// Simien tables that lack one of their timestamp columns: made before
+    /// Simien kept timestamps, or changed by hand.
+    pub unstamped: Vec<String>,
 }
 
 /// The Simien field type for a Postgres column type, as pg_zega maps them.
@@ -72,6 +78,7 @@ pub fn read(catalog: &Catalog) -> Read {
     let mut read = Read {
         schema: Schema::default(),
         unmanaged: Vec::new(),
+        unstamped: Vec::new(),
     };
     let mut tables: Vec<&CatalogTable> = catalog.tables.iter().collect();
     tables.sort_by(|a, b| a.name.cmp(&b.name));
@@ -80,7 +87,12 @@ pub fn read(catalog: &Catalog) -> Read {
             continue;
         }
         match node(table) {
-            Ok(node) => read.schema.tables.push(node),
+            Ok(node) => {
+                if node.stamps().iter().any(|stamp| !table.columns.iter().any(|c| c.name == *stamp)) {
+                    read.unstamped.push(node.name.clone());
+                }
+                read.schema.tables.push(node)
+            }
             Err(reason) => read.unmanaged.push(Unmanaged {
                 table: table.name.clone(),
                 reason,
@@ -140,7 +152,7 @@ fn node(table: &CatalogTable) -> Result<Table, String> {
     }
     Ok(Table {
         name: table.name.clone(),
-        fields: fields(table, &[ID], false)?,
+        fields: fields(table, &[ID, CREATED_AT, UPDATED_AT], false)?,
     })
 }
 

@@ -104,7 +104,7 @@ fn every_sync_rule_holds_on_real_data() {
   wrote: defineEdge("users", "posts"),"#);
     let stopped = blocked(schema_sync::sync_once(project, &mut db));
     assert!(stopped[0].contains("users.email still holds data"), "{stopped:?}");
-    assert_eq!(columns(&mut sql, "users"), ["_id", "name", "email"]);
+    assert_eq!(columns(&mut sql, "users"), ["_id", "name", "email", "created_at", "updated_at"]);
 
     // A rename warns, applies at once, and Zega carries the data under the new name.
     write_schema(project, r#"  users: defineTable({ name: v.string(), contact: v.optional(v.string()) }),
@@ -123,7 +123,7 @@ fn every_sync_rule_holds_on_real_data() {
   posts: defineTable({ title: v.string() }),
   wrote: defineEdge("users", "posts"),"#);
     assert_eq!(schema_sync::sync_once(project, &mut db).unwrap().changes, ["remove users.contact"]);
-    assert_eq!(columns(&mut sql, "users"), ["_id", "name"]);
+    assert_eq!(columns(&mut sql, "users"), ["_id", "name", "created_at", "updated_at"]);
     // pg_zega 0.1 leaves a value in Zega when Postgres sets it to NULL; the reload clears it.
     assert!(node(&graph(&mut sql), "users").get("contact").is_none());
 
@@ -133,7 +133,7 @@ fn every_sync_rule_holds_on_real_data() {
   wrote: defineEdge("users", "posts"),"#);
     let stopped = blocked(schema_sync::sync_once(project, &mut db));
     assert!(stopped[0].contains("v.optional(...) first"), "{stopped:?}");
-    assert_eq!(columns(&mut sql, "users"), ["_id", "name"]);
+    assert_eq!(columns(&mut sql, "users"), ["_id", "name", "created_at", "updated_at"]);
 
     // A table rename keeps rows and edges, and Zega relabels them.
     let articles = r#"  users: defineTable({ name: v.string() }),
@@ -165,9 +165,56 @@ fn every_sync_rule_holds_on_real_data() {
     assert!(schema_sync::pull_from_database(project, &mut db).unwrap().is_some());
     let text = std::fs::read_to_string(project.schema_file()).unwrap();
     assert!(text.contains("views: v.optional(v.int())"), "{text}");
+    // Timestamps are the database's, never fields in schema.ts.
+    assert!(!text.contains("created_at") && !text.contains("updated_at"), "{text}");
     // The sync's own DDL is not reported back.
     schema_sync::sync_once(project, &mut db).unwrap();
     write_schema(project, articles);
     schema_sync::sync_once(project, &mut db).unwrap();
     assert_eq!(listener.next(Duration::from_secs(2)).unwrap(), None);
+
+    // Every table carries createdAt/updatedAt (milliseconds, UTC), in Postgres and in Zega.
+    let stamps = |sql: &mut Client, table: &str| -> (i64, i64) {
+        let row = sql.query_one(&format!("select created_at, updated_at from {table} order by _id limit 1"), &[]).unwrap();
+        (row.get(0), row.get(1))
+    };
+    let (created, updated) = stamps(&mut sql, "users");
+    let wall = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    assert!(created > wall - 600_000 && created <= wall, "created_at {created}, now {wall}");
+    assert_eq!(node(&graph(&mut sql), "users")["created_at"], created);
+    // An update made anywhere, even by hand, moves updated_at and leaves created_at.
+    std::thread::sleep(Duration::from_millis(20));
+    sql.batch_execute("update users set name = 'Nia B'").unwrap();
+    let (created_after, updated_after) = stamps(&mut sql, "users");
+    assert_eq!(created_after, created);
+    assert!(updated_after > updated, "{updated_after} > {updated}");
+    assert_eq!(node(&graph(&mut sql), "users")["updated_at"], updated_after);
+
+    // A Simien table made before timestamps gets them; its rows get the migration's time.
+    // pg_zega before 7ffabd2 crashed the backend here: a CREATE TABLE after a
+    // write to a tracked table on the same connection.
+    sql.batch_execute("create table legacy (_id bigint generated always as identity primary key, note text)").unwrap();
+    sql.batch_execute("select zega.track('legacy')").unwrap();
+    sql.batch_execute("insert into legacy (note) values ('old')").unwrap();
+    let with_legacy = format!("{articles}\n  legacy: defineTable({{ note: v.optional(v.string()) }}),");
+    write_schema(project, &with_legacy);
+    let stamped = schema_sync::sync_once(project, &mut db).unwrap();
+    assert_eq!(stamped.changes, ["add timestamps to legacy"]);
+    assert_eq!(columns(&mut sql, "legacy"), ["_id", "note", "created_at", "updated_at"]);
+    let (legacy_created, _) = stamps(&mut sql, "legacy");
+    assert!(legacy_created >= wall, "{legacy_created}");
+    assert_eq!(node(&graph(&mut sql), "legacy")["created_at"], legacy_created);
+    assert_eq!(schema_sync::sync_once(project, &mut db).unwrap().changes, Vec::<String>::new());
+
+    // A log_ table keeps only created_at and stays out of Zega.
+    write_schema(project, &format!("{with_legacy}\n  log_events: defineTable({{ kind: v.string() }}),"));
+    assert_eq!(schema_sync::sync_once(project, &mut db).unwrap().changes, ["add table log_events"]);
+    assert_eq!(columns(&mut sql, "log_events"), ["_id", "kind", "created_at"]);
+    sql.batch_execute("insert into log_events (kind) values ('signed_in')").unwrap();
+    let now = graph(&mut sql);
+    assert!(
+        !now["nodes"].as_array().unwrap().iter().any(|n| n["labels"][0] == "log_events"),
+        "a log table reached Zega: {now}"
+    );
+    assert_eq!(schema_sync::sync_once(project, &mut db).unwrap().changes, Vec::<String>::new());
 }

@@ -88,6 +88,12 @@ export default defineSchema({
     assert_eq!(first["id"], 1);
     assert_eq!(first["title"], "Hello");
     assert_eq!(first["score"], Value::Null);
+    // The database stamps the row; both stamps start equal.
+    let created = first["createdAt"]
+        .as_i64()
+        .expect("createdAt is milliseconds");
+    assert!(created > 1_700_000_000_000, "{created}");
+    assert_eq!(first["updatedAt"], created);
 
     // A list inserts each row.
     let more = run(
@@ -125,6 +131,10 @@ export default defineSchema({
         (
             json!({ "id": 99, "title": "x", "published": true, "views": 1 }),
             "posts.id is set by the database",
+        ),
+        (
+            json!({ "title": "x", "published": true, "views": 1, "createdAt": 0 }),
+            "posts.createdAt is set by the database",
         ),
     ];
     for (values, why) in refused {
@@ -261,6 +271,19 @@ export default defineSchema({
     )
     .unwrap();
     assert_eq!(hello["views"], 26);
+    // Updates move updatedAt and never createdAt.
+    assert_eq!(hello["createdAt"], created);
+    assert!(hello["updatedAt"].as_i64().unwrap() >= created);
+    let message = invalid(run(
+        &mut db,
+        &schema,
+        json!({ "op": "update", "table": "posts",
+        "where": { "id": 1 }, "values": { "updatedAt": 0 } }),
+    ));
+    assert!(
+        message.starts_with("posts.updatedAt is set by the database"),
+        "{message}"
+    );
 
     // Writes reach Zega in the same transaction.
     let graph: String = db

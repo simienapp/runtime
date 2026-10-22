@@ -82,6 +82,14 @@ pub struct Schema {
 pub const ID: &str = "_id";
 /// The Postgres prefix pg_zega reads as a relationship.
 pub const EDGE_PREFIX: &str = "ze_";
+/// A table whose name starts with this is a log (APS 5): it isn't synced to
+/// Zega and has no `updated_at`, since its rows are only appended.
+pub const LOG_PREFIX: &str = "log_";
+/// Set by the database on every table (APS 4): milliseconds since 1970, UTC,
+/// as a `bigint`, because pg_zega and Zega carry no timestamp type.
+pub const CREATED_AT: &str = "created_at";
+/// Set by the database on every change of a row; not on log tables.
+pub const UPDATED_AT: &str = "updated_at";
 /// The edge columns that point at the two endpoints.
 pub const SOURCE: &str = "source";
 pub const TARGET: &str = "target";
@@ -89,6 +97,21 @@ pub const TARGET: &str = "target";
 impl Edge {
     pub fn table(&self) -> String {
         format!("{EDGE_PREFIX}{}", self.name)
+    }
+}
+
+impl Table {
+    pub fn is_log(&self) -> bool {
+        self.name.starts_with(LOG_PREFIX)
+    }
+
+    /// The timestamp columns the database keeps on this table.
+    pub fn stamps(&self) -> &'static [&'static str] {
+        if self.is_log() {
+            &[CREATED_AT]
+        } else {
+            &[CREATED_AT, UPDATED_AT]
+        }
     }
 }
 
@@ -121,5 +144,8 @@ pub fn invalid_name(name: &str) -> Option<&'static str> {
 
 /// Field names pg_zega or Simien already use.
 pub fn reserved_field(name: &str, edge: bool) -> bool {
-    name == "id" || (edge && (name == SOURCE || name == TARGET))
+    name == "id"
+        || name == CREATED_AT
+        || name == UPDATED_AT
+        || (edge && (name == SOURCE || name == TARGET))
 }
