@@ -70,9 +70,17 @@ impl FetchPermissions for RuntimeNetPolicy {
     }
 }
 
+/// `Simien.version`: this build's version, the one `s --version` prints.
+#[simien_core::op2]
+#[string]
+fn op_simien_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
 simien_core::extension!(
     simien_globals,
     deps = [simien_webidl, simien_web, simien_fetch, simien_crypto],
+    ops = [op_simien_version],
     esm_entry_point = "ext:simien_globals/globals.js",
     esm = [dir "js", "globals.js"],
     options = { fetch_permissions: PermissionsContainer },
