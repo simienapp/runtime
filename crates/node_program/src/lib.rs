@@ -1,40 +1,53 @@
-//! `simien __node-program --project <dir> <script> [args]`: what Simien runs
+//! `simien __node-program --project <dir> [rules] <script> [args]`: what Simien runs
 //! a Node program with (APS 2). `simien x` and `simien dev` start it inside
 //! the program's sandbox (APS 3) for a package granted `dangerouslyUseNode`;
 //! it checks that grant again itself, so running it by hand grants nothing.
 //!
-//! The isolate is the web APIs (fetch allowed: the sandbox decides the
-//! network) plus Simien's Node layer, and Node's module resolution from the
-//! program's node_modules. In-process, the policy allows everything: the
-//! sandbox around the process is what confines it.
+//! The isolate is the web APIs plus Simien's Node layer, and Node's module
+//! resolution from the program's node_modules. `[rules]` are the sandbox's
+//! (`packages::sandbox::Rules`, passed by the runner): Simien's checks in the
+//! program, fetch() included, answer as the sandbox does ([`policy`]).
+
+pub mod policy;
 
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::Arc;
 
 use anyhow::{Context as _, bail};
 use simien_core::{JsRuntime, ModuleSpecifier, RuntimeOptions};
 use simien_node_runtime::BootstrapOptions;
 use simien_node_runtime::loader::NodeProgram;
+use packages::sandbox::Rules;
 use simien_permissions::PermissionsContainer;
 
 /// What the command was given.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Invocation {
     pub project: PathBuf,
+    /// What the program's sandbox allows; none given, nothing beyond reads.
+    pub rules: Rules,
     pub script: PathBuf,
     pub args: Vec<String>,
 }
 
 impl Invocation {
-    /// `--project <dir> <script> [args]`.
+    /// `--project <dir> [--write <dir>]… [--deny <path>]… [--network] <script> [args]`.
     pub fn parse(mut argv: impl Iterator<Item = String>) -> anyhow::Result<Self> {
         if argv.next().as_deref() != Some("--project") {
-            bail!("usage: __node-program --project <dir> <script> [args]");
+            bail!("usage: __node-program --project <dir> [rules] <script> [args]");
         }
         let project = argv.next().context("--project needs a folder")?;
-        let script = argv.next().context("no program to run")?;
+        let mut rules = Rules::default();
+        let script = loop {
+            let arg = argv.next().context("no program to run")?;
+            if !rules.take_arg(&arg, &mut argv)? {
+                break arg;
+            }
+        };
         Ok(Self {
             project: PathBuf::from(project),
+            rules,
             script: PathBuf::from(script),
             args: argv.collect(),
         })
@@ -74,8 +87,9 @@ fn modules_root(package_dir: &Path) -> PathBuf {
 
 simien_core::extension!(
     simien_node_program,
-    state = |state| {
-        state.put(PermissionsContainer::allow_all());
+    options = { permissions: PermissionsContainer },
+    state = |state, options| {
+        state.put(options.permissions);
     },
 );
 
@@ -93,8 +107,9 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
     let program = NodeProgram::new(&modules_root(&package_dir));
     let exit_code = simien_os::ExitCode::default();
 
-    let mut extensions = vec![simien_node_program::init()];
-    extensions.extend(web_host::web(simien_fetch::PermissionsContainer::allow_all()));
+    let policy = Arc::new(policy::SandboxPolicy::new(&invocation.rules));
+    let mut extensions = vec![simien_node_program::init(PermissionsContainer::new(policy.clone()))];
+    extensions.extend(web_host::web(simien_fetch::PermissionsContainer::new(policy)));
     extensions.extend(simien_node_runtime::extensions(
         Some(&program),
         main.clone(),
@@ -132,11 +147,21 @@ mod tests {
             Invocation::parse(argv.into_iter()).unwrap(),
             Invocation {
                 project: "/p".into(),
+                rules: Rules::default(),
                 script: "bin/vite.js".into(),
                 args: vec!["dev".into(), "--port".into(), "3000".into()],
             }
         );
         assert!(Invocation::parse(["bin/vite.js".to_string()].into_iter()).is_err());
+        let argv = ["--project", "/p", "--write", "/p", "--deny", "/h/.ssh", "--network", "cli.js", "--write"]
+            .map(String::from);
+        let invocation = Invocation::parse(argv.into_iter()).unwrap();
+        assert_eq!(
+            invocation.rules,
+            Rules { writable: vec!["/p".into()], denied: vec!["/h/.ssh".into()], network: true }
+        );
+        assert_eq!(invocation.script, PathBuf::from("cli.js"));
+        assert_eq!(invocation.args, vec!["--write".to_string()], "the program's own args are left alone");
     }
 
     #[test]

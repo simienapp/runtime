@@ -60,3 +60,69 @@ fn a_granted_node_program_sees_simien_and_no_deno() {
         })
     );
 }
+
+#[cfg(unix)]
+/// `simien x` runs a granted program in its sandbox, and Simien's own checks
+/// in the program answer as the sandbox does: the project is writable,
+/// elsewhere isn't, with Simien's error rather than the system's EPERM.
+#[test]
+fn a_node_program_writes_only_where_its_sandbox_does() {
+    let project = tempfile::tempdir().expect("project");
+    let home = tempfile::tempdir().expect("fake home");
+    fs::write(
+        project.path().join("simien.json"),
+        r#"{ "packagePermissions": { "probe": { "dangerouslyUseNode": true } } }"#,
+    )
+    .expect("simien.json");
+    let package = project.path().join("node_modules/probe");
+    fs::create_dir_all(&package).expect("package dir");
+    fs::write(
+        package.join("package.json"),
+        r#"{ "name": "probe", "version": "1.0.0", "bin": "cli.js" }"#,
+    )
+    .expect("package.json");
+    fs::write(
+        package.join("cli.js"),
+        r#"#!/usr/bin/env node
+        const fs = require("node:fs");
+        const path = require("node:path");
+        const attempt = (file) => {
+          try { fs.writeFileSync(file, "x"); return "ok"; }
+          catch (e) { return `${e.name}: ${e.message}`; }
+        };
+        console.log(JSON.stringify({
+          project: attempt(path.join(process.cwd(), "inside.txt")),
+          home: attempt(path.join(process.env.HOME, "outside.txt")),
+        }));
+        "#,
+    )
+    .expect("cli.js");
+    // Where an install puts the program.
+    let bin = project.path().join("node_modules/.bin");
+    fs::create_dir_all(&bin).expect(".bin");
+    std::os::unix::fs::symlink("../probe/cli.js", bin.join("probe")).expect("link");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_simien"))
+        .args(["x", "probe"])
+        .current_dir(project.path())
+        .env("HOME", home.path())
+        .output()
+        .expect("run simien x");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "exit {:?}\nstdout: {stdout}\nstderr: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let line = stdout.lines().find(|line| line.starts_with('{')).expect("the program's JSON line");
+    let seen: serde_json::Value = serde_json::from_str(line).expect("JSON");
+    assert_eq!(seen["project"], "ok", "{seen}");
+    let home_write = seen["home"].as_str().expect("a string");
+    assert!(
+        home_write.starts_with("NotCapable: Requires write access") && home_write.contains("it writes only"),
+        "{home_write}"
+    );
+    assert!(project.path().join("inside.txt").exists());
+    assert!(!home.path().join("outside.txt").exists());
+}
