@@ -218,6 +218,8 @@ pub fn create(spec: &str, folder: &Path) -> anyhow::Result<Created> {
     let name = app_name(&folder);
     rename(&folder.join("package.json"), &name)?;
     rename(&folder.join("simien.json"), &name)?;
+    // A template's database ports are every copy's; this one gets free ones.
+    project::db::free_template_ports(&folder).map_err(anyhow::Error::msg)?;
     Ok(Created { folder, name, template })
 }
 

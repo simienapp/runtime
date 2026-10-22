@@ -5347,6 +5347,7 @@ dependencies = [
  "gelada",
  "libc",
  "output",
+ "project",
  "reqwest",
  "serde",
  "serde_json",

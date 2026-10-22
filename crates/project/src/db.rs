@@ -14,8 +14,59 @@ use crate::{CONFIG, write_schema_types};
 /// The schema a new database starts with.
 pub const STARTER: &str = include_str!("starter.ts");
 
-/// Postgres's port when none is given; Zega uses the next one.
+/// Where the search for Postgres's port starts when none is given; Zega
+/// uses the next one.
 pub const DEFAULT_PORT: u16 = 54330;
+
+/// The first pair from `start`, stepping by two (Postgres on the first port,
+/// Zega on the next), that nothing on this machine is using, so two
+/// projects' stacks can run at once. A running stack holds its ports, so it
+/// counts; a stopped one doesn't, and its project may pick the same pair.
+pub fn free_ports(start: u16) -> Result<u16, String> {
+    let mut base = start;
+    while base < u16::MAX {
+        if free(base) && free(base + 1) {
+            return Ok(base);
+        }
+        base = base.saturating_add(2);
+    }
+    Err(format!("no two free ports from {start} up; pass --port"))
+}
+
+/// Nothing answers on it and it can be bound on every interface (Docker's
+/// forwarded ports listen on one or the other).
+fn free(port: u16) -> bool {
+    use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
+    let local = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
+    TcpStream::connect_timeout(&local, std::time::Duration::from_millis(200)).is_err()
+        && TcpListener::bind((Ipv4Addr::UNSPECIFIED, port)).is_ok()
+}
+
+/// A project made from a template keeps the template's `db` section, ports
+/// included: they move to the first free pair from the template's. The new
+/// Postgres port when they moved.
+pub fn free_template_ports(root: &Path) -> Result<Option<u16>, String> {
+    let config = root.join(CONFIG);
+    let Ok(text) = std::fs::read_to_string(&config) else {
+        return Ok(None);
+    };
+    let mut settings: Value = serde_json::from_str(&text).map_err(|err| format!("{}: {err}", config.display()))?;
+    let Some(ports) = settings.pointer_mut("/db/ports").and_then(Value::as_object_mut) else {
+        return Ok(None);
+    };
+    let Some(postgres) = ports.get("postgres").and_then(Value::as_u64).and_then(|port| u16::try_from(port).ok()) else {
+        return Ok(None);
+    };
+    let base = free_ports(postgres)?;
+    if base == postgres && ports.get("zega").and_then(Value::as_u64) == Some(u64::from(postgres) + 1) {
+        return Ok(None);
+    }
+    ports.insert("postgres".into(), json!(base));
+    ports.insert("zega".into(), json!(base + 1));
+    let text = serde_json::to_string_pretty(&settings).expect("json");
+    std::fs::write(&config, format!("{text}\n")).map_err(|err| format!("{}: {err}", config.display()))?;
+    Ok(Some(base))
+}
 
 const DB: CommandSpec = CommandSpec {
     owner: "project",
@@ -40,7 +91,7 @@ pub fn register(registry: &mut Registry) {
     });
     registry.add_param(ParamSpec {
         name: "--port",
-        description: "db init: Postgres port; Zega uses the next one (default 54330)",
+        description: "db init: Postgres port; Zega uses the next one (default: the first free pair from 54330)",
     });
     registry.add_flag(FlagSpec {
         name: "--force",
@@ -72,7 +123,7 @@ pub fn make(root: &Path, name: Option<&str>, port: Option<&str>, force: bool) ->
         return Err(format!("{CONFIG} already has a db section (use --force to replace it)"));
     }
     let base = match port {
-        None => DEFAULT_PORT,
+        None => free_ports(DEFAULT_PORT)?,
         Some(text) => text
             .parse::<u16>()
             .ok()
