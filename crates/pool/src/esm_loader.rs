@@ -37,6 +37,7 @@ use permissions::host_bridge::{self, GrantTable};
 
 mod grants;
 mod graph_hash;
+mod packages;
 mod import_meta;
 pub mod import_meta_ops;
 mod policy;
@@ -59,6 +60,8 @@ use transforms::{append_entry_footer, prepend_host_bindings, prepend_import_meta
 #[derive(Clone)]
 pub struct PhpxEsmLoader {
     project_root: PathBuf,
+    /// Bare imports from the project's node_modules, by Node's package rules.
+    packages: packages::PackageResolver,
     /// Explicit stdlib root for a stdlib-only tenant. This is intentionally
     /// distinct from `project_root`; ordinary projects pass their own root.
     module_root: Option<PathBuf>,
@@ -178,6 +181,7 @@ impl PhpxEsmLoader {
         let source_override = import_meta::resolve_source_override();
 
         let loader = Self {
+            packages: packages::PackageResolver::new(&project_root),
             project_root,
             module_root,
             dsc,
@@ -410,18 +414,26 @@ impl PhpxEsmLoader {
                 return ModuleSpecifier::from_file_path(path)
                     .map_err(|_| JsErrorBox::generic("invalid module path"));
             }
-            let message = if specifier.starts_with("deka:dev/") {
-                format!(
-                    "build value '{}' has not been materialized; run deka build",
-                    specifier
-                )
-            } else {
-                format!(
-                    "unable to resolve module '{}'; check {MODULES_DIR}",
-                    specifier
-                )
-            };
-            return Err(JsErrorBox::generic(message));
+            if specifier.starts_with("deka:dev/") {
+                return Err(JsErrorBox::generic(format!(
+                    "build value '{specifier}' has not been materialized; run deka build"
+                )));
+            }
+            // `import "fs"`: Node's module by its bare name, which the
+            // carve-outs allow or refuse as `node:fs`.
+            if simien_node_resolver::IsBuiltInNodeModuleChecker::is_builtin_node_module(
+                &simien_node_resolver::DenoIsBuiltInNodeModuleChecker,
+                specifier,
+            ) {
+                return self.resolve_path(&format!("node:{specifier}"), referrer);
+            }
+            return self.packages.resolve(specifier, referrer).map_err(|err| {
+                JsErrorBox::generic(format!(
+                    "can't import '{specifier}': {}. Packages come from node_modules; add it with `simien add {}`",
+                    err.trim_end_matches('.'),
+                    package_name(specifier)
+                ))
+            });
         }
 
         if specifier.to_ascii_lowercase().ends_with(".phpx") {
@@ -684,6 +696,16 @@ impl ModuleLoader for PhpxEsmLoader {
                 .insert(spec.to_string(), source.code);
             Ok(())
         })
+    }
+}
+
+/// The package a bare specifier names: `@scope/pkg/sub` → `@scope/pkg`,
+/// `pkg/sub` → `pkg`.
+fn package_name(specifier: &str) -> &str {
+    let parts = if specifier.starts_with('@') { 2 } else { 1 };
+    match specifier.match_indices('/').nth(parts - 1) {
+        Some((at, _)) => &specifier[..at],
+        None => specifier,
     }
 }
 
@@ -969,9 +991,12 @@ mod tests {
             .expect_err("unresolved specifier");
         let message = err.to_string();
         assert!(
-            message.contains(MODULES_DIR),
-            "unresolved specifier must name {MODULES_DIR}: {message}"
+            message.contains("node_modules") && message.contains("simien add missing-pkg"),
+            "an unresolved package says where packages come from and how to add it: {message}"
         );
+        assert_eq!(super::package_name("@scope/pkg/sub/x"), "@scope/pkg");
+        assert_eq!(super::package_name("pkg/sub"), "pkg");
+        assert_eq!(super::package_name("pkg"), "pkg");
         assert!(
             !message.contains("php_modules"),
             "unresolved specifier must not name php_modules: {message}"
