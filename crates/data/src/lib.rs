@@ -4,6 +4,7 @@
 //! reach Zega through pg_zega inside the same transaction.
 
 mod compile;
+pub mod modules;
 mod param;
 pub mod query;
 

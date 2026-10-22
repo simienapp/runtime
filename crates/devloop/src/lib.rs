@@ -13,6 +13,8 @@
 //! Nothing here exits on an error: it is reported and the loop waits for the
 //! next change, so fixing schema.ts or starting Docker is enough.
 
+pub mod service;
+
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -107,6 +109,8 @@ struct Running {
     ports: (u16, u16),
     db: postgres::Client,
     listening: Arc<AtomicBool>,
+    /// Stops with the stack: new ports or no db section end it.
+    _data: service::DataService,
 }
 
 impl Drop for Running {
@@ -232,7 +236,9 @@ fn bring_up(project: &Project, ports: (u16, u16), tx: &Sender<Change>, on_event:
         "postgres": format!("postgres://postgres@127.0.0.1:{}/postgres", ports.0),
         "zega": format!("http://127.0.0.1:{}", ports.1),
     }));
-    Ok(Running { ports, db, listening })
+    let data = service::start(project, url)?;
+    on_event(json!({ "event": "data", "url": data.endpoint, "file": format!(".simien/{}", service::FILE) }));
+    Ok(Running { ports, db, listening, _data: data })
 }
 
 fn report(outcome: Result<Synced, SyncError>, project: &Project, on_event: &dyn Fn(Value)) {

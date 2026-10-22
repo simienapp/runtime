@@ -55,7 +55,7 @@ fn queries_and_writes_hold_on_real_data() {
     let project = &stack.0;
     std::fs::write(
         project.schema_file(),
-        r#"import { defineSchema, defineTable, v } from "@simien/client/schema"
+        r#"import { defineSchema, defineTable, v } from "simien:schema"
 
 export default defineSchema({
   posts: defineTable({

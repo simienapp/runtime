@@ -25,7 +25,7 @@ fn makes_a_project_with_a_database_that_opens() {
     assert_eq!(config["db"]["ports"]["postgres"], DEFAULT_PORT);
     assert_eq!(std::fs::read_to_string(project.schema_file()).unwrap(), STARTER);
     assert_eq!(
-        std::fs::read_to_string(project.generated_dir().join("schema.d.ts")).unwrap(),
+        std::fs::read_to_string(project.generated_dir().join("simien.d.ts")).unwrap(),
         SCHEMA_TYPES
     );
     assert_eq!(std::fs::read_to_string(root.join(".gitignore")).unwrap(), ".simien\n");

@@ -5,7 +5,7 @@
 
 use crate::model::{Field, ID, SOURCE, Schema, TARGET, Type};
 
-pub const IMPORT: &str = "@simien/client/schema";
+pub const IMPORT: &str = "simien:schema";
 
 fn validator(field: &Field) -> String {
     if field.optional {

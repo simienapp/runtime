@@ -104,7 +104,8 @@ impl Project {
     }
 }
 
-fn random_hex(bytes: usize) -> Result<String, String> {
+/// `bytes` random bytes as hex, for secrets and tokens.
+pub fn random_hex(bytes: usize) -> Result<String, String> {
     use std::io::Read;
     let mut buf = vec![0u8; bytes];
     std::fs::File::open("/dev/urandom")
@@ -145,15 +146,17 @@ pub fn write_private(file: &Path, text: &str) -> Result<(), String> {
     std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))
 }
 
-/// Types for `simien/schema.ts`'s import of "@simien/client/schema", so a
-/// project type-checks before @simien/client is installed. They describe
-/// exactly the schema language the schema engine reads.
-pub const SCHEMA_TYPES: &str = include_str!("schema.d.ts");
+/// Types for "simien:schema" (schema.ts's import) and "simien:db" (the data
+/// API), so a project type-checks with nothing installed. Row types are
+/// inferred from schema.ts, so this file is the same for every project.
+pub const SCHEMA_TYPES: &str = include_str!("simien.d.ts");
 
-/// Writes `simien/_generated/schema.d.ts` if its text changed; returns
-/// whether it did.
+/// Writes `simien/_generated/simien.d.ts` if its text changed, and removes the
+/// `schema.d.ts` it replaces; returns whether anything changed.
 pub fn write_schema_types(generated_dir: &Path) -> Result<bool, String> {
-    write_if_changed(&generated_dir.join("schema.d.ts"), SCHEMA_TYPES)
+    let replaced = generated_dir.join("schema.d.ts");
+    let removed = replaced.exists() && std::fs::remove_file(&replaced).is_ok();
+    Ok(write_if_changed(&generated_dir.join("simien.d.ts"), SCHEMA_TYPES)? || removed)
 }
 
 /// Writes `text` to `file` unless it already holds exactly that.

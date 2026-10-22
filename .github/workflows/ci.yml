@@ -83,4 +83,6 @@ jobs:
         run: cargo test --locked -p devloop --test devloop
       - name: The data API's query engine on real data
         run: cargo test --locked -p data --test engine
+      - name: The dev data service, driven by the real client on Bun
+        run: cargo test --locked -p devloop --test service
       - run: sccache --show-stats

@@ -7,9 +7,12 @@ publish = false
 
 [dependencies]
 container = { path = "../container" }
+data = { path = "../data" }
+httparse = "1.10"
 notify = { workspace = true }
 postgres = "0.19"
 project = { path = "../project" }
+schema = { path = "../schema" }
 schema_sync = { path = "../schema_sync" }
 serde_json = "1.0"
 
