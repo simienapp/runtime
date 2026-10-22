@@ -121,6 +121,63 @@ impl Prepared {
     }
 }
 
+/// What a sandbox allows, as a Node program run inside it hears it: the
+/// sandbox confines the process, and Simien's own checks in the program
+/// (`fs`, `net`, `fetch`) answer the same way, with a clear error instead of
+/// a bare EPERM. Passed to `__node-program` as arguments by the one function
+/// that reads them back, so the two can't drift.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Rules {
+    /// Writable folders, the sandbox's temporary folder included.
+    pub writable: Vec<PathBuf>,
+    /// Never readable or writable: the secrets the sandbox denies.
+    pub denied: Vec<PathBuf>,
+    pub network: bool,
+}
+
+impl Rules {
+    pub fn of(sandbox: &Sandbox) -> Self {
+        Self {
+            writable: sandbox.writable(),
+            denied: sandbox.denied().to_vec(),
+            network: sandbox.has_network(),
+        }
+    }
+
+    /// `--write <dir>`… `--deny <path>`… `[--network]`.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = Vec::new();
+        for dir in &self.writable {
+            args.push("--write".to_string());
+            args.push(dir.display().to_string());
+        }
+        for path in &self.denied {
+            args.push("--deny".to_string());
+            args.push(path.display().to_string());
+        }
+        if self.network {
+            args.push("--network".to_string());
+        }
+        args
+    }
+
+    /// Takes one of [`Rules::to_args`]'s flags from `argv`; false when `flag`
+    /// isn't one of them.
+    pub fn take_arg(
+        &mut self,
+        flag: &str,
+        argv: &mut impl Iterator<Item = String>,
+    ) -> anyhow::Result<bool> {
+        match flag {
+            "--write" => self.writable.push(argv.next().context("--write needs a folder")?.into()),
+            "--deny" => self.denied.push(argv.next().context("--deny needs a path")?.into()),
+            "--network" => self.network = true,
+            _ => return Ok(false),
+        }
+        Ok(true)
+    }
+}
+
 /// The package's own request: its package.json `permissions`, if any.
 pub fn declared(package_dir: &Path) -> anyhow::Result<Option<Grant>> {
     let path = package_dir.join("package.json");
@@ -420,6 +477,23 @@ mod tests {
         let puppeteer = preapproved("puppeteer").unwrap();
         assert!(puppeteer.install.unwrap().write.contains(&"$CACHE/puppeteer".to_string()));
         assert!(preapproved("left-pad").is_none());
+    }
+
+    #[test]
+    fn rules_go_to_the_node_program_and_back_unchanged() {
+        let rules = Rules {
+            writable: vec!["/p".into(), "/tmp/sandbox x".into()],
+            denied: vec!["/home/u/.ssh".into()],
+            network: true,
+        };
+        let mut argv = rules.to_args().into_iter();
+        let mut back = Rules::default();
+        while let Some(flag) = argv.next() {
+            assert!(back.take_arg(&flag, &mut argv).unwrap(), "{flag}");
+        }
+        assert_eq!(back, rules);
+        assert!(!Rules::default().take_arg("cli.js", &mut std::iter::empty()).unwrap());
+        assert!(Rules::default().take_arg("--write", &mut std::iter::empty()).is_err());
     }
 
     #[test]

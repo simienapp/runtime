@@ -74,7 +74,11 @@ impl Program {
         let mut command = match &self.runner {
             Some(runner) => {
                 let mut command = sandbox.command(&runner.program)?;
-                command.args(&runner.args).arg(&self.path);
+                // The program's own checks answer as the sandbox does.
+                command
+                    .args(&runner.args)
+                    .args(crate::sandbox::Rules::of(sandbox).to_args())
+                    .arg(&self.path);
                 command
             }
             None => sandbox.command(&self.path)?,
