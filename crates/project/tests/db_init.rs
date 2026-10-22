@@ -1,7 +1,7 @@
 //! `simien db init`: simien.json's db section (the source of truth for whether
 //! a project has a database), a starter schema, and what it refuses.
 
-use project::db::{DEFAULT_PORT, Made, STARTER, make};
+use project::db::{DEFAULT_PORT, STARTER, free_ports, free_template_ports, make};
 use project::{Project, SCHEMA_TYPES};
 
 fn folder(name: &str) -> (tempfile::TempDir, std::path::PathBuf) {
@@ -15,14 +15,15 @@ fn folder(name: &str) -> (tempfile::TempDir, std::path::PathBuf) {
 fn makes_a_project_with_a_database_that_opens() {
     let (_dir, root) = folder("My Shop!");
     let made = make(&root, None, None, false).unwrap();
-    assert_eq!(made, Made { name: "my-shop-".into(), postgres: DEFAULT_PORT, zega: DEFAULT_PORT + 1 });
+    assert_eq!(made.name, "my-shop-");
+    assert!(made.postgres >= DEFAULT_PORT && made.zega == made.postgres + 1, "{made:?}");
 
     let project = Project::find(&root).unwrap();
     assert_eq!(project.name, "my-shop-");
-    assert_eq!(project.ports().unwrap().zega, DEFAULT_PORT + 1);
+    assert_eq!(project.ports().unwrap().zega, made.zega);
     let config: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(root.join("simien.json")).unwrap()).unwrap();
-    assert_eq!(config["db"]["ports"]["postgres"], DEFAULT_PORT);
+    assert_eq!(config["db"]["ports"]["postgres"], made.postgres);
     assert_eq!(std::fs::read_to_string(project.schema_file()).unwrap(), STARTER);
     assert_eq!(
         std::fs::read_to_string(project.generated_dir().join("simien.d.ts")).unwrap(),
@@ -96,4 +97,42 @@ fn refuses_ports_out_of_range() {
         assert!(error.contains("--port"), "{port}: {error}");
     }
     assert!(!root.join("simien.json").exists());
+}
+
+#[test]
+fn picks_ports_nothing_else_is_using() {
+    // Whatever would be picked now, taken: the next free pair is picked instead.
+    let first = free_ports(DEFAULT_PORT).unwrap();
+    let _postgres = std::net::TcpListener::bind(("127.0.0.1", first)).unwrap();
+    let (_dir, root) = folder("shop");
+    let made = make(&root, None, None, false).unwrap();
+    assert!(made.postgres > first, "{made:?} should skip {first}");
+    assert_eq!(made.zega, made.postgres + 1);
+
+    // Zega's port taken counts too.
+    let second = free_ports(made.postgres).unwrap();
+    let _zega = std::net::TcpListener::bind(("127.0.0.1", second + 1)).unwrap();
+    assert!(free_ports(second).unwrap() > second);
+}
+
+#[test]
+fn a_template_copy_moves_off_ports_in_use() {
+    // A port the system hands out, so no other test is using it.
+    let taken = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let first = taken.local_addr().unwrap().port();
+    let (_dir, root) = folder("from-template");
+    std::fs::write(
+        root.join("simien.json"),
+        format!(r#"{{ "name": "x", "db": {{ "ports": {{ "postgres": {first}, "zega": {} }} }}, "other": true }}"#, first + 1),
+    )
+    .unwrap();
+    let moved = free_template_ports(&root).unwrap().expect("moved");
+    assert!(moved > first);
+    let config: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(root.join("simien.json")).unwrap()).unwrap();
+    assert_eq!(config["db"]["ports"]["postgres"], moved);
+    assert_eq!(config["db"]["ports"]["zega"], moved + 1);
+    assert_eq!(config["other"], true, "the rest is kept");
+    // Free already: left alone.
+    assert_eq!(free_template_ports(&root).unwrap(), None);
 }
