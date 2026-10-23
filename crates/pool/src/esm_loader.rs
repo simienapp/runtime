@@ -35,6 +35,7 @@ use simien_error::JsErrorBox;
 use deka_modules::modules::MODULES_DIR;
 use permissions::host_bridge::{self, GrantTable};
 
+mod cjs;
 mod grants;
 mod graph_hash;
 mod packages;
@@ -343,6 +344,30 @@ impl PhpxEsmLoader {
         Ok(ModuleSourceCode::String(text.into()))
     }
 
+    /// A package's CommonJS file, as its facade or its definition ([`cjs`]);
+    /// none for an ES module.
+    fn load_commonjs(&self, specifier: &ModuleSpecifier, path: &Path) -> Result<Option<String>, JsErrorBox> {
+        if !cjs::in_package(path) {
+            return Ok(None);
+        }
+        let source = std::fs::read_to_string(path).map_err(|err| JsErrorBox::generic(format!("{}: {err}", path.display())))?;
+        let Some(exports) = self.packages.commonjs(path, &source).map_err(JsErrorBox::generic)? else {
+            return Ok(None);
+        };
+        let code = if cjs::is_definition(specifier) {
+            let requires: Vec<_> = exports
+                .requires
+                .iter()
+                .map(|required| (required.clone(), self.packages.require(required, path)))
+                .collect();
+            cjs::definition(path, &source, &requires)
+        } else {
+            cjs::facade(path, &self.packages.export_names(path, &exports))
+        };
+        self.dynamic.borrow_mut().note(specifier.as_str(), path, &code)?;
+        Ok(Some(code))
+    }
+
     fn load_ds_source(&self, path: &Path) -> Result<ModuleSourceCode, JsErrorBox> {
         if let Some(v2_modules) = &self.v2_modules {
             if let Some(js) = crate::dsc_compile::lookup_js(v2_modules, path) {
@@ -580,6 +605,14 @@ impl PhpxEsmLoader {
             return Ok(ModuleSource::new(
                 ModuleType::JavaScript,
                 code,
+                specifier,
+                None,
+            ));
+        }
+        if let Some(code) = self.load_commonjs(specifier, &raw_path)? {
+            return Ok(ModuleSource::new(
+                ModuleType::JavaScript,
+                ModuleSourceCode::String(code.into()),
                 specifier,
                 None,
             ));
