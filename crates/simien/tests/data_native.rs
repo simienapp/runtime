@@ -1,6 +1,7 @@
-//! `simien:db` natively (#69): a program run with `--data`, as `simien dev`
-//! runs Vite, writes and reads the project's real database through the
-//! engine, with no data service. The row is checked in Postgres itself.
+//! `simien:db` natively: a program run with `--data`, as `simien dev` runs
+//! Vite (#69), and a served app under `simien serve` (#71) write and read the
+//! project's real database through the engine, with no data service. Rows
+//! are checked in Postgres itself.
 //!
 //! Needs Docker and kebele for the local stack, like the data crate's engine
 //! test, so it's ignored in the normal suite and run in CI's schema-sync job.
@@ -81,4 +82,43 @@ fn a_program_given_data_writes_and_reads_the_real_database() {
     // In Postgres itself, not just what the client said.
     let row = db.query_one("select text from notes", &[]).expect("the row");
     assert_eq!(row.get::<_, String>(0), "written natively");
+
+    // A served app (#71): `simien serve`, the app's own policy granting db.
+    fs::write(
+        root.join("app.js"),
+        r#"import { defineSchema, defineTable, v } from "simien:schema";
+        import { connect } from "simien:db";
+        const db = connect(defineSchema({ notes: defineTable({ text: v.string() }) }));
+        export default {
+          fetch: async () => {
+            await db.notes.insert({ text: "written by a served app" });
+            return Response.json(await db.notes.findMany({ orderBy: { id: "asc" } }));
+          },
+        };"#,
+    )
+    .unwrap();
+    let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let mut server = Command::new(env!("CARGO_BIN_EXE_simien"))
+        .args(["serve", "app.js", "--port", &port.to_string()])
+        .current_dir(root)
+        .env("HOME", home.path())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .expect("simien serve");
+    let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(30)).build().unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    let rows: serde_json::Value = loop {
+        match client.get(format!("http://127.0.0.1:{port}/")).send() {
+            Ok(response) => break response.json().expect("json"),
+            Err(_) if std::time::Instant::now() < deadline => std::thread::sleep(Duration::from_millis(200)),
+            Err(error) => panic!("simien serve didn't answer: {error}"),
+        }
+    };
+    let _ = server.kill();
+    let _ = server.wait();
+    let texts: Vec<&str> = rows.as_array().expect("rows").iter().map(|row| row["text"].as_str().unwrap_or_default()).collect();
+    assert_eq!(texts, ["written natively", "written by a served app"], "{rows}");
+    let count: i64 = db.query_one("select count(*) from notes", &[]).unwrap().get(0);
+    assert_eq!(count, 2);
 }

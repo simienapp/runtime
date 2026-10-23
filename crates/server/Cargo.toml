@@ -5,6 +5,7 @@ edition = "2024"
 description = "Serves a fetch-handler app with one warm isolate per core, each serving many connections at once through simien_http"
 
 [dependencies]
+data = { path = "../data" }
 simien_core.workspace = true
 simien_http = "0.2.0"
 simien_websocket = "0.2.0"

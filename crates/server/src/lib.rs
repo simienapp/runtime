@@ -376,8 +376,15 @@ fn serve_isolate(
             false,
         )
         .map_err(|err| err.to_string())?;
+        let mut extensions = extensions();
+        // simien:db (APS 4): the project's database, each query gated by the
+        // app's `db` permission.
+        extensions.push(data::binding::extension(
+            data::binding::access_for(&shared.project_root),
+            Some(pool::data_gate()),
+        ));
         let mut runtime = JsRuntime::new(RuntimeOptions {
-            extensions: extensions(),
+            extensions,
             module_loader: Some(Rc::new(loader)),
             ..Default::default()
         });
