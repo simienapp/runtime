@@ -10,7 +10,16 @@ use std::time::{Duration, Instant};
 use project::Project;
 use serde_json::Value;
 
-const PORT: &str = "54400";
+/// Where this test's search for a free Postgres + Zega pair starts: below
+/// every OS's ephemeral range, so no outgoing connection on the machine
+/// already holds it (#75), and apart from the other stack tests' starts.
+const FIRST_PORT: u16 = 21400;
+
+/// The first pair from [`FIRST_PORT`] that nothing is using, for `root`.
+fn free_port(root: &std::path::Path) -> String {
+    let map = project::portmap::PortMap::at(root.join("portmap.json"));
+    project::db::free_ports(FIRST_PORT, &map, root).expect("a free pair of ports").to_string()
+}
 
 struct Stack(Project);
 impl Drop for Stack {
@@ -38,7 +47,7 @@ fn wait_for(events: &Events, name: &str, timeout: Duration) -> Value {
 fn the_client_reads_and_writes_through_the_data_service() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().to_path_buf();
-    project::db::make(&root, Some(&format!("service-{}", std::process::id())), Some(PORT), false, &project::portmap::PortMap::at(root.join("portmap.json"))).unwrap();
+    project::db::make(&root, Some(&format!("service-{}", std::process::id())), Some(&free_port(&root)), false, &project::portmap::PortMap::at(root.join("portmap.json"))).unwrap();
     let stack = Stack(Project::open(&root).unwrap());
     std::fs::write(
         stack.0.schema_file(),
