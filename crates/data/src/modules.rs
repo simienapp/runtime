@@ -66,7 +66,8 @@ export function connect(schema) {{
 const track = globalThis[Symbol.for("simien.data.track")];
 
 export function live(query) {{
-  const run = (...args) => query(...args);
+  // An async function: React lets a "use server" module export only those.
+  const run = async (...args) => query(...args);
   Object.defineProperty(run, Symbol.for("simien.live"), {{
     value: (...args) => track(() => query(...args)),
   }});
