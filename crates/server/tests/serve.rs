@@ -424,6 +424,55 @@ fn an_app_imports_packages_from_node_modules() {
     assert_eq!(body, "HELLO SIMIEN", "the worker build, with its own dependency");
 }
 
+#[cfg(unix)]
+#[test]
+fn an_app_imports_a_commonjs_package_as_node_would() {
+    let store = "node_modules/.simien/counter@1.0.0/node_modules/counter";
+    let (_dir, addr) = start_app(&[
+        (
+            "app.js",
+            r#"import counter, { name, twice, cycle, optional, os } from "counter";
+            export default { fetch: () => Response.json({ name, twice: twice(21), cycle, optional, os, same: counter.twice === twice }) };"#,
+        ),
+        (&format!("{store}/package.json"), r#"{ "name": "counter", "main": "index.js" }"#),
+        // React's shape: the build is picked by NODE_ENV, and the other one
+        // never loads.
+        (
+            &format!("{store}/index.js"),
+            r#"'use strict';
+            if (process.env.NODE_ENV === 'production') { module.exports = require('./prod.js'); }
+            else { module.exports = require('./dev.js'); }"#,
+        ),
+        (&format!("{store}/dev.js"), "throw new Error('the development build loaded');"),
+        (
+            &format!("{store}/prod.js"),
+            r#"const data = require('./data.json');
+            const a = require('./a');
+            exports.name = data.name;
+            exports.twice = (n) => a.double(n);
+            exports.cycle = a.seenFromB;
+            try { require('left-pad') } catch (error) { exports.optional = error.code }
+            try { require('os') } catch (error) { exports.os = error.message }
+            function never(name) { return require(name) }"#,
+        ),
+        (&format!("{store}/data.json"), r#"{ "name": "counter" }"#),
+        // A cycle: b sees the exports a has so far, as in Node.
+        (&format!("{store}/a.js"), "exports.double = (n) => n * 2; exports.seenFromB = require('./b').seen;"),
+        (&format!("{store}/b.js"), "exports.seen = typeof require('./a').double;"),
+        ("simien.json", "{}"),
+    ],
+    &[("node_modules/counter", store)])
+    .expect("start");
+    let body: serde_json::Value =
+        client().get(format!("http://{addr}/")).send().expect("request").json().expect("json");
+    assert_eq!(body["name"], "counter", "{body}");
+    assert_eq!(body["twice"], 42);
+    assert_eq!(body["cycle"], "function");
+    assert_eq!(body["optional"], "MODULE_NOT_FOUND");
+    assert!(body["os"].as_str().unwrap().contains("node:os isn't available"), "{body}");
+    assert_eq!(body["same"], true, "the default export is module.exports");
+}
+
 #[test]
 fn a_bare_node_module_name_is_still_a_node_module() {
     let error = start_app(&[

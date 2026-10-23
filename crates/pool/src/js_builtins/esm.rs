@@ -25,6 +25,8 @@ pub fn esm_for_file(file: &str) -> Option<&'static str> {
         "react-dom-server-legacy.js" => Some(server_legacy_esm()),
         "react-dom-server-browser.js" => Some(server_browser_esm()),
         "react-dom-server.js" => Some(server_esm()),
+        // CommonJS packages' runtime (esm_loader/cjs.rs).
+        "cjs.js" => Some(include_str!("cjs.js")),
         _ => None,
     }
 }
