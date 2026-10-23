@@ -183,7 +183,7 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
     extensions.extend(web_host::web(simien_fetch::PermissionsContainer::new(policy)));
     let with_data = access.is_some();
     if let Some(access) = access {
-        extensions.push(data::binding::extension(access));
+        extensions.push(data::binding::extension(access, None));
     }
     extensions.extend(simien_node_runtime::extensions(
         Some(&program),
@@ -225,18 +225,14 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
     })
 }
 
-/// What `simien:db` gives the program: the engine for the project's
-/// database (its schema.ts and local Postgres, from simien.json and
-/// `.simien/`) when it has one and its dev policy grants `db` (APS 4).
+/// What `simien:db` gives the program: the project's database
+/// ([`data::binding::access_for`]) when its dev policy grants `db` (APS 4).
 /// Otherwise the program still runs, and every query says what's missing.
 fn access_for(root: &Path) -> anyhow::Result<data::binding::Access> {
     use data::binding::Access;
-    if !root.join(project::CONFIG).is_file() {
-        return Ok(Access::Refused(NO_DATABASE.to_string()));
-    }
-    let project = project::Project::open(root).map_err(anyhow::Error::msg)?;
-    if project.database.is_none() {
-        return Ok(Access::Refused(NO_DATABASE.to_string()));
+    let access = data::binding::access_for(root);
+    if let Access::Refused(_) = access {
+        return Ok(access);
     }
     let none = std::collections::HashMap::new();
     let policy = runtime::security::resolve_security_policy_for_root(
@@ -248,16 +244,10 @@ fn access_for(root: &Path) -> anyhow::Result<data::binding::Access> {
     )
     .map_err(anyhow::Error::msg)?;
     if !deka_host::modules::simien_db_allowed(&policy.policy_json).map_err(anyhow::Error::msg)? {
-        return Ok(Access::Refused(
-            "simien:db needs the db permission (APS 4); to allow it, set \"security\": { \"allow\": { \"db\": [\"postgres\"] } } in simien.json"
-                .to_string(),
-        ));
+        return Ok(Access::Refused(data::binding::NEEDS_DB_PERMISSION.to_string()));
     }
-    let url = schema_sync::database_url(&project).map_err(anyhow::Error::msg)?;
-    Ok(Access::Granted(Box::new(data::Engine::new(project.schema_file(), url))))
+    Ok(access)
 }
-
-const NO_DATABASE: &str = "this project has no database yet; run `simien db init`";
 
 #[cfg(test)]
 mod tests {

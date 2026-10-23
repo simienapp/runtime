@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 bytes = "1.12.1"
 postgres = "0.19"
+project = { path = "../project" }
 schema = { path = "../schema" }
 schema_sync = { path = "../schema_sync" }
 serde = { version = "1.0", features = ["derive"] }
@@ -17,5 +18,4 @@ tokio = { workspace = true, features = ["rt"] }
 
 [dev-dependencies]
 container = { path = "../container" }
-project = { path = "../project" }
 tempfile = "3.23.0"

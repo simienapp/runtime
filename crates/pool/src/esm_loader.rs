@@ -423,6 +423,11 @@ impl PhpxEsmLoader {
     }
 
     fn resolve_path(&self, specifier: &str, referrer: &str) -> Result<ModuleSpecifier, JsErrorBox> {
+        // Simien's data modules (APS 4), for source and built apps alike: a
+        // build leaves them external for Simien to provide.
+        if data_module(specifier).is_some() {
+            return ModuleSpecifier::parse(specifier).map_err(JsErrorBox::from_err);
+        }
         if let Some(url) = carve_outs::resolve(specifier) {
             return Ok(url);
         }
@@ -552,6 +557,14 @@ impl PhpxEsmLoader {
     }
 
     fn load_source(&self, specifier: &ModuleSpecifier) -> Result<ModuleSource, JsErrorBox> {
+        if let Some(source) = data_module(specifier.as_str()) {
+            return Ok(ModuleSource::new(
+                ModuleType::JavaScript,
+                ModuleSourceCode::String(source.into()),
+                specifier,
+                None,
+            ));
+        }
         if let Some(source) = carve_outs::source(specifier) {
             return Ok(ModuleSource::new(
                 ModuleType::JavaScript,
@@ -738,6 +751,15 @@ impl ModuleLoader for PhpxEsmLoader {
                 .insert(spec.to_string(), source.code);
             Ok(())
         })
+    }
+}
+
+/// `simien:db` (the native client, over [`data::binding`]) or `simien:schema`.
+fn data_module(specifier: &str) -> Option<String> {
+    match specifier {
+        "simien:db" => Some(data::modules::db_native()),
+        "simien:schema" => Some(data::modules::SCHEMA.to_string()),
+        _ => None,
     }
 }
 
