@@ -49,3 +49,9 @@ platform_server = { path = "../platform_server" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 mach2 = "0.7.0"
+
+# Captures the process's own fd 1/2, so it runs as its own harness, one case
+# at a time (#30).
+[[test]]
+name = "console_output"
+harness = false
