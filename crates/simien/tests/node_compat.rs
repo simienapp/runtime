@@ -111,7 +111,8 @@ fn run(root: &Path, home: &Path, test: &str, serial: usize, log: &Path) -> Resul
         .arg(root)
         .arg("--network")
         .arg(root.join(test))
-        .current_dir(root.join("test"))
+        // As Node's own runner (tools/test.py): from the checkout's root.
+        .current_dir(root)
         // cargo's DYLD_*/LD_* variables would keep every child_process test
         // from starting a program (the policy refuses those unless every
         // program may run), so the test gets a plain environment.
