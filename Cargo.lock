@@ -7829,9 +7829,9 @@ dependencies = [
 
 [[package]]
 name = "simien_io"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0739e70d9e322c1f599bb1b71a78012e46e464160514315a82aea694bf4bca4d"
+checksum = "af4cbbfc5120cd0ba1b665bb4836eac2e7b98eca3ce0267302de6890eb4a503d"
 dependencies = [
  "async-trait",
  "filetime",
@@ -7957,9 +7957,9 @@ dependencies = [
 
 [[package]]
 name = "simien_node"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e600e7743079bfaad38eae515589a7b574cc1a7fde2bf92d11db513474d9c15"
+checksum = "3af1a2d94dc131063ab3b2200b61c78c2c88c2fd7e2e80a83897a8c815acb78b"
 dependencies = [
  "base64 0.22.1",
  "brotli 6.0.0",
@@ -8123,9 +8123,9 @@ dependencies = [
 
 [[package]]
 name = "simien_node_runtime"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abe2739def07dca7c43883ad79a09df0ce338a9dc7dd19767fdf2c2063a48522"
+checksum = "86c2ea77b2437637bc648bed6d294a1a96503a0d0e07337b4bc80b3155736e1e"
 dependencies = [
  "async-trait",
  "futures",
@@ -8380,9 +8380,9 @@ dependencies = [
 
 [[package]]
 name = "simien_process"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91d702b8dc5362ec5509377a3f49c01da59c22bdb5b3e0ca2b113fa67aad89ad"
+checksum = "f52fab58cd2f81105cb38a79dc38978abb7e3ef1fa2bfd93cd1e5589ce30e7d1"
 dependencies = [
  "libc",
  "log",
