@@ -94,6 +94,34 @@ jobs:
         run: cargo test --locked -p simien --test no_node -- --ignored
       - run: sccache --show-stats
 
+  # Node's own tests for the modules Vite and vinext use, from Deno's mirror
+  # at a pinned commit: the passing list must pass and the known failures
+  # must still fail (crates/simien/tests/node_compat.rs, #82).
+  node-tests:
+    name: Node's own tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: "true"
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
+      - name: sccache is required
+        run: sccache --show-stats
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev libxdo-dev \
+            libasound2-dev libfontconfig1-dev libwayland-dev libxkbcommon-x11-dev libx11-xcb-dev \
+            libegl1-mesa-dev libvulkan-dev libxcb-shape0-dev libxcb-xfixes0-dev clang pkg-config libssl-dev
+      - name: Node's tests pass on Simien
+        run: cargo test --locked -p simien --test node_compat -- --ignored --nocapture
+      - run: sccache --show-stats
+
   # simien dev's schema sync, database loop and query engine against a real local stack: Docker (on the
   # runner) runs pg_zega and Zega through kebele, as `simien container start`
   # does. The test fails without them; it never skips.
