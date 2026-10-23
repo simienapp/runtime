@@ -3,8 +3,6 @@
 # A test here that passes fails the gate: move it to passing.txt.
 test/parallel/test-buffer-constructor-node-modules-paths.js                all  runtime#86  see the checklist
 test/parallel/test-buffer-constructor-node-modules.js                      all  runtime#86  see the checklist
-test/parallel/test-buffer-isascii.js                                       all  runtime#86  see the checklist
-test/parallel/test-buffer-isutf8.js                                        all  runtime#86  see the checklist
 test/parallel/test-child-process-exec-maxbuf.js                            all  runtime#86  see the checklist
 test/parallel/test-child-process-execfile-maxbuf.js                        all  runtime#86  see the checklist
 test/parallel/test-child-process-execfilesync-maxbuf.js                    all  runtime#86  see the checklist

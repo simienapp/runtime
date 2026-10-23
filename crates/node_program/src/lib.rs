@@ -214,6 +214,10 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
             }),
             extension_transpiler: Some(Rc::new(simien_node_runtime::transpile::transpile_extension)),
             extensions,
+            // structuredClone's and postMessage's `transfer` move a buffer
+            // through this store; without one they copied it and left the
+            // original attached.
+            shared_array_buffer_store: Some(Default::default()),
             ..Default::default()
         });
         let lifecycle = simien_node_runtime::bootstrap(&mut runtime, "node", env!("CARGO_PKG_VERSION"))

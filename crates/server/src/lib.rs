@@ -401,6 +401,10 @@ fn serve_isolate(
             } else {
                 None
             },
+            // structuredClone's and postMessage's `transfer` move a buffer
+            // through this store; without one they copied it and left the
+            // original attached.
+            shared_array_buffer_store: Some(Default::default()),
             ..Default::default()
         });
         // The server's own glue, made before any app code runs, keeps its
