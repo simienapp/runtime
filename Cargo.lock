@@ -1052,11 +1052,14 @@ version = "0.61.0"
 dependencies = [
  "dcore",
  "output",
+ "packages",
  "project",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "stdio 0.5.0",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]
