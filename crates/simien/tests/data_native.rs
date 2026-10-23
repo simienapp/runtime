@@ -12,7 +12,16 @@ use std::time::Duration;
 
 use project::Project;
 
-const PORT: &str = "54410";
+/// Where this test's search for a free Postgres + Zega pair starts: below
+/// every OS's ephemeral range, so no outgoing connection on the machine
+/// already holds it (#75), and apart from the other stack tests' starts.
+const FIRST_PORT: u16 = 21410;
+
+/// The first pair from [`FIRST_PORT`] that nothing is using, for `root`.
+fn free_port(root: &std::path::Path) -> String {
+    let map = project::portmap::PortMap::at(root.join("portmap.json"));
+    project::db::free_ports(FIRST_PORT, &map, root).expect("a free pair of ports").to_string()
+}
 
 /// Takes the stack and its volumes down however the test ends.
 struct Stack(Project);
@@ -28,7 +37,7 @@ fn a_program_given_data_writes_and_reads_the_real_database() {
     let dir = tempfile::tempdir().expect("project");
     let root = dir.path();
     let map = project::portmap::PortMap::at(root.join("portmap.json"));
-    project::db::make(root, Some(&format!("native-{}", std::process::id())), Some(PORT), false, &map).expect("db init");
+    project::db::make(root, Some(&format!("native-{}", std::process::id())), Some(&free_port(root)), false, &map).expect("db init");
     // Grant the probe Node, keeping what db init wrote.
     let config = root.join("simien.json");
     let mut settings: serde_json::Value = serde_json::from_str(&fs::read_to_string(&config).unwrap()).unwrap();

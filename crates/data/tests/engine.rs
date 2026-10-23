@@ -11,7 +11,16 @@ use postgres::Client;
 use project::Project;
 use serde_json::{Value, json};
 
-const PORT: &str = "54380";
+/// Where this test's search for a free Postgres + Zega pair starts: below
+/// every OS's ephemeral range, so no outgoing connection on the machine
+/// already holds it (#75), and apart from the other stack tests' starts.
+const FIRST_PORT: u16 = 21380;
+
+/// The first pair from [`FIRST_PORT`] that nothing is using, for `root`.
+fn free_port(root: &std::path::Path) -> String {
+    let map = project::portmap::PortMap::at(root.join("portmap.json"));
+    project::db::free_ports(FIRST_PORT, &map, root).expect("a free pair of ports").to_string()
+}
 
 /// Takes the stack and its volumes down however the test ends.
 struct Stack(Project);
@@ -47,7 +56,7 @@ fn queries_and_writes_hold_on_real_data() {
     project::db::make(
         dir.path(),
         Some(&format!("data-{}", std::process::id())),
-        Some(PORT),
+        Some(&free_port(dir.path())),
         false,
         &project::portmap::PortMap::at(dir.path().join("portmap.json")),
     )

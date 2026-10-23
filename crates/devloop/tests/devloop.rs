@@ -9,7 +9,16 @@ use std::time::{Duration, Instant};
 use project::Project;
 use serde_json::Value;
 
-const PORT: &str = "54370";
+/// Where this test's search for a free Postgres + Zega pair starts: below
+/// every OS's ephemeral range, so no outgoing connection on the machine
+/// already holds it (#75), and apart from the other stack tests' starts.
+const FIRST_PORT: u16 = 21370;
+
+/// The first pair from [`FIRST_PORT`] that nothing is using, for `root`.
+fn free_port(root: &std::path::Path) -> String {
+    let map = project::portmap::PortMap::at(root.join("portmap.json"));
+    project::db::free_ports(FIRST_PORT, &map, root).expect("a free pair of ports").to_string()
+}
 
 struct Stack(Project);
 impl Drop for Stack {
@@ -60,7 +69,8 @@ fn db_init_while_dev_runs_starts_the_stack_and_keeps_it_in_step() {
     // `simien db init` while dev runs: the stack starts with its ports and the
     // starter schema's tables sync.
     let from = seen(&events);
-    project::db::make(&root, None, Some(PORT), false, &project::portmap::PortMap::at(root.join("portmap.json"))).unwrap();
+    let port = free_port(&root);
+    project::db::make(&root, None, Some(&port), false, &project::portmap::PortMap::at(root.join("portmap.json"))).unwrap();
     let stack = Stack(Project::open(&root).unwrap());
     let schema_file = stack.0.schema_file();
     let synced = wait_for(&events, from, Duration::from_secs(240), |e| e["event"] == "synced" || e["event"] == "error");
@@ -70,7 +80,7 @@ fn db_init_while_dev_runs_starts_the_stack_and_keeps_it_in_step() {
         "{synced}"
     );
     let watching = wait_for(&events, from, Duration::from_secs(1), is("watching"));
-    assert_eq!(watching["postgres"], format!("postgres://postgres@127.0.0.1:{PORT}/postgres"));
+    assert_eq!(watching["postgres"], format!("postgres://postgres@127.0.0.1:{port}/postgres"));
 
     // A save syncs.
     let from = seen(&events);

@@ -13,7 +13,16 @@ use project::Project;
 use schema_sync::{SyncError, Synced};
 use serde_json::Value;
 
-const PORT: &str = "54360";
+/// Where this test's search for a free Postgres + Zega pair starts: below
+/// every OS's ephemeral range, so no outgoing connection on the machine
+/// already holds it (#75), and apart from the other stack tests' starts.
+const FIRST_PORT: u16 = 21360;
+
+/// The first pair from [`FIRST_PORT`] that nothing is using, for `root`.
+fn free_port(root: &std::path::Path) -> String {
+    let map = project::portmap::PortMap::at(root.join("portmap.json"));
+    project::db::free_ports(FIRST_PORT, &map, root).expect("a free pair of ports").to_string()
+}
 
 /// Takes the stack and its volumes down however the test ends.
 struct Stack(Project);
@@ -64,7 +73,7 @@ fn blocked(result: Result<Synced, SyncError>) -> Vec<String> {
 }
 
 fn open(root: &Path) -> Project {
-    project::db::make(root, Some(&format!("sync-{}", std::process::id())), Some(PORT), false, &project::portmap::PortMap::at(root.join("portmap.json"))).unwrap();
+    project::db::make(root, Some(&format!("sync-{}", std::process::id())), Some(&free_port(root)), false, &project::portmap::PortMap::at(root.join("portmap.json"))).unwrap();
     Project::open(root).unwrap()
 }
 
