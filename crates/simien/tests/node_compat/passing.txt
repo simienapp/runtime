@@ -245,6 +245,7 @@ test/parallel/test-fs-cp-async-dir-to-file.mjs
 test/parallel/test-fs-cp-async-error-on-exist.mjs
 test/parallel/test-fs-cp-async-file-to-dir.mjs
 test/parallel/test-fs-cp-async-file-to-file.mjs
+test/parallel/test-fs-cp-async-file-url.mjs
 test/parallel/test-fs-cp-async-filter-child-folder.mjs
 test/parallel/test-fs-cp-async-filter-function.mjs
 test/parallel/test-fs-cp-async-identical-src-dest.mjs
@@ -397,6 +398,7 @@ test/parallel/test-fs-readv-sync.js
 test/parallel/test-fs-readv.js
 test/parallel/test-fs-ready-event-stream.js
 test/parallel/test-fs-realpath-buffer-encoding.js
+test/parallel/test-fs-realpath-native.js
 test/parallel/test-fs-realpath-on-substed-drive.js
 test/parallel/test-fs-rename-type-check.js
 test/parallel/test-fs-rmSync-special-char.js
