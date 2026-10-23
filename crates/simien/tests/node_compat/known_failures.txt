@@ -32,8 +32,8 @@ test/parallel/test-crypto-prime.js                                         all  
 test/parallel/test-crypto-subtle-cross-realm.js                            all  core#34     vm.createContext / inspector abort
 test/parallel/test-crypto-webcrypto-aes-decrypt-tag-too-small.js           all  runtime#86  see the checklist
 test/parallel/test-crypto-worker-thread.js                                 all  runtime#46  node:worker_threads is not supported yet
-test/parallel/test-fs-chmod-mask.js                                        all  runtime#84  symlinks need write access to every path (decision)
-test/parallel/test-fs-chmod.js                                             all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-chmod-mask.js                                        macosruntime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-chmod.js                                             macosruntime#84  symlinks need write access to every path (decision)
 test/parallel/test-fs-cp-async-copy-non-directory-symlink.mjs              all  runtime#84  symlinks need write access to every path (decision)
 test/parallel/test-fs-cp-async-dereference-symlink.mjs                     all  runtime#84  symlinks need write access to every path (decision)
 test/parallel/test-fs-cp-async-dest-symlink-points-to-src-error.mjs        all  runtime#84  symlinks need write access to every path (decision)
