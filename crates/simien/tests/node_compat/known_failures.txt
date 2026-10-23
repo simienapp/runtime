@@ -11,7 +11,6 @@ test/parallel/test-child-process-fork-stdio-string-variant.js              all  
 test/parallel/test-child-process-kill.js                                     all  runtime#91  starts Node with -e/-p code (decision)
 test/parallel/test-child-process-promisified.js                            all  n/a         `simien -p`: Simien runs Node programs from files only
 test/parallel/test-child-process-server-close.js                           all  runtime#85  fork IPC and cluster hang
-test/parallel/test-child-process-spawn-argv0.js                            all  runtime#86  see the checklist
 test/parallel/test-child-process-spawn-shell.js                            all  runtime#86  see the checklist
 test/parallel/test-child-process-spawnsync-input.js                          all  runtime#91  starts Node with -e/-p code (decision)
 test/parallel/test-child-process-spawnsync-maxbuf.js                         all  runtime#91  starts Node with -e/-p code (decision)

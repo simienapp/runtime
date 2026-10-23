@@ -223,7 +223,10 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
             shared_array_buffer_store: Some(Default::default()),
             ..Default::default()
         });
-        let lifecycle = simien_node_runtime::bootstrap(&mut runtime, "node", env!("CARGO_PKG_VERSION"))
+        // process.argv0 is what this process was started as, as in Node: a
+        // parent's `spawn(execPath, …, { argv0 })` sets it.
+        let argv0 = std::env::args().next().unwrap_or_else(|| "node".to_string());
+        let lifecycle = simien_node_runtime::bootstrap(&mut runtime, &argv0, env!("CARGO_PKG_VERSION"))
             .map_err(|error| anyhow::anyhow!("{error}"))?;
         lifecycle
             .run(&mut runtime, &exit_code, &main, None)

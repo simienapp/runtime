@@ -119,6 +119,7 @@ test/parallel/test-child-process-send-type-error.js
 test/parallel/test-child-process-set-blocking.js
 test/parallel/test-child-process-silent.js
 test/parallel/test-child-process-spawn-args.mjs
+test/parallel/test-child-process-spawn-argv0.js
 test/parallel/test-child-process-spawn-controller.js
 test/parallel/test-child-process-spawn-error.js
 test/parallel/test-child-process-spawn-event.js

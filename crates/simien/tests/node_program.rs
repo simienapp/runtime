@@ -517,3 +517,34 @@ fn a_granted_program_runs_cluster_workers() {
     assert!(output.status.success(), "{stdout}{}", String::from_utf8_lossy(&output.stderr));
     assert_eq!(stdout.trim(), r#"{"worker":true}"#);
 }
+
+#[cfg(unix)]
+/// `process.argv0` is what the program was started as, as in Node: a child
+/// started with `spawn(execPath, …, { argv0 })` sees that name, and one
+/// started without it sees the path it was started by.
+#[test]
+fn a_program_sees_the_argv0_it_was_started_with() {
+    let project = probe_project(
+        true,
+        r#"const { spawnSync } = require("node:child_process");
+        if (process.argv[2] === "child") { console.log(process.argv0); return; }
+        const run = (options) =>
+          String(spawnSync(process.execPath, [__filename, "child"], options).stdout).trim();
+        console.log(JSON.stringify({ named: run({ argv0: "custom" }), plain: run({}), execPath: process.execPath }));
+        "#,
+    );
+    let home = tempfile::tempdir().expect("fake home");
+    let output = Command::new(env!("CARGO_BIN_EXE_simien"))
+        .args(["x", "probe"])
+        .current_dir(project.path())
+        .env_clear()
+        .env("HOME", home.path())
+        .env("PATH", "/usr/bin:/bin")
+        .output()
+        .expect("run simien x");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{stdout}{}", String::from_utf8_lossy(&output.stderr));
+    let seen: serde_json::Value = serde_json::from_str(stdout.trim()).expect("one JSON line");
+    assert_eq!(seen["named"], "custom", "{seen}");
+    assert_eq!(seen["plain"], seen["execPath"], "{seen}");
+}
