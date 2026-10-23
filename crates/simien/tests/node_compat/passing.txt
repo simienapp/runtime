@@ -9,7 +9,6 @@ test/parallel/test-assert-first-line.js
 test/parallel/test-assert-if-error.js
 test/parallel/test-assert-partial-deep-equal.js
 test/parallel/test-assert-typedarray-deepequal.js
-test/parallel/test-assert.js
 test/parallel/test-buffer-alloc.js
 test/parallel/test-buffer-arraybuffer.js
 test/parallel/test-buffer-ascii.js
@@ -225,7 +224,6 @@ test/parallel/test-crypto-subtle-cross-realm.js
 test/parallel/test-crypto-subtle-zero-length.js
 test/parallel/test-crypto-update-encoding.js
 test/parallel/test-crypto-verify-failure.js
-test/parallel/test-events-add-abort-listener.mjs
 test/parallel/test-events-getmaxlisteners.js
 test/parallel/test-events-list.js
 test/parallel/test-events-listener-count-with-listener.js
@@ -975,6 +973,7 @@ test/parallel/test-path-parse-format.js
 test/parallel/test-path-posix-exists.js
 test/parallel/test-path-posix-relative-on-windows.js
 test/parallel/test-path-relative.js
+test/parallel/test-path-resolve.js
 test/parallel/test-path-win32-exists.js
 test/parallel/test-path-win32-normalize-device-names.js
 test/parallel/test-path-zero-length-strings.js
@@ -1224,6 +1223,7 @@ test/parallel/test-timers-negative-duration-warning.js
 test/parallel/test-timers-non-integer-delay.js
 test/parallel/test-timers-not-emit-duration-zero.js
 test/parallel/test-timers-promises-scheduler.js
+test/parallel/test-timers-promises.js
 test/parallel/test-timers-refresh-in-callback.js
 test/parallel/test-timers-same-timeout-wrong-list-deleted.js
 test/parallel/test-timers-setimmediate-infinite-loop.js
