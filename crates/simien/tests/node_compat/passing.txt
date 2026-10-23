@@ -31,7 +31,9 @@ test/parallel/test-buffer-includes.js
 test/parallel/test-buffer-indexof.js
 test/parallel/test-buffer-inheritance.js
 test/parallel/test-buffer-inspect.js
+test/parallel/test-buffer-isascii.js
 test/parallel/test-buffer-isencoding.js
+test/parallel/test-buffer-isutf8.js
 test/parallel/test-buffer-iterator.js
 test/parallel/test-buffer-new.js
 test/parallel/test-buffer-no-negative-allocation.js
