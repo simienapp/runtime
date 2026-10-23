@@ -62,13 +62,8 @@ test/parallel/test-fs-utimes.js                                            all  
 test/parallel/test-http-debug.js                                           all  runtime#86  see the checklist
 test/parallel/test-module-circular-symlinks.js                             all  runtime#84  symlinks need write access to every path (decision)
 test/parallel/test-module-main-extension-lookup.js                         all  runtime#86  see the checklist
-test/parallel/test-module-multi-extensions.js                              all  runtime#86  see the checklist
 test/parallel/test-net-better-error-messages-listen-path.js                all  n/a         writes outside the sandbox (/tmp, /blah); refused by design (APS 3)
 test/parallel/test-net-better-error-messages-path.js                       all  n/a         writes outside the sandbox (/tmp, /blah); refused by design (APS 3)
-test/parallel/test-net-listen-exclusive-random-ports.js                    all  runtime#85  fork IPC and cluster hang
-test/parallel/test-net-listen-twice.js                                     all  runtime#85  fork IPC and cluster hang
-test/parallel/test-net-server-close-before-ipc-response.js                 all  runtime#85  fork IPC and cluster hang
-test/parallel/test-net-socket-constructor.js                               all  runtime#85  fork IPC and cluster hang
 test/parallel/test-os-userinfo-handles-getter-errors.js                    all  runtime#86  see the checklist
 test/parallel/test-path-resolve.js                                         all  runtime#86  see the checklist
 test/parallel/test-process-execve-worker-threads.js                        all  runtime#46  node:worker_threads is not supported yet

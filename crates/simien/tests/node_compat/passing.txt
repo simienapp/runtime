@@ -816,6 +816,7 @@ test/parallel/test-module-circular-dependency-warning.js
 test/parallel/test-module-create-require-multibyte.js
 test/parallel/test-module-create-require.js
 test/parallel/test-module-isBuiltin.js
+test/parallel/test-module-multi-extensions.js
 test/parallel/test-module-nodemodulepaths.js
 test/parallel/test-module-prototype-mutation.js
 test/parallel/test-module-readonly.js
@@ -881,8 +882,10 @@ test/parallel/test-net-listen-after-destroying-stdin.js
 test/parallel/test-net-listen-close-server-callback-is-not-function.js
 test/parallel/test-net-listen-close-server.js
 test/parallel/test-net-listen-error.js
+test/parallel/test-net-listen-exclusive-random-ports.js
 test/parallel/test-net-listen-fd0.js
 test/parallel/test-net-listen-invalid-port.js
+test/parallel/test-net-listen-twice.js
 test/parallel/test-net-listening.js
 test/parallel/test-net-local-address-port.js
 test/parallel/test-net-localerror.js
@@ -902,6 +905,7 @@ test/parallel/test-net-server-blocklist.js
 test/parallel/test-net-server-call-listen-multiple-times.js
 test/parallel/test-net-server-capture-rejection.js
 test/parallel/test-net-server-close-before-calling-lookup-callback.js
+test/parallel/test-net-server-close-before-ipc-response.js
 test/parallel/test-net-server-close.js
 test/parallel/test-net-server-listen-options-signal.js
 test/parallel/test-net-server-listen-options.js
@@ -922,6 +926,7 @@ test/parallel/test-net-socket-connect-invalid-autoselectfamily.js
 test/parallel/test-net-socket-connect-invalid-autoselectfamilyattempttimeout.js
 test/parallel/test-net-socket-connect-without-cb.js
 test/parallel/test-net-socket-connecting.js
+test/parallel/test-net-socket-constructor.js
 test/parallel/test-net-socket-destroy-send.js
 test/parallel/test-net-socket-destroy-twice.js
 test/parallel/test-net-socket-end-before-connect.js
