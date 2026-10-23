@@ -17,6 +17,7 @@ const checks = {
   async simienGlobal() { return typeof Simien === 'object' && /^\d+\.\d+\.\d+/.test(Simien.version) && Object.isFrozen(Simien) && typeof Deno === 'undefined'; },
   async setTimeout() { const t0 = performance.now(); await new Promise((r) => setTimeout(r, 20)); return performance.now() - t0 >= 15; },
   async structuredClone() { const v = structuredClone({ a: [1, { b: new Date(0) }] }); return v.a[1].b instanceof Date && v.a[0] === 1; },
+  async structuredCloneTransfer() { const b = new ArrayBuffer(8); const c = structuredClone(b, { transfer: [b] }); return b.detached === true && b.byteLength === 0 && c.byteLength === 8; },
   async base64() { return btoa('simien') === 'c2ltaWVu' && atob('c2ltaWVu') === 'simien'; },
   async textCoding() { return new TextDecoder().decode(new TextEncoder().encode('héllo ✓')) === 'héllo ✓'; },
   async url() { const u = new URL('/a?b=1#c', 'https://simien.dev'); return u.href === 'https://simien.dev/a?b=1#c' && new URLSearchParams(u.search).get('b') === '1'; },

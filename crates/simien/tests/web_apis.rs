@@ -60,7 +60,7 @@ fn every_wintertc_global_exists_and_works() {
 
     let results: BTreeMap<String, String> =
         serde_json::from_value(get(&client, &format!("{base}/checks"))).expect("results");
-    assert_eq!(results.len(), 16);
+    assert_eq!(results.len(), 17);
     let failed: Vec<_> = results.iter().filter(|(_, v)| *v != "ok").collect();
     assert!(failed.is_empty(), "failing checks: {failed:?}");
 }

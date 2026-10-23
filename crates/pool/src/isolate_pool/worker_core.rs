@@ -800,6 +800,10 @@ impl WorkerThread {
                 .as_ref()
                 .map(|metrics| metrics.clone().op_metrics_factory_fn()),
             module_loader,
+            // structuredClone's and postMessage's `transfer` move a buffer
+            // through this store; without one they copied it and left the
+            // original attached.
+            shared_array_buffer_store: Some(Default::default()),
             ..Default::default()
         });
         // `import.meta.resolve()` (rfd#12 amendment, deka#1139) is a thin op
