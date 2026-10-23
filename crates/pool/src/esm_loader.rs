@@ -65,6 +65,9 @@ pub struct PhpxEsmLoader {
     dynamic: Rc<RefCell<policy::DynamicImports>>,
     /// Bare imports from the project's node_modules, by Node's package rules.
     packages: packages::PackageResolver,
+    /// The app is granted `dangerouslyUseNode` (APS 2): `node:*` is Node's
+    /// own modules, from the Node layer in its isolate.
+    node: bool,
     /// Explicit stdlib root for a stdlib-only tenant. This is intentionally
     /// distinct from `project_root`; ordinary projects pass their own root.
     module_root: Option<PathBuf>,
@@ -97,6 +100,13 @@ pub struct PhpxEsmLoader {
 }
 
 impl PhpxEsmLoader {
+    /// For an app granted `dangerouslyUseNode` (APS 2), whose isolate has
+    /// the Node layer: `node:*` resolves to Node's own modules.
+    pub fn with_node(mut self) -> Self {
+        self.node = true;
+        self
+    }
+
     pub fn new(
         project_root: PathBuf,
         entry_path: PathBuf,
@@ -186,6 +196,7 @@ impl PhpxEsmLoader {
         let loader = Self {
             dynamic: Rc::default(),
             packages: packages::PackageResolver::new(&project_root),
+            node: false,
             project_root,
             module_root,
             dsc,
@@ -427,6 +438,19 @@ impl PhpxEsmLoader {
         // build leaves them external for Simien to provide.
         if data_module(specifier).is_some() {
             return ModuleSpecifier::parse(specifier).map_err(JsErrorBox::from_err);
+        }
+        // An app granted `dangerouslyUseNode` (APS 2) gets Node's own
+        // modules, from the Node layer in its isolate, not the carve-outs.
+        if self.node {
+            let builtin = specifier.strip_prefix("node:").unwrap_or(specifier);
+            if specifier.starts_with("node:")
+                || simien_node_resolver::IsBuiltInNodeModuleChecker::is_builtin_node_module(
+                    &simien_node_resolver::DenoIsBuiltInNodeModuleChecker,
+                    builtin,
+                )
+            {
+                return ModuleSpecifier::parse(&format!("node:{builtin}")).map_err(JsErrorBox::from_err);
+            }
         }
         if let Some(url) = carve_outs::resolve(specifier) {
             return Ok(url);

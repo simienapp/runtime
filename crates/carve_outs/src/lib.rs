@@ -143,7 +143,9 @@ pub fn refusal(specifier: &str) -> Option<String> {
         let carved: Vec<&str> = MODULES.iter().map(|(name, _)| *name).collect();
         format!(
             "{specifier} isn't available: Simien implements web standards, not Node's APIs (Simien APS 2). \
-             The Node modules carved out for the framework are: {}",
+             The Node modules carved out for the framework are: {}. To give the app's own code Node's APIs \
+             (still checked by its policy), set \"security\": {{ \"allow\": {{ \"dangerouslyUseNode\": true }} }} \
+             in simien.json",
             carved.join(", ")
         )
     })
@@ -177,6 +179,7 @@ mod tests {
         let message = refusal("node:child_process").unwrap();
         assert!(message.contains("node:child_process isn't available"), "{message}");
         assert!(message.contains("node:async_hooks, node:buffer"), "{message}");
+        assert!(message.contains(r#""allow": { "dangerouslyUseNode": true }"#), "says how to grant Node: {message}");
         assert!(refusal("react").is_none());
     }
 

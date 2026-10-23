@@ -18,6 +18,8 @@
 //! starts a fresh isolate, and the accept loop sends new connections to it.
 //! An isolate that stops for any other reason is replaced the same way.
 
+mod node_layer;
+
 use std::net::SocketAddr;
 use std::net::TcpListener;
 use std::path::PathBuf;
@@ -367,6 +369,8 @@ fn serve_isolate(
         .build()
         .map_err(|err| format!("failed to start the isolate's runtime: {err}"))?;
     tokio.block_on(async move {
+        // `dangerouslyUseNode` (APS 2): the app's own code gets Node's APIs.
+        let node = node_layer::granted(&shared.security.policy_json)?;
         let loader = pool::PhpxEsmLoader::new(
             shared.project_root.clone(),
             entry.clone(),
@@ -376,7 +380,13 @@ fn serve_isolate(
             false,
         )
         .map_err(|err| err.to_string())?;
+        let loader = if node { loader.with_node() } else { loader };
         let mut extensions = extensions();
+        if node {
+            let main = ModuleSpecifier::from_file_path(&entry)
+                .map_err(|_| format!("invalid entry path: {}", entry.display()))?;
+            extensions.extend(node_layer::extensions(&shared.project_root, main));
+        }
         // simien:db (APS 4): the project's database, each query gated by the
         // app's `db` permission.
         extensions.push(data::binding::extension(
@@ -386,8 +396,27 @@ fn serve_isolate(
         let mut runtime = JsRuntime::new(RuntimeOptions {
             extensions,
             module_loader: Some(Rc::new(loader)),
+            extension_transpiler: if node {
+                Some(Rc::new(simien_node_runtime::transpile::transpile_extension))
+            } else {
+                None
+            },
             ..Default::default()
         });
+        // The server's own glue, made before any app code runs, keeps its
+        // reference to the runtime's core; then `Deno` goes from globalThis,
+        // so the app never sees it (Node's bootstrap removes it too).
+        let serve = runtime
+            .execute_script("ext:server/serve.js", SERVE)
+            .map_err(|err| format!("{}: {err}", entry.display()))?;
+        if node {
+            simien_node_runtime::bootstrap(&mut runtime, "simien", env!("CARGO_PKG_VERSION"))
+                .map_err(|err| format!("{}: Node's APIs didn't start: {err}", entry.display()))?;
+        } else {
+            runtime
+                .execute_script("ext:server/hide.js", "delete globalThis.Deno;")
+                .map_err(|err| format!("{}: {err}", entry.display()))?;
+        }
         // `security.deny.dynamic`: V8 refuses `eval` and `new Function` (and
         // any alias of them) when they run, before any app code loads. The
         // loader refuses a computed `import()` the same way (#33).
@@ -430,13 +459,20 @@ fn serve_isolate(
                 .get(scope, key.into())
                 .filter(|app| app.is_object())
                 .ok_or_else(|| format!("{} has no default export", entry.display()))?;
-            let global = scope.get_current_context().global(scope);
-            let name = simien_core::v8::String::new(scope, "__simienApp").expect("string");
-            global.set(scope, name.into(), app);
+            let serve = simien_core::v8::Local::new(scope, serve);
+            let serve = simien_core::v8::Local::<simien_core::v8::Function>::try_from(serve)
+                .map_err(|_| "the server's glue isn't a function".to_string())?;
+            let inbox = simien_core::v8::Number::new(scope, f64::from(rid));
+            let undefined = simien_core::v8::undefined(scope);
+            simien_core::v8::tc_scope!(let tc, scope);
+            if serve.call(tc, undefined.into(), &[app, inbox.into()]).is_none() {
+                let message = tc
+                    .exception()
+                    .map(|exception| exception.to_rust_string_lossy(tc))
+                    .unwrap_or_else(|| "the server's glue failed".to_string());
+                return Err(format!("{}: {message}", entry.display()));
+            }
         }
-        runtime
-            .execute_script("ext:server/serve.js", serve_script(rid))
-            .map_err(|err| format!("{}: {err}", entry.display()))?;
 
         *slot.sender.write().unwrap_or_else(|err| err.into_inner()) = Some(sender);
         *serving = true;
@@ -452,26 +488,26 @@ fn serve_isolate(
     })
 }
 
-/// Hands the app's fetch handler to simien_http.
-fn serve_script(inbox: simien_core::ResourceId) -> String {
-    format!(
-        r#"(() => {{
-  const app = globalThis.__simienApp;
-  delete globalThis.__simienApp;
-  if (typeof app.fetch !== "function") {{
-    throw new TypeError("the default export has no fetch(request) method");
-  }}
-  const {{ serveHttpOnListener }} = Deno.core.loadExtScript("ext:simien_http/00_serve.js");
-  serveHttpOnListener(
-    {{ [Deno.core.internalRidSymbol]: {inbox} }},
-    undefined,
-    (request) => app.fetch(request),
-    (error) => {{
-      console.error(error);
-      return new Response("Internal Server Error", {{ status: 500 }});
-    }},
-    () => {{}},
-  );
-}})();"#
-    )
-}
+/// Hands the app's fetch handler to simien_http. Evaluated before any app
+/// code runs, it keeps its own reference to the runtime's core and returns
+/// the function the server calls with the app and its connection inbox.
+const SERVE: &str = r#"(() => {
+  const core = Deno.core;
+  const { serveHttpOnListener } = core.loadExtScript("ext:simien_http/00_serve.js");
+  const rid = core.internalRidSymbol;
+  return (app, inbox) => {
+    if (typeof app.fetch !== "function") {
+      throw new TypeError("the default export has no fetch(request) method");
+    }
+    serveHttpOnListener(
+      { [rid]: inbox },
+      undefined,
+      (request) => app.fetch(request),
+      (error) => {
+        console.error(error);
+        return new Response("Internal Server Error", { status: 500 });
+      },
+      () => {},
+    );
+  };
+})();"#;

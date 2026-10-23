@@ -105,10 +105,11 @@ pub fn resolve_security_policy_for_root(
     let policy_json = serde_json::to_string(&policy_to_json(&merged))
         .map_err(|err| format!("failed to serialize security policy: {}", err))?;
     let summary = format!(
-        "default-deny; allow(run={}, dynamic={}, wasm={}) deny(run={}, dynamic={}, net={}) prompt={}",
+        "default-deny; allow(run={}, dynamic={}, wasm={}, node={}) deny(run={}, dynamic={}, net={}) prompt={}",
         summarize_rule(&merged.allow.run),
         merged.allow.dynamic,
         summarize_rule(&merged.allow.wasm),
+        security::security_policy::uses_node(&merged),
         summarize_rule(&merged.deny.run),
         merged.deny.dynamic,
         summarize_rule(&merged.deny.net),

@@ -155,6 +155,21 @@ impl PermissionDenied {
         format!("{PERMISSION_DENIED_MARKER}{json}")
     }
 
+    /// The denial as people read it: what was refused, and the
+    /// `simien.json` line that allows it.
+    pub fn explain(&self) -> String {
+        format!("Requires {} access to {}; {}", self.capability, self.target, self.fix())
+    }
+
+    /// The `simien.json` line that allows it.
+    pub fn fix(&self) -> String {
+        format!(
+            "to allow it, set \"security\": {{ \"allow\": {{ \"{capability}\": [\"{target}\"] }} }} in simien.json",
+            capability = self.capability,
+            target = self.target
+        )
+    }
+
     /// Decode a CoreError/thrown message back into a denial; `None` when the
     /// message is not a denial (no marker, bad JSON, wrong shape).
     pub fn decode(message: &str) -> Option<Self> {
