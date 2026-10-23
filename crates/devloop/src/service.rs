@@ -9,6 +9,10 @@
 //!   `{ "error": { "kind", "message" } }` with 400 (refused) or 500 (Postgres).
 //! - `GET /modules/simien:db` and `GET /modules/simien:schema` serve the client
 //!   modules, so the framework's dev server can load them from the binary.
+//! - `GET /changes` streams committed writes as server-sent events, one
+//!   `event: change` per statement with the table's name as its data, from
+//!   Postgres itself (schema sync's triggers), so writes from any process
+//!   arrive: what live queries (APS 4 §4) re-run on.
 //! - Queries run on [`data::Engine`], the same engine the native `simien:db`
 //!   binding uses.
 
@@ -33,6 +37,8 @@ struct Shared {
     engine: data::Engine,
     token: String,
     endpoint: String,
+    /// Postgres, for the change feed's own listening connection.
+    url: String,
 }
 
 /// The running service. Dropping it stops it and removes `.simien/data.json`.
@@ -62,9 +68,10 @@ pub fn start(project: &Project, url: String) -> Result<DataService, String> {
     let file = project.state_dir().join(FILE);
     project::write_private(&file, &format!("{}\n", json!({ "url": endpoint, "token": token })))?;
     let shared = Arc::new(Shared {
-        engine: data::Engine::new(project.schema_file(), url),
+        engine: data::Engine::new(project.schema_file(), url.clone()),
         token,
         endpoint: endpoint.clone(),
+        url,
     });
     let stop = Arc::new(AtomicBool::new(false));
     let stopping = Arc::clone(&stop);
@@ -102,6 +109,9 @@ fn serve(mut stream: TcpStream, shared: &Shared) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(30)));
     let (status, content_type, body) = match read_request(&mut stream) {
         Err(message) => (400, "application/json", error_body("invalid", &message)),
+        Ok(request) if request.method == "GET" && request.path == "/changes" && authorized(&request, shared) => {
+            return stream_changes(stream, shared);
+        }
         Ok(request) => respond(&request, shared),
     };
     let head = format!(
@@ -179,9 +189,48 @@ fn error_body(kind: &str, message: &str) -> Vec<u8> {
     json!({ "error": { "kind": kind, "message": message } }).to_string().into_bytes()
 }
 
-fn respond(request: &Request, shared: &Shared) -> (u16, &'static str, Vec<u8>) {
+fn authorized(request: &Request, shared: &Shared) -> bool {
     let expected = format!("Bearer {}", shared.token);
-    if !request.authorization.as_deref().is_some_and(|given| same(given.as_bytes(), expected.as_bytes())) {
+    request.authorization.as_deref().is_some_and(|given| same(given.as_bytes(), expected.as_bytes()))
+}
+
+/// How often an idle change feed sends a comment, which also finds out
+/// whether the subscriber is still there.
+const KEEPALIVE: Duration = Duration::from_secs(15);
+
+/// `GET /changes`: one `event: change` per committed write, until the
+/// subscriber goes away.
+fn stream_changes(mut stream: TcpStream, shared: &Shared) {
+    let mut listener = match schema_sync::Listener::data(&shared.url) {
+        Ok(listener) => listener,
+        Err(message) => {
+            let body = error_body("database", &message);
+            let head = format!(
+                "HTTP/1.1 500 Internal Server Error\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(head.as_bytes()).and_then(|_| stream.write_all(&body));
+            return;
+        }
+    };
+    let head = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncache-control: no-store\r\nconnection: close\r\n\r\n: listening\n\n";
+    if stream.write_all(head.as_bytes()).and_then(|_| stream.flush()).is_err() {
+        return;
+    }
+    loop {
+        let event = match listener.next(KEEPALIVE) {
+            Ok(Some(table)) => format!("event: change\ndata: {table}\n\n"),
+            Ok(None) => ": keepalive\n\n".to_string(),
+            Err(_) => return,
+        };
+        if stream.write_all(event.as_bytes()).and_then(|_| stream.flush()).is_err() {
+            return;
+        }
+    }
+}
+
+fn respond(request: &Request, shared: &Shared) -> (u16, &'static str, Vec<u8>) {
+    if !authorized(request, shared) {
         return (401, "application/json", error_body("unauthorized", "the data service needs its token"));
     }
     match (request.method.as_str(), request.path.as_str()) {

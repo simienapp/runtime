@@ -18,6 +18,9 @@ use schema::catalog::{Catalog, Unmanaged};
 
 /// The channel `simien_ddl_notify` reports DDL on.
 pub const CHANNEL: &str = "simien_schema";
+/// The channel `simien_data_notify` reports committed writes on: one
+/// notification per statement, its payload the table's name (APS 4 §4).
+pub const DATA_CHANNEL: &str = "simien_data";
 
 /// The local stack's Postgres, as the project's superuser.
 pub fn database_url(project: &Project) -> Result<String, String> {
@@ -162,6 +165,7 @@ pub fn sync_once(project: &Project, client: &mut Client) -> Result<Synced, SyncE
     if !planned.plan.statements.is_empty() {
         apply(client, &planned.plan)?;
     }
+    install_change_triggers(client).map_err(SyncError::Failed)?;
     let generated = write_generated(project, &planned.data_model).map_err(SyncError::Failed)?;
     Ok(Synced {
         changes: planned.plan.changes,
@@ -222,6 +226,33 @@ pub fn install_notifier(client: &mut Client) -> Result<(), String> {
         .map_err(|err| err.to_string())
 }
 
+/// Gives every table in the database a statement trigger that reports each
+/// committed write on [`DATA_CHANNEL`], whoever made it (the app through
+/// `simien:db`, a migration, `psql`): live queries re-run from these. A
+/// notification is sent at commit, so a rolled-back write sends none.
+/// Idempotent; schema sync runs it every time.
+pub fn install_change_triggers(client: &mut Client) -> Result<(), String> {
+    let tables = catalog(client)?.tables;
+    let mut sql = format!(
+        r#"select set_config('simien.syncing', 'on', true);
+    create or replace function simien_data_notify() returns trigger language plpgsql as $$
+    begin
+      perform pg_notify('{DATA_CHANNEL}', tg_table_name);
+      return null;
+    end $$;"#
+    );
+    for table in &tables {
+        let name = table.name.replace('"', "\"\"");
+        sql.push_str(&format!(
+            "\n    create or replace trigger simien_data_notify after insert or update or delete or truncate on \"{name}\" \
+             for each statement execute function simien_data_notify();"
+        ));
+    }
+    let mut tx = client.transaction().map_err(|err| err.to_string())?;
+    tx.batch_execute(&sql).map_err(|err| err.to_string())?;
+    tx.commit().map_err(|err| err.to_string())
+}
+
 /// A connection listening for direct schema changes.
 pub struct Listener {
     client: Client,
@@ -229,8 +260,17 @@ pub struct Listener {
 
 impl Listener {
     pub fn new(url: &str) -> Result<Self, String> {
+        Self::on(url, CHANNEL)
+    }
+
+    /// Listening for committed writes instead: each next() is a table's name.
+    pub fn data(url: &str) -> Result<Self, String> {
+        Self::on(url, DATA_CHANNEL)
+    }
+
+    fn on(url: &str, channel: &str) -> Result<Self, String> {
         let mut client = connect(url, Duration::from_secs(5))?;
-        client.batch_execute(&format!("listen {CHANNEL}")).map_err(|err| err.to_string())?;
+        client.batch_execute(&format!("listen {channel}")).map_err(|err| err.to_string())?;
         Ok(Self { client })
     }
 
