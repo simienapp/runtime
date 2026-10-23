@@ -9,6 +9,7 @@ deka-modules = "0.3.0"
 compiler = { path = "../compiler" }
 serve = { path = "../serve" }
 security = { path = "../security" }
+data = { path = "../data" }
 permissions = { path = "../permissions" }
 nanoid = { workspace = true }
 core_affinity = { workspace = true }
@@ -40,10 +41,9 @@ oxc_span = "0.152.0"
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls"] }
 deka-validation = { version = "0.2", features = ["wasm"] }
 
-[dev-dependencies]
-# RFD 27 grant fixtures: compute the fsGraph digest the lockfile pins, exactly
-# as `deka install` does (crates/pm), so grant-table digests match on disk.
 deka_host = { path = "../deka_host", default-features = false, features = ["runtime"] }
+
+[dev-dependencies]
 tempfile = "3"
 platform_server = { path = "../platform_server" }
 

@@ -783,6 +783,12 @@ impl WorkerThread {
                 .map_err(|err| err.to_string())?;
             let import_meta_loader = loader.clone();
             let loader: Rc<dyn simien_core::ModuleLoader> = Rc::new(loader);
+            // simien:db (APS 4): the project's database, each query gated by
+            // the request's `db` permission.
+            extensions.push(data::binding::extension(
+                data::binding::access_for(&project_root),
+                Some(crate::data_gate()),
+            ));
             (Some(loader), Some(wrapper_specifier), Some(import_meta_loader))
         } else {
             (None, None, None)

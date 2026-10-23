@@ -587,3 +587,71 @@ fn a_refused_fetch_says_what_and_how_to_allow_it() {
     assert!(message.contains(r#""allow": { "net": ["refused.example"] }"#), "says how to allow it: {message}");
     assert!(!message.contains("__DEKA"), "no internal marker: {message}");
 }
+
+/// A served app with `files`, under `policy`.
+fn start_with_policy(
+    files: &[(&str, &str)],
+    policy: &security::security_policy::SecurityPolicy,
+) -> Result<(tempfile::TempDir, std::net::SocketAddr), String> {
+    let dir = tempfile::tempdir().expect("app dir");
+    for (path, text) in files {
+        let path = dir.path().join(path);
+        fs::create_dir_all(path.parent().expect("parent")).expect("folders");
+        fs::write(path, text).expect("write");
+    }
+    let server = server::start(ServerOptions {
+        addr: "127.0.0.1:0".parse().expect("addr"),
+        entry: dir.path().join("app.js"),
+        project_root: dir.path().to_path_buf(),
+        isolates: 1,
+        inbox_capacity: 8,
+        max_busy: None,
+        on_event: None,
+        security: pool::ExecutionSecurity {
+            policy_json: security::security_policy::policy_to_json(policy).to_string(),
+            no_prompt: true,
+        },
+    })?;
+    let addr = server.addr;
+    std::mem::forget(server);
+    Ok((dir, addr))
+}
+
+/// Production `simien:db` (#71): a served app imports it from Simien, and
+/// its queries go to the engine only when the app's policy grants `db`
+/// (APS 4). Postgres isn't running here, so a granted query gets the
+/// engine's own "database" error.
+#[test]
+fn a_served_app_queries_its_database_only_with_the_db_permission() {
+    let closed = {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a free port");
+        listener.local_addr().expect("addr").port()
+    };
+    let simien_json = format!(r#"{{ "name": "shop", "db": {{ "ports": {{ "postgres": {closed}, "zega": {} }} }} }}"#, closed + 1);
+    let schema = "import { defineSchema, defineTable, v } from \"simien:schema\";\nexport default defineSchema({ posts: defineTable({ title: v.string() }) });\n";
+    let app = r#"import { connect } from "simien:db";
+        import schema from "./simien/schema.js";
+        const db = connect(schema);
+        export default {
+          fetch: async () => {
+            try { await db.posts.findMany(); return Response.json({ queried: true }); }
+            catch (error) { return Response.json({ name: error.name, kind: error.kind, message: error.message }); }
+          },
+        };"#;
+    let files = [("app.js", app), ("simien.json", simien_json.as_str()), ("simien/schema.ts", schema), ("simien/schema.js", schema)];
+    let answer = |policy: &security::security_policy::SecurityPolicy| -> serde_json::Value {
+        let (_dir, addr) = start_with_policy(&files, policy).expect("start");
+        client().get(format!("http://{addr}/")).send().expect("request").json().expect("json")
+    };
+
+    let denied = answer(&Default::default());
+    assert_eq!(denied["kind"], "refused", "{denied}");
+    assert!(denied["message"].as_str().unwrap_or_default().contains(r#""allow": { "db": ["postgres"] }"#), "{denied}");
+
+    let mut granted = security::security_policy::SecurityPolicy::default();
+    granted.allow.db = security::security_policy::RuleList::List(vec!["postgres".into()]);
+    let queried = answer(&granted);
+    assert_eq!(queried["name"], "SimienDataError", "{queried}");
+    assert_eq!(queried["kind"], "database", "the engine ran it and Postgres wasn't there: {queried}");
+    assert!(queried["message"].as_str().unwrap_or_default().contains("Postgres"), "{queried}");
+}
