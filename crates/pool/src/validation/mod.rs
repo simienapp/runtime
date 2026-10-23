@@ -68,23 +68,48 @@ fn parse_number_prefix(value: &str) -> Option<usize> {
     digits.parse().ok()
 }
 
+/// Why V8 refused `eval` / `new Function`, and how to allow them.
+const CODE_GENERATION_HINT: &str = "eval and new Function are disabled by the security policy; to allow them, \
+     set \"security\": { \"allow\": { \"dynamic\": true } } in simien.json";
+
 /// Whether V8 may generate code from strings (`eval`, `new Function` and
 /// every alias of them) in `runtime`'s context: false when the policy denies
 /// dynamic code, so they're refused when they run (#33), not by scanning.
 pub fn allow_code_generation_from_strings(runtime: &mut simien_core::JsRuntime, allow: bool) {
     let context = runtime.main_context();
+    if !allow {
+        runtime
+            .v8_isolate()
+            .set_modify_code_generation_from_strings_callback(refuse_code_generation);
+    }
     simien_core::scope!(scope, runtime);
     simien_core::v8::Local::new(scope, context).set_allow_generation_from_strings(allow);
+}
+
+/// V8 asks this before it refuses code generation in a context that
+/// disallows it, so a refusal is logged with how to allow it, once per
+/// process, even when the app catches the EvalError and V8's message never
+/// reaches anyone. It refuses as V8 would. In a context that allows code
+/// generation (V8 also asks for a source that isn't a string), V8 decides as
+/// if there were no callback.
+fn refuse_code_generation<'s>(
+    scope: &mut simien_core::v8::PinScope<'s, '_>,
+    _source: simien_core::v8::Local<'s, simien_core::v8::Value>,
+    _is_code_like: bool,
+) -> simien_core::v8::ModifyCodeGenerationFromStringsResult<'s> {
+    static LOGGED: std::sync::Once = std::sync::Once::new();
+    let allowed = scope.get_current_context().is_code_generation_from_strings_allowed();
+    if !allowed {
+        LOGGED.call_once(|| eprintln!("[security] refused eval/new Function: {CODE_GENERATION_HINT}"));
+    }
+    simien_core::v8::ModifyCodeGenerationFromStringsResult { codegen_allowed: allowed, modified_source: None }
 }
 
 /// V8's refusal of `eval` / `new Function` doesn't say why or how to allow
 /// it; this says both. Other errors are returned as they are.
 pub fn explain_code_generation_refusal(error: String) -> String {
     if error.contains("Code generation from strings disallowed") {
-        format!(
-            "{error} (eval and new Function are disabled by the security policy; to allow them, \
-             set \"security\": {{ \"allow\": {{ \"dynamic\": true }} }} in simien.json)"
-        )
+        format!("{error} ({CODE_GENERATION_HINT})")
     } else {
         error
     }

@@ -8069,9 +8069,9 @@ dependencies = [
 
 [[package]]
 name = "simien_node_resolver"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08bee14a093efc58d31841f02929ebf954ec22327dabb041ba89b8896ab14f0a"
+checksum = "a3b8f9fa5fe047d9f560ca50a6752a39267f0c68b7a262256d98ffabed810af6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8079,6 +8079,11 @@ dependencies = [
  "lazy-regex",
  "log",
  "once_cell",
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_ast_visit",
+ "oxc_parser",
+ "oxc_span",
  "path-clean",
  "percent-encoding",
  "pretty_assertions",
@@ -8101,9 +8106,9 @@ dependencies = [
 
 [[package]]
 name = "simien_node_runtime"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b2778ce25e39ae4f66f51eb44e795fe1175dfa21462ddf71b6de37ca371c25a"
+checksum = "abe2739def07dca7c43883ad79a09df0ce338a9dc7dd19767fdf2c2063a48522"
 dependencies = [
  "async-trait",
  "futures",

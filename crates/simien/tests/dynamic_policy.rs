@@ -78,3 +78,12 @@ fn dynamic_code_that_never_runs_does_not_stop_the_app_when_denied() {
     let out = run(project(DENY, source).path());
     assert!(out.contains("ran 2"), "{out}");
 }
+
+#[test]
+fn a_refusal_the_app_catches_still_says_how_to_allow_it() {
+    let source = "let refused;\ntry { eval(\"1\"); } catch (error) { refused = error.name; }\nconsole.log(\"caught\", refused);\n";
+    let out = run(project(DENY, source).path());
+    assert!(out.contains("caught EvalError"), "{out}");
+    assert!(out.contains("[security] refused eval/new Function"), "logged: {out}");
+    assert!(out.contains(r#""allow": { "dynamic": true }"#), "says how to allow it: {out}");
+}
