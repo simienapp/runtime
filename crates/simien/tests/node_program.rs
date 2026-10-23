@@ -285,6 +285,7 @@ fn only_a_program_given_data_can_query_the_projects_database() {
         project.path().join("simien.json"),
         format!(
             r#"{{ "name": "shop", "packagePermissions": {{ "probe": {{ "dangerouslyUseNode": true }} }},
+               "security": {{ "allow": {{ "db": ["postgres"] }} }},
                "db": {{ "ports": {{ "postgres": {closed}, "zega": {} }} }} }}"#,
             closed + 1
         ),
@@ -333,13 +334,21 @@ fn only_a_program_given_data_can_query_the_projects_database() {
     assert_eq!(given["kind"], "database", "the engine ran the query and Postgres wasn't there: {given}");
     assert!(given["message"].as_str().unwrap_or_default().contains("Postgres"), "{given}");
 
+    // The db permission (APS 4) not granted: the program runs, and every
+    // query says how to allow it.
+    let config = project.path().join("simien.json");
+    let mut settings: serde_json::Value = serde_json::from_str(&fs::read_to_string(&config).unwrap()).unwrap();
+    settings.as_object_mut().unwrap().remove("security");
+    fs::write(&config, settings.to_string()).unwrap();
+    let ungranted = run(true);
+    assert_eq!(ungranted["kind"], "refused", "{ungranted}");
+    assert!(ungranted["message"].as_str().unwrap_or_default().contains(r#""allow": { "db": ["postgres"] }"#), "{ungranted}");
+
     // A project with no database yet still runs; the query says what to do.
-    let mut settings: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(project.path().join("simien.json")).unwrap()).unwrap();
     settings.as_object_mut().unwrap().remove("db");
-    fs::write(project.path().join("simien.json"), settings.to_string()).unwrap();
+    fs::write(&config, settings.to_string()).unwrap();
     let no_database = run(true);
-    assert_eq!(no_database["kind"], "invalid", "{no_database}");
+    assert_eq!(no_database["kind"], "refused", "{no_database}");
     assert!(no_database["message"].as_str().unwrap_or_default().contains("simien db init"), "{no_database}");
 
     let withheld = run(false);

@@ -7,9 +7,11 @@ description = "Runs a Node program granted dangerouslyUseNode on Simien's Node l
 [dependencies]
 anyhow = "1"
 data = { path = "../data" }
+deka_host = { path = "../deka_host", default-features = false, features = ["runtime"] }
 libc = "0.2"
 packages = { path = "../packages" }
 project = { path = "../project" }
+runtime = { path = "../runtime" }
 schema_sync = { path = "../schema_sync" }
 serde_json = "1"
 simien_core.workspace = true

@@ -130,6 +130,15 @@ pub fn enforce_net_public(host: &str) -> Result<(), String> {
     enforce_net_public_with(&policy, host)
 }
 
+/// Whether the resolved policy (as the per-execution JSON) lets app code use
+/// the project's database through `simien:db` (APS 4): the `db` permission,
+/// for its driver, Postgres.
+pub fn simien_db_allowed(policy_json: &str) -> Result<bool, String> {
+    let policy = security_policy_from_json_str(policy_json).map_err(|err| err.to_string())?;
+    Ok(rule_allows("db", &policy.allow.db, Some("postgres"))
+        && !rule_denies("db", &policy.deny.db, Some("postgres")))
+}
+
 /// The gate itself, with the policy passed in. Callers that already hold
 /// the resolved policy (pinned per-isolate net state, tests) use this to
 /// avoid re-resolving it per call.

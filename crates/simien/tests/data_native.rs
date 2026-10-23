@@ -32,6 +32,7 @@ fn a_program_given_data_writes_and_reads_the_real_database() {
     let config = root.join("simien.json");
     let mut settings: serde_json::Value = serde_json::from_str(&fs::read_to_string(&config).unwrap()).unwrap();
     settings["packagePermissions"] = serde_json::json!({ "probe": { "dangerouslyUseNode": true } });
+    settings["security"] = serde_json::json!({ "allow": { "db": ["postgres"] } });
     fs::write(&config, settings.to_string()).unwrap();
     let schema = "import { defineSchema, defineTable, v } from \"simien:schema\";\n\nexport default defineSchema({\n  notes: defineTable({ text: v.string() }),\n});\n";
     fs::write(root.join("simien/schema.ts"), schema).unwrap();

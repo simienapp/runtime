@@ -15,11 +15,23 @@ use simien_core::{OpState, op2};
 
 use crate::Engine;
 
+/// What the app may do with its database.
+pub enum Access {
+    /// Its queries run on this engine.
+    Granted(Box<Engine>),
+    /// Every query is refused with this: what's missing and how to fix it
+    /// (no database yet, or the `db` permission not granted).
+    Refused(String),
+}
+
 #[op2]
 #[string]
 async fn op_simien_data_query(state: Rc<RefCell<OpState>>, #[string] query: String) -> String {
-    let engine = state.borrow().borrow::<Arc<Engine>>().clone();
-    let outcome = tokio::task::spawn_blocking(move || engine.query(query.as_bytes()))
+    let access = state.borrow().borrow::<Arc<Access>>().clone();
+    let outcome = tokio::task::spawn_blocking(move || match access.as_ref() {
+        Access::Granted(engine) => engine.query(query.as_bytes()),
+        Access::Refused(reason) => Err(crate::DataError::Refused(reason.clone())),
+    })
         .await
         .unwrap_or_else(|err| Err(crate::DataError::Database(format!("the query stopped: {err}"))));
     match outcome {
@@ -34,13 +46,13 @@ simien_core::extension!(
     ops = [op_simien_data_query],
     esm_entry_point = "ext:simien_data/send.js",
     esm = [dir "js", "send.js"],
-    options = { engine: Arc<Engine> },
+    options = { access: Arc<Access> },
     state = |state, options| {
-        state.put(options.engine);
+        state.put(options.access);
     },
 );
 
-/// The binding for an app whose queries run on `engine`.
-pub fn extension(engine: Engine) -> simien_core::Extension {
-    simien_data::init(Arc::new(engine))
+/// The binding for an app with `access` to its database.
+pub fn extension(access: Access) -> simien_core::Extension {
+    simien_data::init(Arc::new(access))
 }

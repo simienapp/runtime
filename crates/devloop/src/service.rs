@@ -188,7 +188,9 @@ fn respond(request: &Request, shared: &Shared) -> (u16, &'static str, Vec<u8>) {
         ("POST", "/query") => match shared.engine.query(&request.body) {
             Ok(result) => (200, "application/json", json!({ "result": result }).to_string().into_bytes()),
             Err(error @ DataError::Invalid(_)) => (400, "application/json", error_body(error.kind(), &error.to_string())),
-            Err(error @ DataError::Database(_)) => (500, "application/json", error_body(error.kind(), &error.to_string())),
+            Err(error @ (DataError::Database(_) | DataError::Refused(_))) => {
+                (500, "application/json", error_body(error.kind(), &error.to_string()))
+            }
         },
         ("GET", "/modules/simien:db") => (
             200,

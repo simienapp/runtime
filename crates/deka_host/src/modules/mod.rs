@@ -42,7 +42,7 @@ mod security;
 mod security_context_tests;
 mod security_hint;
 
-pub use security::{enforce_net_public, enforce_net_public_with, security_policy_from_context};
+pub use security::{enforce_net_public, enforce_net_public_with, security_policy_from_context, simien_db_allowed};
 
 fn core_err(msg: impl Into<String>) -> simien_core::error::CoreError {
     simien_core::error::CoreError::from(std::io::Error::other(msg.into()))

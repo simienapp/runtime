@@ -172,7 +172,7 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
     let main = ModuleSpecifier::from_file_path(std::fs::canonicalize(&invocation.script)?)
         .map_err(|()| anyhow::anyhow!("{} is not absolute", invocation.script.display()))?;
     let program = NodeProgram::new(&modules_root(&package_dir));
-    let engine = if invocation.data { engine_for(&invocation.project)? } else { None };
+    let access = if invocation.data { Some(access_for(&invocation.project)?) } else { None };
     let exit_code = simien_os::ExitCode::default();
 
     let policy = Arc::new(policy::SandboxPolicy::new(&invocation.rules));
@@ -181,9 +181,9 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
         forked_channel(),
     )];
     extensions.extend(web_host::web(simien_fetch::PermissionsContainer::new(policy)));
-    let with_data = invocation.data;
-    if let Some(engine) = engine {
-        extensions.push(data::binding::extension(engine));
+    let with_data = access.is_some();
+    if let Some(access) = access {
+        extensions.push(data::binding::extension(access));
     }
     extensions.extend(simien_node_runtime::extensions(
         Some(&program),
@@ -225,20 +225,39 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
     })
 }
 
-/// The engine for the project's database: its schema.ts and its local
-/// Postgres, from simien.json and `.simien/`. None when the project has no
-/// database yet: the program still runs, and `simien:db`'s queries say so.
-fn engine_for(project: &Path) -> anyhow::Result<Option<data::Engine>> {
-    if !project.join(project::CONFIG).is_file() {
-        return Ok(None);
+/// What `simien:db` gives the program: the engine for the project's
+/// database (its schema.ts and local Postgres, from simien.json and
+/// `.simien/`) when it has one and its dev policy grants `db` (APS 4).
+/// Otherwise the program still runs, and every query says what's missing.
+fn access_for(root: &Path) -> anyhow::Result<data::binding::Access> {
+    use data::binding::Access;
+    if !root.join(project::CONFIG).is_file() {
+        return Ok(Access::Refused(NO_DATABASE.to_string()));
     }
-    let project = project::Project::open(project).map_err(anyhow::Error::msg)?;
+    let project = project::Project::open(root).map_err(anyhow::Error::msg)?;
     if project.database.is_none() {
-        return Ok(None);
+        return Ok(Access::Refused(NO_DATABASE.to_string()));
+    }
+    let none = std::collections::HashMap::new();
+    let policy = runtime::security::resolve_security_policy_for_root(
+        root,
+        &std::collections::HashMap::new(),
+        &none,
+        runtime::security::ProjectKind::Js,
+        true,
+    )
+    .map_err(anyhow::Error::msg)?;
+    if !deka_host::modules::simien_db_allowed(&policy.policy_json).map_err(anyhow::Error::msg)? {
+        return Ok(Access::Refused(
+            "simien:db needs the db permission (APS 4); to allow it, set \"security\": { \"allow\": { \"db\": [\"postgres\"] } } in simien.json"
+                .to_string(),
+        ));
     }
     let url = schema_sync::database_url(&project).map_err(anyhow::Error::msg)?;
-    Ok(Some(data::Engine::new(project.schema_file(), url)))
+    Ok(Access::Granted(Box::new(data::Engine::new(project.schema_file(), url))))
 }
+
+const NO_DATABASE: &str = "this project has no database yet; run `simien db init`";
 
 #[cfg(test)]
 mod tests {
