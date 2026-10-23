@@ -14,6 +14,10 @@ nanoid = { workspace = true }
 core_affinity = { workspace = true }
 simien_core = { workspace = true }
 simien_error = { workspace = true }
+simien_maybe_sync = "0.1.1"
+simien_node_resolver = "0.1.1"
+simien_resolver = "0.1.3"
+simien_sys_traits = { version = "0.1.1", features = ["real", "libc"] }
 libc = "0.2"
 num_cpus = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
