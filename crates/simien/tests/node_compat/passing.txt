@@ -816,6 +816,7 @@ test/parallel/test-module-circular-dependency-warning.js
 test/parallel/test-module-create-require-multibyte.js
 test/parallel/test-module-create-require.js
 test/parallel/test-module-isBuiltin.js
+test/parallel/test-module-main-extension-lookup.js
 test/parallel/test-module-multi-extensions.js
 test/parallel/test-module-nodemodulepaths.js
 test/parallel/test-module-prototype-mutation.js
