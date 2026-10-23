@@ -70,9 +70,36 @@ fn write_description(project: &Project) -> Result<PathBuf, String> {
     Ok(file)
 }
 
+/// The kebele Simien starts when neither the project nor PATH has one:
+/// installed on first use into Simien's cache and run on its Node layer
+/// (`simien x`, pre-approved in permissions.json), so a new app needs no Bun.
+pub const KEBELE: &str = "kebele@0.11.0";
+
+/// How to start kebele.
+pub struct Kebele {
+    program: PathBuf,
+    leading: Vec<String>,
+    dir: Option<PathBuf>,
+}
+
+impl Kebele {
+    fn command(&self, args: &[&str]) -> Command {
+        let mut command = Command::new(&self.program);
+        command.args(&self.leading).args(args).arg("--nopretty");
+        if let Some(dir) = &self.dir {
+            command.current_dir(dir);
+        }
+        command
+    }
+
+    fn name(&self) -> String {
+        if self.leading.is_empty() { self.program.display().to_string() } else { format!("simien x {KEBELE}") }
+    }
+}
+
 /// The kebele program: the project's own (node_modules/.bin, the version it
-/// pins) first, then the one on PATH.
-pub fn kebele(project_root: Option<&Path>) -> Result<PathBuf, String> {
+/// pins) first, then the one on PATH, else Simien's own ([`KEBELE`]).
+pub fn kebele(project_root: Option<&Path>) -> Result<Kebele, String> {
     let on_path = std::env::var_os("PATH").and_then(|path| {
         std::env::split_paths(&path)
             .map(|dir| dir.join("kebele"))
@@ -81,18 +108,23 @@ pub fn kebele(project_root: Option<&Path>) -> Result<PathBuf, String> {
     let local = project_root
         .map(|root| root.join("node_modules/.bin/kebele"))
         .filter(|candidate| candidate.is_file());
-    local.or(on_path).ok_or_else(|| {
-        "kebele isn't installed; it runs the local containers. Install it: `bun add -g kebele`".to_string()
+    if let Some(program) = local.or(on_path) {
+        return Ok(Kebele { program, leading: Vec::new(), dir: None });
+    }
+    let simien = std::env::current_exe().map_err(|err| format!("finding simien to run kebele: {err}"))?;
+    Ok(Kebele {
+        program: simien,
+        leading: vec!["x".to_string(), KEBELE.to_string()],
+        dir: project_root.map(Path::to_path_buf),
     })
 }
 
 /// Runs kebele with `args` and returns its JSON answer.
-fn run(kebele: &Path, args: &[&str]) -> Result<Value, String> {
-    let output = Command::new(kebele)
-        .args(args)
-        .arg("--nopretty")
+fn run(kebele: &Kebele, args: &[&str]) -> Result<Value, String> {
+    let output = kebele
+        .command(args)
         .output()
-        .map_err(|err| format!("running {}: {err}", kebele.display()))?;
+        .map_err(|err| format!("running {}: {err}", kebele.name()))?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     if !output.status.success() {
         return Err(kebele_error(&output.stderr, &stdout));
@@ -114,14 +146,13 @@ fn kebele_error(stderr: &[u8], stdout: &str) -> String {
 }
 
 /// Runs kebele and hands each JSON line it prints to `on_line`.
-fn stream(kebele: &Path, args: &[&str], mut on_line: impl FnMut(Value)) -> Result<(), String> {
-    let mut child = Command::new(kebele)
-        .args(args)
-        .arg("--nopretty")
+fn stream(kebele: &Kebele, args: &[&str], mut on_line: impl FnMut(Value)) -> Result<(), String> {
+    let mut child = kebele
+        .command(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|err| format!("running {}: {err}", kebele.display()))?;
+        .map_err(|err| format!("running {}: {err}", kebele.name()))?;
     let stdout = child.stdout.take().expect("piped");
     for line in BufReader::new(stdout).lines() {
         let Ok(line) = line else { break };

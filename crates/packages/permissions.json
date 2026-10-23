@@ -56,6 +56,10 @@
         ]
       }
     },
+    "kebele": {
+      "reason": "runs the project's local Postgres and Zega containers for simien dev, over the Docker socket (node:http to a unix socket); Simien starts it itself as `simien x kebele@<pinned>` when the project doesn't have it",
+      "dangerouslyUseNode": true
+    },
     "vite": {
       "reason": "Vite's dev server and build are Node programs (node:fs, node:http, node:module and Rolldown's native addon); Tana apps run them with s dev",
       "dangerouslyUseNode": true
