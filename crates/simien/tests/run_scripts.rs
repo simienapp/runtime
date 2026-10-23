@@ -64,8 +64,8 @@ fn simien_run_runs_a_shell_script() {
 
 #[test]
 fn simien_build_runs_the_build_script() {
-    let project = project(r#"{ "build": "probe build" }"#);
-    let (code, out) = simien(&project, &["build"]);
+    let with_build = project(r#"{ "build": "probe build" }"#);
+    let (code, out) = simien(&with_build, &["build"]);
     assert_eq!(code, 0, "{out}");
     assert!(out.contains("probe build"), "{out}");
 
