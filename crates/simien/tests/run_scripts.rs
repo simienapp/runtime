@@ -54,9 +54,20 @@ fn simien_run_runs_a_package_script_on_simien() {
     assert!(out.contains("probe hello again"), "the package's program ran with the script's and the extra arguments: {out}");
 }
 
+/// A shell script starts only the programs the project's policy allows, as
+/// simien.json's scripts do.
 #[test]
-fn simien_run_runs_a_shell_script() {
+fn simien_run_runs_a_shell_script_under_the_projects_policy() {
     let project = project(r#"{ "hello": "echo shell-ran && echo $((1 + 1))" }"#);
+    let (code, out) = simien(&project, &["run", "hello"]);
+    assert_eq!(code, 1, "echo isn't allowed yet: {out}");
+    assert!(out.contains("subprocess `echo` is not allowed"), "{out}");
+
+    fs::write(
+        project.path().join("simien.json"),
+        r#"{ "name": "app", "security": { "allow": { "run": ["echo"] } } }"#,
+    )
+    .expect("simien.json");
     let (code, out) = simien(&project, &["run", "hello"]);
     assert_eq!(code, 0, "{out}");
     assert!(out.contains("shell-ran") && out.contains('2'), "{out}");
