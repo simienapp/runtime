@@ -1,7 +1,8 @@
 //! Dynamic code on a real `simien run` of a JavaScript app. Like Deno, `eval`,
 //! the `Function` constructor and `import()` run by default; simien.json can
 //! still refuse them with `"deny": {"dynamic": true}`, and then every spelling
-//! is refused before any of the app runs.
+//! is refused when it runs (#33: V8 refuses code generation from strings, the
+//! loader a computed `import()`), so code that never runs never fails an app.
 
 use std::fs;
 use std::path::Path;
@@ -62,10 +63,18 @@ fn a_fixed_path_import_runs_even_when_dynamic_code_is_denied() {
 }
 
 #[test]
-fn simien_json_can_deny_dynamic_code_and_every_spelling_is_refused_before_it_runs() {
+fn simien_json_can_deny_dynamic_code_and_every_spelling_is_refused_when_it_runs() {
     for spelling in SPELLINGS {
         let out = run(project(DENY, &evaluating(spelling)).path());
-        assert!(out.contains("disabled by the security policy"), "{spelling}: {out}");
+        assert!(out.contains("Code generation from strings disallowed"), "{spelling}: {out}");
+        assert!(out.contains("disabled by the security policy"), "says why and how to allow it: {out}");
         assert!(!out.contains("ran 2"), "{spelling} ran anyway: {out}");
     }
+}
+
+#[test]
+fn dynamic_code_that_never_runs_does_not_stop_the_app_when_denied() {
+    let source = "function never() { return false; }\nif (never()) { eval(\"1\"); new Function(\"x\"); }\nconsole.log(\"ran\", 2);\n";
+    let out = run(project(DENY, source).path());
+    assert!(out.contains("ran 2"), "{out}");
 }

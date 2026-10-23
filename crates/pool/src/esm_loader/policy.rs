@@ -65,6 +65,56 @@ pub(crate) fn enforce_dynamic_policy(modules: &HashMap<PathBuf, String>) -> Resu
     Ok(())
 }
 
+/// Dynamic code in JavaScript modules, held to the policy when it runs
+/// (#33): `eval` and `new Function` are refused by V8 (the server turns
+/// code generation from strings off), and an `import()` may load only the
+/// specifiers its module names in its source. A module whose dead branches hold either
+/// still loads; the old source scan refused it whole.
+#[derive(Default)]
+pub(crate) struct DynamicImports {
+    /// The policy's answer, read once from the security context.
+    allowed: Option<bool>,
+    /// Each module's named imports (static, re-exports, fixed `import()`),
+    /// by module URL.
+    fixed: HashMap<String, std::collections::HashSet<String>>,
+}
+
+impl DynamicImports {
+    pub(crate) fn allowed(&mut self) -> Result<bool, JsErrorBox> {
+        if let Some(allowed) = self.allowed {
+            return Ok(allowed);
+        }
+        let allowed = crate::validation::dynamic_allowed_from_security_context()
+            .map_err(|err| JsErrorBox::generic(format!("{DEKA_VALIDATION_ERROR_MARKER}{err}")))?;
+        self.allowed = Some(allowed);
+        Ok(allowed)
+    }
+
+    /// Records the specifiers `module` names, when dynamic code is denied.
+    pub(crate) fn note(&mut self, module: &str, path: &Path, source: &str) -> Result<(), JsErrorBox> {
+        if self.allowed()? {
+            return Ok(());
+        }
+        let fixed = crate::validation::named_imports(source, &path.to_string_lossy())
+            .map_err(|err| JsErrorBox::generic(format!("{DEKA_VALIDATION_ERROR_MARKER}{err}")))?;
+        self.fixed.insert(module.to_string(), fixed.into_iter().collect());
+        Ok(())
+    }
+
+    /// `specifier` loading from `referrer` dynamically: refused when dynamic
+    /// code is denied and `referrer`'s source doesn't name `specifier`.
+    pub(crate) fn check(&mut self, specifier: &str, referrer: &str) -> Result<(), JsErrorBox> {
+        if self.allowed()? || self.fixed.get(referrer).is_some_and(|fixed| fixed.contains(specifier)) {
+            return Ok(());
+        }
+        Err(JsErrorBox::generic(format!(
+            "Dynamic import of a computed specifier is disabled by the security policy ('{specifier}' from {referrer}). \
+             Import a fixed path (import(\"./module.js\")) or allow dynamic code in simien.json \
+             (\"security\": {{ \"allow\": {{ \"dynamic\": true }} }})."
+        )))
+    }
+}
+
 /// The same check for one JavaScript or TypeScript module, as the loader
 /// reads it: a `.js`/`.ts` entry never goes through the DekaScript graph
 /// above, so without this `dynamic=false` was printed and not enforced.

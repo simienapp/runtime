@@ -97,7 +97,19 @@ pub fn validate_dynamic_code_with_policy(
     file_path: &str,
     policy_json: Option<&str>,
 ) -> Result<(), String> {
-    let allow_dynamic = match policy_json {
+    validate_dynamic_code(source_code, file_path, dynamic_allowed(policy_json)?)
+}
+
+/// Whether the policy in the current execution's security context allows
+/// dynamic code. A missing context denies it, as above.
+pub fn dynamic_allowed_from_security_context() -> Result<bool, String> {
+    dynamic_allowed(security::security_context::context_policy_json().as_deref())
+}
+
+/// `security.allow.dynamic` and not `security.deny.dynamic`; no policy
+/// denies.
+pub fn dynamic_allowed(policy_json: Option<&str>) -> Result<bool, String> {
+    Ok(match policy_json {
         Some(raw) => {
             let document = serde_json::from_str::<serde_json::Value>(&raw)
                 .map_err(|err| format!("invalid security policy: {}", err))?;
@@ -125,9 +137,52 @@ pub fn validate_dynamic_code_with_policy(
             parsed.policy.allow.dynamic && !parsed.policy.deny.dynamic
         }
         None => false,
-    };
+    })
+}
 
-    validate_dynamic_code(source_code, file_path, allow_dynamic)
+/// Every specifier a module names in its source: `import … from`,
+/// `export … from`, and `import()` of a fixed path (a string, or a template
+/// with no `${}`). When dynamic code is denied these are the only ones it may
+/// load: anything else was computed when it ran. (deno_core resolves a whole
+/// graph reached through `import()` as dynamic, so the kind of a resolution
+/// can't tell a static import from a dynamic one; the source can.) Code that
+/// never runs is never refused.
+pub fn named_imports(source_code: &str, file_path: &str) -> Result<Vec<String>, String> {
+    let allocator = Allocator::default();
+    let jsx = file_path.ends_with(".tsx") || file_path.ends_with(".jsx");
+    let source_type = if jsx { SourceType::tsx() } else { SourceType::ts() };
+    let parsed = Parser::new(&allocator, source_code, source_type).parse();
+    if let Some(error) = parsed.diagnostics.errors().next() {
+        return Err(format_parse_error(source_code, file_path, error));
+    }
+    #[derive(Default)]
+    struct Fixed(Vec<String>);
+    impl<'a> Visit<'a> for Fixed {
+        fn visit_import_declaration(&mut self, node: &oxc_ast::ast::ImportDeclaration<'a>) {
+            self.0.push(node.source.value.to_string());
+        }
+        fn visit_export_from_declaration(&mut self, node: &oxc_ast::ast::ExportFromDeclaration<'a>) {
+            self.0.push(node.source.value.to_string());
+        }
+        fn visit_export_all_declaration(&mut self, node: &oxc_ast::ast::ExportAllDeclaration<'a>) {
+            self.0.push(node.source.value.to_string());
+        }
+        fn visit_import_expression(&mut self, node: &ImportExpression<'a>) {
+            match &node.source {
+                Expression::StringLiteral(literal) => self.0.push(literal.value.to_string()),
+                Expression::TemplateLiteral(template) if template.expressions.is_empty() => {
+                    if let Some(cooked) = template.quasis.first().and_then(|quasi| quasi.value.cooked) {
+                        self.0.push(cooked.to_string());
+                    }
+                }
+                _ => {}
+            }
+            walk::walk_import_expression(self, node);
+        }
+    }
+    let mut fixed = Fixed::default();
+    fixed.visit_program(&parsed.program);
+    Ok(fixed.0)
 }
 
 #[derive(Default)]

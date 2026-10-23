@@ -381,6 +381,11 @@ fn serve_isolate(
             module_loader: Some(Rc::new(loader)),
             ..Default::default()
         });
+        // `security.deny.dynamic`: V8 refuses `eval` and `new Function` (and
+        // any alias of them) when they run, before any app code loads. The
+        // loader refuses a computed `import()` the same way (#33).
+        let dynamic = pool::validation::dynamic_allowed(Some(&shared.security.policy_json))?;
+        pool::validation::allow_code_generation_from_strings(&mut runtime, dynamic);
         slot.heartbeat.store(shared.now(), Ordering::Relaxed);
         *slot.handle.lock().unwrap_or_else(|err| err.into_inner()) =
             Some(runtime.v8_isolate().thread_safe_handle());
@@ -394,14 +399,14 @@ fn serve_isolate(
             .map_err(|_| format!("invalid entry path: {}", entry.display()))?;
         let module = beating(shared, slot, runtime.load_main_es_module(&specifier))
             .await?
-            .map_err(|err| format!("failed to load {}: {err}", entry.display()))?;
+            .map_err(|err| format!("failed to load {}: {}", entry.display(), pool::validation::explain_code_generation_refusal(err.to_string())))?;
         let evaluated = runtime.mod_evaluate(module);
         beating(shared, slot, runtime.run_event_loop(Default::default()))
             .await?
-            .map_err(|err| format!("failed to run {}: {err}", entry.display()))?;
+            .map_err(|err| format!("failed to run {}: {}", entry.display(), pool::validation::explain_code_generation_refusal(err.to_string())))?;
         evaluated
             .await
-            .map_err(|err| format!("failed to run {}: {err}", entry.display()))?;
+            .map_err(|err| format!("failed to run {}: {}", entry.display(), pool::validation::explain_code_generation_refusal(err.to_string())))?;
 
         let namespace = runtime
             .get_module_namespace(module)
