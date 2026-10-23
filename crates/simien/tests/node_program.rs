@@ -455,3 +455,30 @@ fn a_granted_program_reads_no_secrets_and_sees_no_credentials() {
     assert_eq!(seen["inKeys"], false, "{seen}");
     assert_eq!(seen["ordinary"], "seen", "ordinary variables pass: {seen}");
 }
+
+#[cfg(unix)]
+/// `structuredClone`'s `transfer` moves a buffer: the original is detached
+/// (Node's `buffer.isAscii` on it then throws ERR_INVALID_STATE).
+#[test]
+fn a_granted_program_transfers_buffers() {
+    let project = probe_project(
+        true,
+        r#"const b = new ArrayBuffer(8);
+        const c = structuredClone(b, { transfer: [b] });
+        let code;
+        try { require("node:buffer").isAscii(b); } catch (e) { code = e.code; }
+        console.log(JSON.stringify({ detached: b.detached, copy: c.byteLength, code }));
+        "#,
+    );
+    let home = tempfile::tempdir().expect("fake home");
+    let output = Command::new(env!("CARGO_BIN_EXE_simien"))
+        .args(["x", "probe"])
+        .current_dir(project.path())
+        .env("HOME", home.path())
+        .output()
+        .expect("run simien x");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{stdout}{}", String::from_utf8_lossy(&output.stderr));
+    let seen: serde_json::Value = serde_json::from_str(stdout.trim()).expect("one JSON line");
+    assert_eq!(seen, serde_json::json!({ "detached": true, "copy": 8, "code": "ERR_INVALID_STATE" }));
+}
