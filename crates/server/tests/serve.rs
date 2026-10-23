@@ -424,6 +424,38 @@ fn an_app_imports_packages_from_node_modules() {
     assert_eq!(body, "HELLO SIMIEN", "the worker build, with its own dependency");
 }
 
+/// react-dom's streaming renderer keeps a MessagePort for its task queue:
+/// the app still starts and answers (#59).
+#[test]
+fn an_app_that_keeps_a_message_port_open_still_answers() {
+    // Started on its own thread: an isolate waiting for nothing to be
+    // pending would never finish starting, and the test fails instead of
+    // hanging.
+    let (started, starting) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = started.send(start_app(&[
+            (
+                "app.js",
+                r#"const channel = new MessageChannel();
+                const queue = [];
+                channel.port1.onmessage = () => queue.shift()?.();
+                const later = () => new Promise((resolve) => { queue.push(resolve); channel.port2.postMessage(null); });
+                export default { fetch: async () => { await later(); return Response.json({ ok: true }); } };"#,
+            ),
+            ("simien.json", "{}"),
+        ], &[]));
+    });
+    let (_dir, addr) = starting
+        .recv_timeout(Duration::from_secs(30))
+        .expect("the app didn't start within 30s")
+        .expect("start");
+    for _ in 0..2 {
+        let body: serde_json::Value =
+            client().get(format!("http://{addr}/")).send().expect("request").json().expect("json");
+        assert_eq!(body["ok"], true);
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn an_app_imports_a_commonjs_package_as_node_would() {
