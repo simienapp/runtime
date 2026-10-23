@@ -18,14 +18,41 @@ const COMMAND: CommandSpec = CommandSpec {
     handler: cmd,
 };
 
+const BUILD: CommandSpec = CommandSpec {
+    owner: "runtime",
+    name: "build",
+    category: "runtime",
+    summary: "build the app for production: package.json's `build` script (`simien run build`)",
+    aliases: &[],
+    subcommands: &[],
+    handler: build,
+};
+
 pub fn register(registry: &mut Registry) {
     registry.add_command(COMMAND);
+    registry.add_command(BUILD);
+}
+
+fn build(context: &Context) {
+    match try_run_package_script(context, "build", &context.args.positionals) {
+        Some(exit_code) => std::process::exit(exit_code),
+        None => {
+            stdio::error("build", "package.json has no `build` script (add one, e.g. \"build\": \"vite build\")");
+            std::process::exit(1);
+        }
+    }
 }
 
 pub fn cmd(context: &Context) {
     if !cli_arg_is_source_file(context) {
         if let Some(exit_code) = try_run_deka_script(context) {
             std::process::exit(exit_code);
+        }
+        if let Some(name) = requested_script_name(context) {
+            let extra = context.args.positionals.get(1..).unwrap_or(&[]);
+            if let Some(exit_code) = try_run_package_script(context, name, extra) {
+                std::process::exit(exit_code);
+            }
         }
     }
     match prepare_run_context(context) {
@@ -73,7 +100,7 @@ fn prepare_run_context(context: &Context) -> Result<PreparedRun, String> {
     let resolved = run::entry::resolve_entry(&cwd, cli_arg)?;
     if resolved.path.is_dir() {
         return Err(format!(
-            "resolved entry is a directory ({}); deka run executes a .ds/.dsx/.js module, not an HTTP server. Use `deka serve` for app/ and api/ directories.",
+            "resolved entry is a directory ({}); `simien run` runs a file or a package.json script. For the app, use `simien dev`.",
             resolved.path.display()
         ));
     }
@@ -375,9 +402,61 @@ fn rule_denies(rule: &RuleList, target: Option<&str>) -> bool {
     }
 }
 
+/// `simien run <script>` for a package.json script, as `npm run` does. A
+/// script that is one installed package's program (`vite build`) runs as
+/// `simien x vite build`, on Simien's Node layer in its sandbox; anything else
+/// runs in a shell with node_modules/.bin on PATH, under the project's
+/// subprocess policy. None when package.json has no such script.
+fn try_run_package_script(context: &Context, name: &str, extra_args: &[String]) -> Option<i32> {
+    let cwd = std::env::current_dir().ok()?;
+    let package: Value = serde_json::from_str(&std::fs::read_to_string(cwd.join("package.json")).ok()?).ok()?;
+    let script = package.get("scripts")?.get(name)?.as_str()?.to_string();
+    let bin_dir = cwd.join("node_modules/.bin");
+    if let Some(words) = package_program_words(&script, &bin_dir) {
+        let simien = std::env::current_exe().ok()?;
+        let status = Command::new(simien).arg("x").args(&words).args(extra_args).status();
+        return Some(status.map(|status| status.code().unwrap_or(1)).unwrap_or(1));
+    }
+    let project_json = load_simien_json().unwrap_or(Value::Null);
+    if let Err(err) = enforce_subprocess_policy(context, &project_json, &script) {
+        stdio::error("run", &err);
+        return Some(1);
+    }
+    let path = std::env::join_paths(
+        std::iter::once(bin_dir).chain(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())),
+    )
+    .ok()?;
+    let status = Command::new("/bin/sh")
+        .arg("-c")
+        .arg(compose_script_command(&script, extra_args))
+        .env("PATH", path)
+        .status();
+    Some(status.map(|status| status.code().unwrap_or(1)).unwrap_or(1))
+}
+
+/// The words of `script` when it is a plain call to a program in `bin_dir`
+/// (no shell syntax): `vite build` → `["vite", "build"]`.
+fn package_program_words(script: &str, bin_dir: &std::path::Path) -> Option<Vec<String>> {
+    if script.contains(|c: char| "&|;<>$`()'\"\\*?".contains(c)) {
+        return None;
+    }
+    let words: Vec<String> = script.split_whitespace().map(str::to_string).collect();
+    let program = words.first()?;
+    bin_dir.join(program).exists().then_some(words)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_plain_call_to_an_installed_program_is_a_package_program() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("vite"), "").unwrap();
+        assert_eq!(package_program_words("vite build", dir.path()), Some(vec!["vite".to_string(), "build".to_string()]));
+        assert_eq!(package_program_words("vite build && echo done", dir.path()), None, "shell syntax");
+        assert_eq!(package_program_words("tsc -p .", dir.path()), None, "not installed");
+    }
 
     #[test]
     fn resolves_explicit_script_first() {
