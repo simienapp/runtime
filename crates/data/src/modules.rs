@@ -59,6 +59,20 @@ async function send(query) {{
 export function connect(schema) {{
   return client(schema, send);
 }}
+
+// A live query (APS 4): calling it runs the query, as `await latest()` in a
+// Server Component; through `simien.live` it also answers the tables it read,
+// which a subscription watches.
+const track = globalThis[Symbol.for("simien.data.track")];
+
+export function live(query) {{
+  // An async function: React lets a "use server" module export only those.
+  const run = async (...args) => query(...args);
+  Object.defineProperty(run, Symbol.for("simien.live"), {{
+    value: (...args) => track(() => query(...args)),
+  }});
+  return run;
+}}
 "#
     )
 }

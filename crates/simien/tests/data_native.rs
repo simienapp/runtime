@@ -44,7 +44,7 @@ fn a_program_given_data_writes_and_reads_the_real_database() {
     settings["packagePermissions"] = serde_json::json!({ "probe": { "dangerouslyUseNode": true } });
     settings["security"] = serde_json::json!({ "allow": { "db": ["postgres"] } });
     fs::write(&config, settings.to_string()).unwrap();
-    let schema = "import { defineSchema, defineTable, v } from \"simien:schema\";\n\nexport default defineSchema({\n  notes: defineTable({ text: v.string() }),\n});\n";
+    let schema = "import { defineSchema, defineTable, v } from \"simien:schema\";\n\nexport default defineSchema({\n  notes: defineTable({ text: v.string() }),\n  tags: defineTable({ name: v.string() }),\n});\n";
     fs::write(root.join("simien/schema.ts"), schema).unwrap();
 
     let stack = Stack(Project::open(root).unwrap());
@@ -59,13 +59,24 @@ fn a_program_given_data_writes_and_reads_the_real_database() {
     fs::write(
         package.join("cli.mjs"),
         r#"import { defineSchema, defineTable, v } from "simien:schema";
-        import { connect } from "simien:db";
-        const db = connect(defineSchema({ notes: defineTable({ text: v.string() }) }));
+        import { connect, live } from "simien:db";
+        const db = connect(defineSchema({ notes: defineTable({ text: v.string() }), tags: defineTable({ name: v.string() }) }));
         const inserted = await db.notes.insert({ text: "written natively" });
         const rows = await db.notes.findMany({ where: { text: "written natively" } });
         let refused;
         try { await db.notes.findMany({ where: { missing: 1 } }); } catch (error) { refused = error.kind; }
-        console.log(JSON.stringify({ inserted, rows, refused }));
+        // Live queries (APS 4): each names the tables it read, however deep
+        // its awaits, and two running at once don't mix theirs up.
+        const both = live(async () => {
+          const notes = await db.notes.findMany({});
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return { notes: notes.length, tags: await db.tags.count() };
+        });
+        const tagsOnly = live(() => db.tags.findMany({}));
+        const tracked = Symbol.for("simien.live");
+        const [bothRun, tagsRun] = await Promise.all([both[tracked](), tagsOnly[tracked]()]);
+        const direct = await both();
+        console.log(JSON.stringify({ inserted, rows, refused, bothRun, tagsRun, direct }));
         "#,
     )
     .unwrap();
@@ -87,6 +98,10 @@ fn a_program_given_data_writes_and_reads_the_real_database() {
     assert_eq!(seen["inserted"]["text"], "written natively", "{seen}");
     assert_eq!(seen["rows"].as_array().map(Vec::len), Some(1), "{seen}");
     assert_eq!(seen["refused"], "invalid", "the engine checks queries against schema.ts: {seen}");
+    assert_eq!(seen["bothRun"]["tables"], serde_json::json!(["notes", "tags"]), "{seen}");
+    assert_eq!(seen["bothRun"]["result"], serde_json::json!({ "notes": 1, "tags": 0 }), "{seen}");
+    assert_eq!(seen["tagsRun"]["tables"], serde_json::json!(["tags"]), "a concurrent live query keeps its own: {seen}");
+    assert_eq!(seen["direct"], serde_json::json!({ "notes": 1, "tags": 0 }), "called directly, it is the query: {seen}");
 
     // In Postgres itself, not just what the client said.
     let row = db.query_one("select text from notes", &[]).expect("the row");

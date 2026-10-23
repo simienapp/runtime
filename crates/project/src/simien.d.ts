@@ -119,4 +119,10 @@ declare module "simien:db" {
   }
 
   export function connect<S extends Record<string, TableDefinition<any> | EdgeDefinition<any>>>(schema: S): Db<S>
+  /**
+   * A live query (APS 4): call it on the server as the query itself
+   * (`const posts = await latest()`); a client component subscribes to it
+   * with `useQuery(latest)` and re-renders when a table it read changes.
+   */
+  export function live<A extends unknown[], R>(query: (...args: A) => Promise<R>): (...args: A) => Promise<R>
 }
