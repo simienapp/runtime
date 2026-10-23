@@ -449,3 +449,27 @@ fn strings(value: &Value) -> Vec<String> {
         .map(|items| items.iter().filter_map(|item| item.as_str().map(str::to_string)).collect())
         .unwrap_or_default()
 }
+
+#[cfg(test)]
+mod socket_tests {
+    use super::docker_socket;
+
+    #[test]
+    fn the_docker_clis_current_context_names_the_socket() {
+        let home = tempfile::tempdir().unwrap();
+        let socket = home.path().join("custom/docker.sock");
+        std::fs::create_dir_all(socket.parent().unwrap()).unwrap();
+        std::fs::write(&socket, "").unwrap();
+        // The docker CLI keeps a context's endpoint under the sha256 of its name.
+        let digest = format!("{:x}", <sha2::Sha256 as sha2::Digest>::digest(b"colima"));
+        let meta = home.path().join(".docker/contexts/meta").join(&digest);
+        std::fs::create_dir_all(&meta).unwrap();
+        std::fs::write(home.path().join(".docker/config.json"), r#"{ "currentContext": "colima" }"#).unwrap();
+        std::fs::write(
+            meta.join("meta.json"),
+            format!(r#"{{ "Endpoints": {{ "docker": {{ "Host": "unix://{}" }} }} }}"#, socket.display()),
+        )
+        .unwrap();
+        assert_eq!(docker_socket(home.path()), Some(socket));
+    }
+}
