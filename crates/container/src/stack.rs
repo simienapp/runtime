@@ -81,11 +81,14 @@ pub enum Kebele {
     Installed(PathBuf),
     /// Simien's own, in kebele's sandbox plus the one Docker socket it may
     /// use (given with --socket, so it needn't read ~/.docker, a secret).
-    Simien {
-        program: packages::exec::Program,
-        sandbox: packages::sandbox::Prepared,
-        socket: PathBuf,
-    },
+    Simien(Box<SimienKebele>),
+}
+
+/// Simien's own kebele: the installed program, its sandbox, and the socket.
+pub struct SimienKebele {
+    program: packages::exec::Program,
+    sandbox: packages::sandbox::Prepared,
+    socket: PathBuf,
 }
 
 impl Kebele {
@@ -96,7 +99,8 @@ impl Kebele {
                 command.args(args).arg("--nopretty");
                 Ok(command)
             }
-            Kebele::Simien { program, sandbox, socket } => {
+            Kebele::Simien(own) => {
+                let SimienKebele { program, sandbox, socket } = own.as_ref();
                 let mut all: Vec<String> = args.iter().map(|arg| arg.to_string()).collect();
                 all.extend(["--socket".to_string(), socket.display().to_string(), "--nopretty".to_string()]);
                 program.command(&sandbox.sandbox, &all).map_err(|err| format!("starting kebele: {err}"))
@@ -107,7 +111,7 @@ impl Kebele {
     fn name(&self) -> String {
         match self {
             Kebele::Installed(program) => program.display().to_string(),
-            Kebele::Simien { .. } => KEBELE.to_string(),
+            Kebele::Simien(_) => KEBELE.to_string(),
         }
     }
 }
@@ -144,7 +148,7 @@ pub fn kebele(project_root: Option<&Path>) -> Result<Kebele, String> {
     let mut sandbox = program.sandbox(&root).map_err(|err| format!("kebele's sandbox: {err:#}"))?;
     // Connecting to a unix socket is writing to it.
     sandbox.sandbox = sandbox.sandbox.allow_write(&socket);
-    Ok(Kebele::Simien { program, sandbox, socket })
+    Ok(Kebele::Simien(Box::new(SimienKebele { program, sandbox, socket })))
 }
 
 /// The Docker socket the docker CLI would use (its current context), then
