@@ -200,6 +200,9 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
             .into_iter()
             .chain(invocation.rules.to_args())
             .collect(),
+            // A `cluster` worker: the id and policy its primary gave it.
+            cluster_unique_id: std::env::var("NODE_UNIQUE_ID").ok(),
+            cluster_sched_policy: std::env::var("NODE_CLUSTER_SCHED_POLICY").ok(),
             ..Default::default()
         },
         exit_code.clone(),

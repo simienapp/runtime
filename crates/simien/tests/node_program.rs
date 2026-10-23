@@ -482,3 +482,38 @@ fn a_granted_program_transfers_buffers() {
     let seen: serde_json::Value = serde_json::from_str(stdout.trim()).expect("one JSON line");
     assert_eq!(seen, serde_json::json!({ "detached": true, "copy": 8, "code": "ERR_INVALID_STATE" }));
 }
+
+#[cfg(unix)]
+/// `cluster.fork()` starts a worker that knows it is one: it sends its
+/// primary a message and exits (before, every worker took itself for the
+/// primary and forked again).
+#[test]
+fn a_granted_program_runs_cluster_workers() {
+    let project = probe_project(
+        true,
+        r#"const cluster = require("node:cluster");
+        if (cluster.isPrimary) {
+          const worker = cluster.fork();
+          worker.on("message", (m) => console.log(JSON.stringify(m)));
+          setTimeout(() => process.exit(3), 20000).unref();
+        } else {
+          process.send({ worker: cluster.isWorker });
+          setTimeout(() => process.exit(0), 100);
+        }
+        "#,
+    );
+    let home = tempfile::tempdir().expect("fake home");
+    // The program starts itself again: a plain environment, as cargo's
+    // DYLD_*/LD_* variables would refuse that (see node_app.rs).
+    let output = Command::new(env!("CARGO_BIN_EXE_simien"))
+        .args(["x", "probe"])
+        .current_dir(project.path())
+        .env_clear()
+        .env("HOME", home.path())
+        .env("PATH", "/usr/bin:/bin")
+        .output()
+        .expect("run simien x");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{stdout}{}", String::from_utf8_lossy(&output.stderr));
+    assert_eq!(stdout.trim(), r#"{"worker":true}"#);
+}

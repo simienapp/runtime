@@ -18,7 +18,7 @@ simien_core.workspace = true
 simien_error = { workspace = true }
 simien_fetch = "0.1.2"
 simien_node = "0.1.5"
-simien_node_runtime = "0.4.2"
+simien_node_runtime = "0.5.0"
 simien_os = "0.1.0"
 simien_permissions = "0.1.0"
 tokio = { version = "1", features = ["rt", "macros", "time", "net", "fs", "io-util"] }
