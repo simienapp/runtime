@@ -159,10 +159,10 @@ fn the_local_stack_starts_without_node_bun_or_kebele() {
     let home = tempfile::tempdir().expect("fake home");
     // The real Docker CLI context (where Docker Desktop's socket is named),
     // and nothing else of the user's.
-    if let Some(real) = std::env::var_os("HOME").map(std::path::PathBuf::from) {
-        if real.join(".docker").exists() {
-            std::os::unix::fs::symlink(real.join(".docker"), home.path().join(".docker")).expect("link .docker");
-        }
+    if let Some(real) = std::env::var_os("HOME").map(PathBuf::from)
+        && real.join(".docker").exists()
+    {
+        std::os::unix::fs::symlink(real.join(".docker"), home.path().join(".docker")).expect("link .docker");
     }
     write(&project.path().join("package.json"), r#"{ "name": "stack", "private": true }"#);
     let init = simien(project.path(), home.path(), &["db", "init"]).output().expect("db init");
