@@ -1077,13 +1077,15 @@ impl WorkerThread {
                     )),
                 );
                 match handler_result {
-                    Ok(_value) => {
-                        // The async IIFE returns a Promise. Run the event
-                        // loop unconditionally so globalThis.app gets set
-                        // before __dekaExecuteRequest checks it.
+                    Ok(value) => {
+                        // The async IIFE returns a Promise: wait for it, so
+                        // globalThis.app is set before __dekaExecuteRequest
+                        // checks it (not for an idle loop, which what the
+                        // handler keeps open for its requests would hold).
+                        let settled = isolate.runtime.resolve(value);
                         if let Err(err) = isolate
                             .runtime
-                            .run_event_loop(simien_core::PollEventLoopOptions::default())
+                            .with_event_loop_promise(Box::pin(settled), simien_core::PollEventLoopOptions::default())
                             .await
                         {
                             isolate.active_requests = 0;
@@ -1339,19 +1341,34 @@ impl WorkerThread {
                     }
                 };
                 let eval = isolate.runtime.mod_evaluate(module_id);
-                if let Err(err) = isolate
-                    .runtime
-                    .run_event_loop(simien_core::PollEventLoopOptions::default())
-                    .await
-                {
-                    isolate.active_requests = 0;
-                    isolate.state = IsolateState::Idle;
-                    return (
-                        ExecutionOutcome::Err(crate::validation::explain_code_generation_refusal(format!("Module event loop failed: {}", err))),
-                        ExecutionProfile::empty(),
-                    );
-                }
-                if let Err(err) = eval.await {
+                // A script (Module mode) runs until nothing is pending, as
+                // Node's does. A served module runs until it has evaluated:
+                // what it leaves open for its requests (a MessagePort, as
+                // react-dom's streaming renderer does) mustn't hold it.
+                let evaluated = if request.request_data.mode == ExecutionMode::Module {
+                    if let Err(err) = isolate
+                        .runtime
+                        .run_event_loop(simien_core::PollEventLoopOptions::default())
+                        .await
+                    {
+                        isolate.active_requests = 0;
+                        isolate.state = IsolateState::Idle;
+                        return (
+                            ExecutionOutcome::Err(crate::validation::explain_code_generation_refusal(format!("Module event loop failed: {}", err))),
+                            ExecutionProfile::empty(),
+                        );
+                    }
+                    eval.await
+                } else {
+                    isolate
+                        .runtime
+                        .with_event_loop_promise(Box::pin(eval), simien_core::PollEventLoopOptions::default())
+                        .await
+                };
+                // A module that threw can still settle its evaluation, the
+                // error left for the event loop: its namespace shows it.
+                let evaluated = evaluated.and_then(|()| isolate.runtime.get_module_namespace(module_id).map(drop));
+                if let Err(err) = evaluated {
                     isolate.active_requests = 0;
                     isolate.state = IsolateState::Idle;
                     return (
@@ -1513,11 +1530,28 @@ impl WorkerThread {
 
         let event_loop_ms = if needs_event_loop {
             let event_start = Instant::now();
-            if let Err(err) = isolate
-                .runtime
-                .run_event_loop(simien_core::PollEventLoopOptions::default())
-                .await
-            {
+            // A script (Module mode) runs until nothing is pending; a request
+            // until its promise settles, whatever the app keeps open between
+            // requests (a MessagePort, as react-dom's streaming renderer does).
+            let waited = if request.request_data.mode == ExecutionMode::Module {
+                isolate
+                    .runtime
+                    .run_event_loop(simien_core::PollEventLoopOptions::default())
+                    .await
+            } else {
+                let settled = isolate.runtime.resolve(result.clone());
+                match isolate
+                    .runtime
+                    .with_event_loop_promise(Box::pin(settled), simien_core::PollEventLoopOptions::default())
+                    .await
+                {
+                    Ok(_) => Ok(()),
+                    // A rejection is the handler's own, read from the promise below.
+                    Err(_) if !still_pending(&mut isolate.runtime, &result) => Ok(()),
+                    Err(err) => Err(err),
+                }
+            };
+            if let Err(err) = waited {
                 if let Some(watchdog) = watchdog {
                     watchdog.abort();
                 }
@@ -1758,4 +1792,12 @@ mod tests {
         assert_eq!(body["fs"]["error"]["__enum"], "FsError");
         assert_eq!(body["fs"]["error"]["__case"], "PermissionDenied");
     }
+}
+
+/// Whether `value` is a promise that hasn't settled.
+fn still_pending(runtime: &mut simien_core::JsRuntime, value: &simien_core::v8::Global<simien_core::v8::Value>) -> bool {
+    simien_core::scope!(scope, runtime);
+    let local = simien_core::v8::Local::new(scope, value);
+    simien_core::v8::Local::<simien_core::v8::Promise>::try_from(local)
+        .is_ok_and(|promise| promise.state() == simien_core::v8::PromiseState::Pending)
 }

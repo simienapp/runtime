@@ -400,17 +400,20 @@ fn serve_isolate(
         let module = beating(shared, slot, runtime.load_main_es_module(&specifier))
             .await?
             .map_err(|err| format!("failed to load {}: {}", entry.display(), pool::validation::explain_code_generation_refusal(err.to_string())))?;
-        let evaluated = runtime.mod_evaluate(module);
-        beating(shared, slot, runtime.run_event_loop(Default::default()))
+        // Until the module has run, not until nothing is pending: a module
+        // may leave something open for its requests (a MessagePort, as
+        // react-dom's streaming renderer does), and the isolate serves on.
+        let evaluated = Box::pin(runtime.mod_evaluate(module));
+        beating(shared, slot, runtime.with_event_loop_promise(evaluated, Default::default()))
             .await?
             .map_err(|err| format!("failed to run {}: {}", entry.display(), pool::validation::explain_code_generation_refusal(err.to_string())))?;
-        evaluated
-            .await
-            .map_err(|err| format!("failed to run {}: {}", entry.display(), pool::validation::explain_code_generation_refusal(err.to_string())))?;
 
+        // A module that threw can still settle its evaluation, the error
+        // left for the event loop to report: reading its namespace is where
+        // it shows, and it's the module failing to run.
         let namespace = runtime
             .get_module_namespace(module)
-            .map_err(|err| err.to_string())?;
+            .map_err(|err| format!("failed to run {}: {}", entry.display(), pool::validation::explain_code_generation_refusal(err.to_string())))?;
         {
             let runtime = &mut runtime;
             simien_core::scope!(scope, runtime);
