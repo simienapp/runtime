@@ -1463,7 +1463,9 @@ dependencies = [
  "schema_sync",
  "serde",
  "serde_json",
+ "simien_core",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -4494,10 +4496,16 @@ name = "node_program"
 version = "0.61.0"
 dependencies = [
  "anyhow",
+ "data",
+ "deka_host",
  "libc",
  "packages",
+ "project",
+ "runtime",
+ "schema_sync",
  "serde_json",
  "simien_core",
+ "simien_error",
  "simien_fetch",
  "simien_node",
  "simien_node_runtime",
@@ -7465,10 +7473,12 @@ dependencies = [
  "node_program",
  "output",
  "packages",
+ "postgres",
  "project",
  "reqwest",
  "run",
  "runtime",
+ "schema_sync",
  "self_cmd",
  "serde",
  "serde_json",

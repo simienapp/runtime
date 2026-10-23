@@ -3,7 +3,9 @@
 //! compiled to one parameterized SQL statement, and run on Postgres. Writes
 //! reach Zega through pg_zega inside the same transaction.
 
+pub mod binding;
 mod compile;
+mod engine;
 pub mod modules;
 mod param;
 pub mod query;
@@ -14,6 +16,7 @@ use schema::model::Schema;
 use serde_json::Value;
 
 pub use compile::{Compiled, Shape, compile};
+pub use engine::Engine;
 pub use query::Query;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,17 +25,34 @@ pub enum DataError {
     Invalid(String),
     /// Postgres refused or failed the statement.
     Database(String),
+    /// The app may not use its database here: no database yet, or the
+    /// `db` permission isn't granted. Says how to fix it.
+    Refused(String),
 }
 
 impl std::fmt::Display for DataError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DataError::Invalid(message) | DataError::Database(message) => f.write_str(message),
+            DataError::Invalid(message) | DataError::Database(message) | DataError::Refused(message) => {
+                f.write_str(message)
+            }
         }
     }
 }
 
 impl std::error::Error for DataError {}
+
+impl DataError {
+    /// What a client is told it is: `invalid` (the query's to fix),
+    /// `database` (Postgres refused or failed it) or `refused` (no access).
+    pub fn kind(&self) -> &'static str {
+        match self {
+            DataError::Invalid(_) => "invalid",
+            DataError::Database(_) => "database",
+            DataError::Refused(_) => "refused",
+        }
+    }
+}
 
 /// Runs `query` and returns its result: a list of rows, one row or `null`, or a count.
 pub fn run(

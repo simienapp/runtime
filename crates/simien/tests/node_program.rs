@@ -269,6 +269,96 @@ fn a_node_program_can_start_itself_again() {
     assert_eq!(seen["forked"], child("forked"), "{seen}");
 }
 
+/// `--data` (what `simien dev` gives Vite) lets a program import `simien:db`
+/// from Simien, and its queries go to the engine: here the project's
+/// Postgres isn't running, so the engine's own "database" error comes back.
+/// Without `--data` there's no `simien:db` to import.
+#[test]
+fn only_a_program_given_data_can_query_the_projects_database() {
+    let project = tempfile::tempdir().expect("project");
+    let home = tempfile::tempdir().expect("fake home");
+    let closed = {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a free port");
+        listener.local_addr().expect("addr").port()
+    };
+    fs::write(
+        project.path().join("simien.json"),
+        format!(
+            r#"{{ "name": "shop", "packagePermissions": {{ "probe": {{ "dangerouslyUseNode": true }} }},
+               "security": {{ "allow": {{ "db": ["postgres"] }} }},
+               "db": {{ "ports": {{ "postgres": {closed}, "zega": {} }} }} }}"#,
+            closed + 1
+        ),
+    )
+    .expect("simien.json");
+    let schema = "import { defineSchema, defineTable, v } from \"simien:schema\";\n\nexport default defineSchema({\n  posts: defineTable({ title: v.string() }),\n});\n";
+    fs::create_dir_all(project.path().join("simien")).expect("simien/");
+    fs::write(project.path().join("simien/schema.ts"), schema).expect("schema.ts");
+    let package = project.path().join("node_modules/probe");
+    fs::create_dir_all(&package).expect("package dir");
+    fs::write(package.join("package.json"), r#"{ "name": "probe", "version": "1.0.0" }"#).expect("package.json");
+    // An ES module, as Vite and its module runner are.
+    fs::write(
+        package.join("cli.mjs"),
+        r#"let seen;
+        try {
+          const { defineSchema, defineTable, v } = await import("simien:schema");
+          const { connect } = await import("simien:db");
+          const db = connect(defineSchema({ posts: defineTable({ title: v.string() }) }));
+          await db.posts.findMany();
+          seen = { queried: true };
+        } catch (error) {
+          seen = { name: error.name, kind: error.kind ?? null, message: String(error.message) };
+        }
+        console.log(JSON.stringify(seen));
+        "#,
+    )
+    .expect("cli.mjs");
+
+    let run = |data: bool| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_simien"));
+        command.arg("__node-program").arg("--project").arg(project.path());
+        if data {
+            command.arg("--data");
+        }
+        let output = command.arg(package.join("cli.mjs")).env("HOME", home.path()).output().expect("run the program");
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let line = stdout.lines().find(|line| line.starts_with('{')).unwrap_or_else(|| {
+            panic!("no JSON line\nstdout: {stdout}\nstderr: {}", String::from_utf8_lossy(&output.stderr))
+        });
+        serde_json::from_str::<serde_json::Value>(line).expect("JSON")
+    };
+
+    let given = run(true);
+    assert_eq!(given["name"], "SimienDataError", "{given}");
+    assert_eq!(given["kind"], "database", "the engine ran the query and Postgres wasn't there: {given}");
+    assert!(given["message"].as_str().unwrap_or_default().contains("Postgres"), "{given}");
+
+    // The db permission (APS 4) not granted: the program runs, and every
+    // query says how to allow it.
+    let config = project.path().join("simien.json");
+    let mut settings: serde_json::Value = serde_json::from_str(&fs::read_to_string(&config).unwrap()).unwrap();
+    settings.as_object_mut().unwrap().remove("security");
+    fs::write(&config, settings.to_string()).unwrap();
+    let ungranted = run(true);
+    assert_eq!(ungranted["kind"], "refused", "{ungranted}");
+    assert!(ungranted["message"].as_str().unwrap_or_default().contains(r#""allow": { "db": ["postgres"] }"#), "{ungranted}");
+
+    // A project with no database yet still runs; the query says what to do.
+    settings.as_object_mut().unwrap().remove("db");
+    fs::write(&config, settings.to_string()).unwrap();
+    let no_database = run(true);
+    assert_eq!(no_database["kind"], "refused", "{no_database}");
+    assert!(no_database["message"].as_str().unwrap_or_default().contains("simien db init"), "{no_database}");
+
+    let withheld = run(false);
+    assert_ne!(withheld["name"], "SimienDataError", "{withheld}");
+    assert!(
+        withheld["message"].as_str().unwrap_or_default().contains("Received protocol 'simien'"),
+        "the import itself is refused: {withheld}"
+    );
+}
+
 /// A package program at `node_modules/probe` running `source`, with
 /// node_modules/.bin/probe linked to it, as an install puts it. `grant`
 /// says whether simien.json grants it dangerouslyUseNode.
