@@ -144,3 +144,45 @@ fn a_vite_react_app_installs_runs_and_builds_without_node_or_bun() {
     assert!(bundle.contains("No node here"), "the app is in the bundle");
     assert!(bundle.contains("createRoot"), "React is in the bundle");
 }
+
+/// `simien container start` brings a project's Postgres and Zega up with no
+/// node, bun or kebele anywhere: Simien installs kebele itself and runs it on
+/// its own Node layer, given only the Docker socket (#95).
+#[test]
+#[ignore = "pulls images and installs kebele from the npm registry; CI's No node or bun job runs it"]
+fn the_local_stack_starts_without_node_bun_or_kebele() {
+    let path = path_without_node();
+    for dir in std::env::split_paths(&path) {
+        assert!(!dir.join("kebele").exists(), "kebele is on PATH in {}", dir.display());
+    }
+    let project = tempfile::tempdir().expect("project");
+    let home = tempfile::tempdir().expect("fake home");
+    // The real Docker CLI context (where Docker Desktop's socket is named),
+    // and nothing else of the user's.
+    if let Some(real) = std::env::var_os("HOME").map(PathBuf::from)
+        && real.join(".docker").exists()
+    {
+        std::os::unix::fs::symlink(real.join(".docker"), home.path().join(".docker")).expect("link .docker");
+    }
+    write(&project.path().join("package.json"), r#"{ "name": "stack", "private": true }"#);
+    let init = simien(project.path(), home.path(), &["db", "init"]).output().expect("db init");
+    assert!(init.status.success(), "db init: {}", String::from_utf8_lossy(&init.stderr));
+
+    struct Down<'a>(&'a Path, &'a Path);
+    impl Drop for Down<'_> {
+        fn drop(&mut self) {
+            let _ = simien(self.0, self.1, &["container", "reset", "--yes"]).output();
+        }
+    }
+    let _down = Down(project.path(), home.path());
+    let start = simien(project.path(), home.path(), &["container", "start"]).output().expect("container start");
+    let out = format!("{}{}", String::from_utf8_lossy(&start.stdout), String::from_utf8_lossy(&start.stderr));
+    assert!(start.status.success(), "container start: {out}");
+
+    let status = simien(project.path(), home.path(), &["container", "status"]).output().expect("container status");
+    let text = String::from_utf8_lossy(&status.stdout);
+    let value: serde_json::Value = serde_json::from_str(text.trim()).unwrap_or_else(|_| panic!("status JSON: {text}"));
+    assert_eq!(value["ok"], true, "{value}");
+    assert_eq!(value["postgres"]["ready"], true, "Postgres answers: {value}");
+    assert_eq!(value["zega"]["ready"], true, "Zega answers: {value}");
+}

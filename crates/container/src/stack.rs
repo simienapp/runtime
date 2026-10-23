@@ -70,9 +70,55 @@ fn write_description(project: &Project) -> Result<PathBuf, String> {
     Ok(file)
 }
 
+/// The kebele Simien starts when neither the project nor PATH has one:
+/// installed on first use into Simien's cache and run on its Node layer,
+/// pre-approved in permissions.json, so a new app needs no Bun.
+pub const KEBELE: &str = "kebele@0.11.0";
+
+/// How to start kebele.
+pub enum Kebele {
+    /// A kebele the project or PATH has; it runs as it is.
+    Installed(PathBuf),
+    /// Simien's own, in kebele's sandbox plus the one Docker socket it may
+    /// use (given with --socket, so it needn't read ~/.docker, a secret).
+    Simien(Box<SimienKebele>),
+}
+
+/// Simien's own kebele: the installed program, its sandbox, and the socket.
+pub struct SimienKebele {
+    program: packages::exec::Program,
+    sandbox: packages::sandbox::Prepared,
+    socket: PathBuf,
+}
+
+impl Kebele {
+    fn command(&self, args: &[&str]) -> Result<Command, String> {
+        match self {
+            Kebele::Installed(program) => {
+                let mut command = Command::new(program);
+                command.args(args).arg("--nopretty");
+                Ok(command)
+            }
+            Kebele::Simien(own) => {
+                let SimienKebele { program, sandbox, socket } = own.as_ref();
+                let mut all: Vec<String> = args.iter().map(|arg| arg.to_string()).collect();
+                all.extend(["--socket".to_string(), socket.display().to_string(), "--nopretty".to_string()]);
+                program.command(&sandbox.sandbox, &all).map_err(|err| format!("starting kebele: {err}"))
+            }
+        }
+    }
+
+    fn name(&self) -> String {
+        match self {
+            Kebele::Installed(program) => program.display().to_string(),
+            Kebele::Simien(_) => KEBELE.to_string(),
+        }
+    }
+}
+
 /// The kebele program: the project's own (node_modules/.bin, the version it
-/// pins) first, then the one on PATH.
-pub fn kebele(project_root: Option<&Path>) -> Result<PathBuf, String> {
+/// pins) first, then the one on PATH, else Simien's own ([`KEBELE`]).
+pub fn kebele(project_root: Option<&Path>) -> Result<Kebele, String> {
     let on_path = std::env::var_os("PATH").and_then(|path| {
         std::env::split_paths(&path)
             .map(|dir| dir.join("kebele"))
@@ -81,18 +127,62 @@ pub fn kebele(project_root: Option<&Path>) -> Result<PathBuf, String> {
     let local = project_root
         .map(|root| root.join("node_modules/.bin/kebele"))
         .filter(|candidate| candidate.is_file());
-    local.or(on_path).ok_or_else(|| {
-        "kebele isn't installed; it runs the local containers. Install it: `bun add -g kebele`".to_string()
-    })
+    if let Some(program) = local.or(on_path) {
+        return Ok(Kebele::Installed(program));
+    }
+    let home = std::env::var_os("HOME").map(PathBuf::from).ok_or("no HOME to find Docker's socket from")?;
+    let socket = docker_socket(&home).ok_or(
+        "no Docker socket found. Start Docker Desktop, OrbStack or Colima",
+    )?;
+    let root = match project_root {
+        Some(root) => root.to_path_buf(),
+        None => std::env::current_dir().map_err(|err| err.to_string())?,
+    };
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|err| err.to_string())?;
+    let program = runtime
+        .block_on(packages::exec::resolve(&root, KEBELE, None))
+        .map_err(|err| format!("installing {KEBELE}: {err:#}"))?;
+    let mut sandbox = program.sandbox(&root).map_err(|err| format!("kebele's sandbox: {err:#}"))?;
+    // Connecting to a unix socket is writing to it.
+    sandbox.sandbox = sandbox.sandbox.allow_write(&socket);
+    Ok(Kebele::Simien(Box::new(SimienKebele { program, sandbox, socket })))
+}
+
+/// The Docker socket the docker CLI would use (its current context), then
+/// where Docker Desktop, OrbStack, Colima and Rancher put theirs: the order
+/// kebele looks in. Read here, outside kebele's sandbox: ~/.docker holds
+/// registry credentials, which kebele is never given.
+pub fn docker_socket(home: &Path) -> Option<PathBuf> {
+    let context = || -> Option<PathBuf> {
+        let config: Value = serde_json::from_str(&std::fs::read_to_string(home.join(".docker/config.json")).ok()?).ok()?;
+        let name = config["currentContext"].as_str().filter(|name| !name.is_empty() && *name != "default")?;
+        let id = format!("{:x}", <sha2::Sha256 as sha2::Digest>::digest(name.as_bytes()));
+        let meta: Value =
+            serde_json::from_str(&std::fs::read_to_string(home.join(".docker/contexts/meta").join(id).join("meta.json")).ok()?)
+                .ok()?;
+        meta["Endpoints"]["docker"]["Host"].as_str()?.strip_prefix("unix://").map(PathBuf::from)
+    };
+    context()
+        .into_iter()
+        .chain([
+            PathBuf::from("/var/run/docker.sock"),
+            home.join(".docker/run/docker.sock"),
+            home.join(".orbstack/run/docker.sock"),
+            home.join(".colima/default/docker.sock"),
+            home.join(".rd/docker.sock"),
+        ])
+        .find(|path| path.exists())
 }
 
 /// Runs kebele with `args` and returns its JSON answer.
-fn run(kebele: &Path, args: &[&str]) -> Result<Value, String> {
-    let output = Command::new(kebele)
-        .args(args)
-        .arg("--nopretty")
+fn run(kebele: &Kebele, args: &[&str]) -> Result<Value, String> {
+    let output = kebele
+        .command(args)?
         .output()
-        .map_err(|err| format!("running {}: {err}", kebele.display()))?;
+        .map_err(|err| format!("running {}: {err}", kebele.name()))?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     if !output.status.success() {
         return Err(kebele_error(&output.stderr, &stdout));
@@ -114,14 +204,13 @@ fn kebele_error(stderr: &[u8], stdout: &str) -> String {
 }
 
 /// Runs kebele and hands each JSON line it prints to `on_line`.
-fn stream(kebele: &Path, args: &[&str], mut on_line: impl FnMut(Value)) -> Result<(), String> {
-    let mut child = Command::new(kebele)
-        .args(args)
-        .arg("--nopretty")
+fn stream(kebele: &Kebele, args: &[&str], mut on_line: impl FnMut(Value)) -> Result<(), String> {
+    let mut child = kebele
+        .command(args)?
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|err| format!("running {}: {err}", kebele.display()))?;
+        .map_err(|err| format!("running {}: {err}", kebele.name()))?;
     let stdout = child.stdout.take().expect("piped");
     for line in BufReader::new(stdout).lines() {
         let Ok(line) = line else { break };
@@ -363,4 +452,28 @@ fn strings(value: &Value) -> Vec<String> {
         .as_array()
         .map(|items| items.iter().filter_map(|item| item.as_str().map(str::to_string)).collect())
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod socket_tests {
+    use super::docker_socket;
+
+    #[test]
+    fn the_docker_clis_current_context_names_the_socket() {
+        let home = tempfile::tempdir().unwrap();
+        let socket = home.path().join("custom/docker.sock");
+        std::fs::create_dir_all(socket.parent().unwrap()).unwrap();
+        std::fs::write(&socket, "").unwrap();
+        // The docker CLI keeps a context's endpoint under the sha256 of its name.
+        let digest = format!("{:x}", <sha2::Sha256 as sha2::Digest>::digest(b"colima"));
+        let meta = home.path().join(".docker/contexts/meta").join(&digest);
+        std::fs::create_dir_all(&meta).unwrap();
+        std::fs::write(home.path().join(".docker/config.json"), r#"{ "currentContext": "colima" }"#).unwrap();
+        std::fs::write(
+            meta.join("meta.json"),
+            format!(r#"{{ "Endpoints": {{ "docker": {{ "Host": "unix://{}" }} }} }}"#, socket.display()),
+        )
+        .unwrap();
+        assert_eq!(docker_socket(home.path()), Some(socket));
+    }
 }

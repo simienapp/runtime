@@ -12,6 +12,9 @@ output = { path = "../output" }
 stdio = "0.5.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+packages = { path = "../packages" }
+tokio = { workspace = true }
+sha2 = "0.10"
 
 [dev-dependencies]
 tempfile = "3.23.0"

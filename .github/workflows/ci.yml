@@ -90,7 +90,9 @@ jobs:
             echo "a JavaScript runtime is still on PATH"
             exit 1
           fi
-      - name: A Vite + React app installs, runs its dev server and builds on Simien alone
+      # Also: the local Postgres + Zega stack starts with no kebele anywhere
+      # (Simien runs its own on its Node layer, #95).
+      - name: A Vite + React app installs, runs its dev server and builds, and the local stack starts, on Simien alone
         run: cargo test --locked -p simien --test no_node -- --ignored
       - run: sccache --show-stats
 
