@@ -9,6 +9,7 @@ use dcore::{CommandSpec, Context, FlagSpec, ParamSpec, Registry, SubcommandSpec}
 use output::{Globals, SimienError};
 use serde_json::{Map, Value, json};
 
+use crate::portmap::{Claim, PortMap};
 use crate::{CONFIG, write_schema_types};
 
 /// The schema a new database starts with.
@@ -19,13 +20,13 @@ pub const STARTER: &str = include_str!("starter.ts");
 pub const DEFAULT_PORT: u16 = 54330;
 
 /// The first pair from `start`, stepping by two (Postgres on the first port,
-/// Zega on the next), that nothing on this machine is using, so two
-/// projects' stacks can run at once. A running stack holds its ports, so it
-/// counts; a stopped one doesn't, and its project may pick the same pair.
-pub fn free_ports(start: u16) -> Result<u16, String> {
+/// Zega on the next), that nothing on this machine is using and no other
+/// project in `map` has, so two projects' stacks can run at once, and a
+/// stopped stack's ports stay its project's.
+pub fn free_ports(start: u16, map: &PortMap, root: &Path) -> Result<u16, String> {
     let mut base = start;
     while base < u16::MAX {
-        if free(base) && free(base + 1) {
+        if free(base) && free(base + 1) && map.owner(Claim::new(base), root)?.is_none() {
             return Ok(base);
         }
         base = base.saturating_add(2);
@@ -43,9 +44,9 @@ fn free(port: u16) -> bool {
 }
 
 /// A project made from a template keeps the template's `db` section, ports
-/// included: they move to the first free pair from the template's. The new
-/// Postgres port when they moved.
-pub fn free_template_ports(root: &Path) -> Result<Option<u16>, String> {
+/// included: they move to the first free pair from the template's, recorded
+/// in `map` as this project's. The new Postgres port when they moved.
+pub fn free_template_ports(root: &Path, map: &PortMap) -> Result<Option<u16>, String> {
     let config = root.join(CONFIG);
     let Ok(text) = std::fs::read_to_string(&config) else {
         return Ok(None);
@@ -57,7 +58,8 @@ pub fn free_template_ports(root: &Path) -> Result<Option<u16>, String> {
     let Some(postgres) = ports.get("postgres").and_then(Value::as_u64).and_then(|port| u16::try_from(port).ok()) else {
         return Ok(None);
     };
-    let base = free_ports(postgres)?;
+    let base = free_ports(postgres, map, root)?;
+    map.claim(root, Claim::new(base))?;
     if base == postgres && ports.get("zega").and_then(Value::as_u64) == Some(u64::from(postgres) + 1) {
         return Ok(None);
     }
@@ -108,8 +110,8 @@ pub struct Made {
     pub zega: u16,
 }
 
-/// Gives the project in `root` a database.
-pub fn make(root: &Path, name: Option<&str>, port: Option<&str>, force: bool) -> Result<Made, String> {
+/// Gives the project in `root` a database, its ports recorded in `map`.
+pub fn make(root: &Path, name: Option<&str>, port: Option<&str>, force: bool, map: &PortMap) -> Result<Made, String> {
     let config = root.join(CONFIG);
     let mut settings: Map<String, Value> = match std::fs::read_to_string(&config) {
         Ok(text) => match serde_json::from_str(&text) {
@@ -123,7 +125,7 @@ pub fn make(root: &Path, name: Option<&str>, port: Option<&str>, force: bool) ->
         return Err(format!("{CONFIG} already has a db section (use --force to replace it)"));
     }
     let base = match port {
-        None => free_ports(DEFAULT_PORT)?,
+        None => free_ports(DEFAULT_PORT, map, root)?,
         Some(text) => text
             .parse::<u16>()
             .ok()
@@ -140,6 +142,7 @@ pub fn make(root: &Path, name: Option<&str>, port: Option<&str>, force: bool) ->
                 .ok_or("this folder has no name; pass --name")?,
         ),
     };
+    map.claim(root, Claim::new(base))?;
     settings.insert("name".into(), json!(name));
     settings.insert(
         "db".into(),
@@ -190,6 +193,7 @@ fn init(context: &Context) {
                 context.args.params.get("--name").map(String::as_str),
                 context.args.params.get("--port").map(String::as_str),
                 context.args.flags.contains_key("--force"),
+                &PortMap::user()?,
             )
         });
     match result {

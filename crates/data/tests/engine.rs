@@ -49,6 +49,7 @@ fn queries_and_writes_hold_on_real_data() {
         Some(&format!("data-{}", std::process::id())),
         Some(PORT),
         false,
+        &project::portmap::PortMap::at(dir.path().join("portmap.json")),
     )
     .unwrap();
     let stack = Stack(Project::open(dir.path()).unwrap());
@@ -68,7 +69,7 @@ export default defineSchema({
 "#,
     )
     .unwrap();
-    container::stack::start(project, Duration::from_secs(180), |_| {})
+    container::stack::start(project, &project::portmap::PortMap::at(project.root.join("portmap.json")), Duration::from_secs(180), |_| {})
         .expect("start the local stack");
     let url = schema_sync::database_url(project).unwrap();
     let mut db = schema_sync::ready(&url, Duration::from_secs(60)).unwrap();

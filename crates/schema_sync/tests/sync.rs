@@ -64,7 +64,7 @@ fn blocked(result: Result<Synced, SyncError>) -> Vec<String> {
 }
 
 fn open(root: &Path) -> Project {
-    project::db::make(root, Some(&format!("sync-{}", std::process::id())), Some(PORT), false).unwrap();
+    project::db::make(root, Some(&format!("sync-{}", std::process::id())), Some(PORT), false, &project::portmap::PortMap::at(root.join("portmap.json"))).unwrap();
     Project::open(root).unwrap()
 }
 
@@ -73,7 +73,7 @@ fn every_sync_rule_holds_on_real_data() {
     let dir = tempfile::tempdir().unwrap();
     let stack = Stack(open(dir.path()));
     let project = &stack.0;
-    container::stack::start(project, Duration::from_secs(180), |_| {}).expect("start the local stack");
+    container::stack::start(project, &project::portmap::PortMap::at(project.root.join("portmap.json")), Duration::from_secs(180), |_| {}).expect("start the local stack");
     let url = schema_sync::database_url(project).unwrap();
     let mut db = schema_sync::ready(&url, Duration::from_secs(60)).unwrap();
     let mut sql = schema_sync::connect(&url, Duration::from_secs(5)).unwrap();

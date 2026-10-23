@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use project::portmap::{Claim, PortMap};
 use project::{Project, write_private};
 
 /// The images this simien pins.
@@ -254,8 +255,11 @@ pub fn all(project_root: Option<&Path>) -> Result<Vec<(String, Vec<Service>)>, S
 }
 
 /// Starts the stack, reporting kebele's events, then waits until both
-/// databases answer.
-pub fn start(project: &Project, timeout: Duration, mut on_event: impl FnMut(Value)) -> Result<Readiness, String> {
+/// databases answer. Its ports are recorded in `map` as the project's first;
+/// another project's ports are refused.
+pub fn start(project: &Project, map: &PortMap, timeout: Duration, mut on_event: impl FnMut(Value)) -> Result<Readiness, String> {
+    let ports = project.ports()?;
+    map.claim(&project.root, Claim { postgres: ports.postgres, zega: ports.zega })?;
     let kebele = kebele(Some(&project.root))?;
     let file = write_description(project)?;
     let seconds = timeout.as_secs().to_string();
