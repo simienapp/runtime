@@ -7,6 +7,7 @@
 //! it has a `db` section (`"db": { "ports": { "postgres", "zega" } }`).
 
 pub mod db;
+pub mod portmap;
 
 use std::path::{Path, PathBuf};
 

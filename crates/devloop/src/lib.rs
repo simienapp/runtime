@@ -25,6 +25,7 @@ use std::time::Duration;
 
 use notify::{RecursiveMode, Watcher};
 use project::Project;
+use project::portmap::PortMap;
 use schema_sync::{Listener, SyncError, Synced};
 use serde_json::{Value, json};
 
@@ -55,9 +56,9 @@ impl Drop for DevLoop {
     }
 }
 
-/// Starts the loop for the project at `root`. Every event goes to `on_event`
-/// as `{ "event": … }`.
-pub fn start(root: PathBuf, on_event: impl Fn(Value) + Send + 'static) -> Result<DevLoop, String> {
+/// Starts the loop for the project at `root`, its ports recorded in `map`.
+/// Every event goes to `on_event` as `{ "event": … }`.
+pub fn start(root: PathBuf, map: PortMap, on_event: impl Fn(Value) + Send + 'static) -> Result<DevLoop, String> {
     let (tx, rx) = mpsc::channel();
     let watcher = watch(&root, tx.clone())?;
     let stop = Arc::new(AtomicBool::new(false));
@@ -67,7 +68,7 @@ pub fn start(root: PathBuf, on_event: impl Fn(Value) + Send + 'static) -> Result
         .spawn(move || {
             let mut watcher = watcher;
             let mut watch_schema_dir = || watch_schema_dir(&mut watcher, &root);
-            run(&root, &tx, &rx, &stopping, &on_event, &mut watch_schema_dir);
+            run(&root, &map, &tx, &rx, &stopping, &on_event, &mut watch_schema_dir);
         })
         .map_err(|err| err.to_string())?;
     Ok(DevLoop { stop, thread: Some(thread) })
@@ -121,6 +122,7 @@ impl Drop for Running {
 
 fn run(
     root: &Path,
+    map: &PortMap,
     tx: &Sender<Change>,
     rx: &Receiver<Change>,
     stop: &AtomicBool,
@@ -189,7 +191,7 @@ fn run(
         };
         said_no_database = false;
         if running.is_none() {
-            match bring_up(&project, ports, tx, on_event) {
+            match bring_up(&project, map, ports, tx, on_event) {
                 Ok(started) => running = Some(started),
                 Err(message) => {
                     on_event(json!({ "event": "error", "message": message }));
@@ -204,9 +206,9 @@ fn run(
 }
 
 /// Starts the stack, connects, and listens for direct changes.
-fn bring_up(project: &Project, ports: (u16, u16), tx: &Sender<Change>, on_event: &dyn Fn(Value)) -> Result<Running, String> {
+fn bring_up(project: &Project, map: &PortMap, ports: (u16, u16), tx: &Sender<Change>, on_event: &dyn Fn(Value)) -> Result<Running, String> {
     on_event(json!({ "event": "starting", "postgres": ports.0, "zega": ports.1 }));
-    container::stack::start(project, START_TIMEOUT, on_event)?;
+    container::stack::start(project, map, START_TIMEOUT, on_event)?;
     let url = schema_sync::database_url(project)?;
     let mut db = schema_sync::ready(&url, START_TIMEOUT)?;
     schema_sync::install_notifier(&mut db)?;

@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 pub mod stack;
 
 use project::Project;
+use project::portmap::PortMap;
 
 const START_TIMEOUT: Duration = Duration::from_secs(120);
 
@@ -190,7 +191,7 @@ fn status(context: &Context) {
 fn start(context: &Context) {
     run(context, |_, globals| {
         let project = find()?;
-        let now = stack::start(&project, START_TIMEOUT, |event| progress(event, globals))?;
+        let now = stack::start(&project, &PortMap::user()?, START_TIMEOUT, |event| progress(event, globals))?;
         output::result(
             &json!({ "ok": true, "postgres": now.postgres, "zega": now.zega }),
             globals,
@@ -239,7 +240,7 @@ fn update(context: &Context) {
     run(context, |_, globals| {
         let project = find()?;
         let pulled = stack::pull(&project, |event| progress(event, globals))?;
-        let now = stack::start(&project, START_TIMEOUT, |event| progress(event, globals))?;
+        let now = stack::start(&project, &PortMap::user()?, START_TIMEOUT, |event| progress(event, globals))?;
         output::result(
             &json!({
                 "ok": true,
@@ -272,7 +273,7 @@ fn reset(context: &Context) {
             ));
         }
         let deleted = stack::delete_data(&project)?;
-        let now = stack::start(&project, START_TIMEOUT, |event| progress(event, globals))?;
+        let now = stack::start(&project, &PortMap::user()?, START_TIMEOUT, |event| progress(event, globals))?;
         output::result(
             &json!({ "ok": true, "deleted": deleted, "postgres": now.postgres, "zega": now.zega }),
             globals,

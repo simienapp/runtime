@@ -38,7 +38,7 @@ fn wait_for(events: &Events, name: &str, timeout: Duration) -> Value {
 fn the_client_reads_and_writes_through_the_data_service() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().to_path_buf();
-    project::db::make(&root, Some(&format!("service-{}", std::process::id())), Some(PORT), false).unwrap();
+    project::db::make(&root, Some(&format!("service-{}", std::process::id())), Some(PORT), false, &project::portmap::PortMap::at(root.join("portmap.json"))).unwrap();
     let stack = Stack(Project::open(&root).unwrap());
     std::fs::write(
         stack.0.schema_file(),
@@ -48,7 +48,7 @@ fn the_client_reads_and_writes_through_the_data_service() {
 
     let events: Events = Arc::default();
     let sink = Arc::clone(&events);
-    let devloop = devloop::start(root.clone(), move |e| sink.lock().unwrap().push(e)).unwrap();
+    let devloop = devloop::start(root.clone(), project::portmap::PortMap::at(root.join("portmap.json")), move |e| sink.lock().unwrap().push(e)).unwrap();
     let started = wait_for(&events, "data", Duration::from_secs(180));
     wait_for(&events, "synced", Duration::from_secs(30));
     let file = root.join(".simien").join(devloop::service::FILE);

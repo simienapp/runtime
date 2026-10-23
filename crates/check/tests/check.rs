@@ -11,7 +11,7 @@ static CWD: Mutex<()> = Mutex::new(());
 
 fn project() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    project::db::make(dir.path(), Some("check"), Some("54390"), false).unwrap();
+    project::db::make(dir.path(), Some("check"), Some("54390"), false, &project::portmap::PortMap::at(dir.path().join("portmap.json"))).unwrap();
     project::write_schema_types(&dir.path().join("simien/_generated")).unwrap();
     dir
 }

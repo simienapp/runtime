@@ -10,7 +10,9 @@ use serde_json::Value;
 pub fn start(globals: Globals) -> Option<devloop::DevLoop> {
     let here = std::env::current_dir().ok()?;
     let project = project::Project::find(&here).ok()?;
-    match devloop::start(project.root, move |event| print(&event, globals)) {
+    match project::portmap::PortMap::user()
+        .and_then(|map| devloop::start(project.root, map, move |event| print(&event, globals)))
+    {
         Ok(running) => Some(running),
         Err(message) => {
             output::event(&serde_json::json!({ "event": "error", "message": message }), globals, || {

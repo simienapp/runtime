@@ -49,7 +49,7 @@ fn db_init_while_dev_runs_starts_the_stack_and_keeps_it_in_step() {
     std::fs::write(root.join("simien.json"), format!("{{ \"name\": \"{name}\" }}\n")).unwrap();
     let events: Events = Arc::default();
     let sink = Arc::clone(&events);
-    let devloop = devloop::start(root.clone(), move |e| sink.lock().unwrap().push(e)).unwrap();
+    let devloop = devloop::start(root.clone(), project::portmap::PortMap::at(root.join("portmap.json")), move |e| sink.lock().unwrap().push(e)).unwrap();
 
     // No db section: nothing starts.
     let none = wait_for(&events, 0, Duration::from_secs(10), is("no_database"));
@@ -60,7 +60,7 @@ fn db_init_while_dev_runs_starts_the_stack_and_keeps_it_in_step() {
     // `simien db init` while dev runs: the stack starts with its ports and the
     // starter schema's tables sync.
     let from = seen(&events);
-    project::db::make(&root, None, Some(PORT), false).unwrap();
+    project::db::make(&root, None, Some(PORT), false, &project::portmap::PortMap::at(root.join("portmap.json"))).unwrap();
     let stack = Stack(Project::open(&root).unwrap());
     let schema_file = stack.0.schema_file();
     let synced = wait_for(&events, from, Duration::from_secs(240), |e| e["event"] == "synced" || e["event"] == "error");
