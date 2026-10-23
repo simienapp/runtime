@@ -16,7 +16,20 @@ struct RuntimeNetPolicy;
 
 fn allow(host: &str, api_name: &str) -> Result<(), PermissionCheckError> {
     deka_host::modules::enforce_net_public(&host.to_ascii_lowercase())
-        .map_err(|err| PermissionCheckError(format!("{api_name}: {err}")))
+        .map_err(|err| PermissionCheckError(format!("{api_name}: {}", net_refusal(&err))))
+}
+
+/// The policy's refusal, as the app should read it: the bridge's encoded
+/// denial (for DekaScript's `Result`) becomes what was refused and how to
+/// allow it. Anything else is passed on as it is.
+fn net_refusal(error: &str) -> String {
+    match permissions::host_bridge::PermissionDenied::decode(error) {
+        Some(denied) => format!(
+            "Requires net access to {target}; to allow it, set \"security\": {{ \"allow\": {{ \"net\": [\"{target}\"] }} }} in simien.json",
+            target = denied.target
+        ),
+        None => error.to_string(),
+    }
 }
 
 impl FetchPermissions for RuntimeNetPolicy {

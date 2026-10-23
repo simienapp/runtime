@@ -10386,6 +10386,7 @@ version = "0.61.0"
 dependencies = [
  "carve_outs",
  "deka_host",
+ "permissions",
  "simien_core",
  "simien_crypto",
  "simien_fetch",

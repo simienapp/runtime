@@ -514,3 +514,27 @@ fn a_bare_node_module_name_is_still_a_node_module() {
     .expect_err("os is refused");
     assert!(error.contains("node:os isn't available"), "{error}");
 }
+
+/// A refused fetch says what it was refused and how to allow it (#65), not
+/// the bridge's internal encoding.
+#[test]
+fn a_refused_fetch_says_what_and_how_to_allow_it() {
+    let (_dir, addr) = start_app(&[
+        (
+            "app.js",
+            r#"export default {
+              fetch: async () => {
+                try { await fetch("http://refused.example/"); return new Response("fetched"); }
+                catch (error) { return new Response(`${error.name}: ${error.message}`); }
+              },
+            };"#,
+        ),
+        ("simien.json", "{}"),
+    ], &[])
+    .expect("start");
+    let message = client().get(format!("http://{addr}/")).send().expect("request").text().expect("text");
+    assert!(message.starts_with("NotCapable:"), "{message}");
+    assert!(message.contains("Requires net access to refused.example"), "{message}");
+    assert!(message.contains(r#""allow": { "net": ["refused.example"] }"#), "says how to allow it: {message}");
+    assert!(!message.contains("__DEKA"), "no internal marker: {message}");
+}
