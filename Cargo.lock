@@ -7309,6 +7309,8 @@ version = "0.61.0"
 dependencies = [
  "carve_outs",
  "data",
+ "deka_host",
+ "permissions",
  "pool",
  "reqwest",
  "security",
@@ -7316,6 +7318,9 @@ dependencies = [
  "serde_json",
  "simien_core",
  "simien_http",
+ "simien_node_runtime",
+ "simien_os",
+ "simien_permissions",
  "simien_websocket",
  "tempfile",
  "tokio",

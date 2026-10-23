@@ -24,6 +24,10 @@ pub struct SecurityScope {
     pub db: RuleList,
     pub wasm: RuleList,
     pub dynamic: bool,
+    /// `dangerouslyUseNode` (APS 2): the app's own code gets Node's APIs. A
+    /// capability, not a scope, so a boolean; every access those APIs make
+    /// is still checked against the rest of the policy.
+    pub dangerously_use_node: bool,
 }
 
 impl Default for SecurityScope {
@@ -37,6 +41,7 @@ impl Default for SecurityScope {
             db: RuleList::None,
             wasm: RuleList::None,
             dynamic: false,
+            dangerously_use_node: false,
         }
     }
 }
@@ -268,6 +273,12 @@ pub fn merge_policy_with_cli_manifest_net_env(
     merge_policy_with_cli(base, &scoped)
 }
 
+/// Whether the app's own code gets Node's APIs (APS 2): granted, and not
+/// denied.
+pub fn uses_node(policy: &SecurityPolicy) -> bool {
+    policy.allow.dangerously_use_node && !policy.deny.dangerously_use_node
+}
+
 pub fn policy_to_json(policy: &SecurityPolicy) -> Value {
     json!({
         "security": {
@@ -408,8 +419,8 @@ fn apply_legacy_permissions(
 }
 
 /// The capability keys a security scope accepts.
-pub const KNOWN_CAPABILITY_KEYS: [&str; 8] = [
-    "read", "write", "net", "env", "run", "db", "wasm", "dynamic",
+pub const KNOWN_CAPABILITY_KEYS: [&str; 9] = [
+    "read", "write", "net", "env", "run", "db", "wasm", "dynamic", "dangerouslyUseNode",
 ];
 
 /// Keys a misspelling most likely meant, as a comma-joined list.
@@ -526,6 +537,19 @@ fn parse_scope(
                 "SECURITY_POLICY_INVALID_DYNAMIC",
                 &format!("{}.dynamic", path),
                 "Expected boolean for `dynamic`",
+            ));
+        }
+    }
+
+    if let Some(node) = obj.get("dangerouslyUseNode") {
+        if let Some(v) = node.as_bool() {
+            scope.dangerously_use_node = v;
+        } else {
+            diagnostics.push(diag(
+                PolicyDiagnosticLevel::Error,
+                "SECURITY_POLICY_INVALID_DANGEROUSLY_USE_NODE",
+                &format!("{}.dangerouslyUseNode", path),
+                "Expected boolean for `dangerouslyUseNode`",
             ));
         }
     }
@@ -745,6 +769,7 @@ fn scope_to_json(scope: &SecurityScope) -> Value {
     out.insert("db".to_string(), rule_list_to_json(&scope.db));
     out.insert("wasm".to_string(), rule_list_to_json(&scope.wasm));
     out.insert("dynamic".to_string(), Value::Bool(scope.dynamic));
+    out.insert("dangerouslyUseNode".to_string(), Value::Bool(scope.dangerously_use_node));
     Value::Object(out)
 }
 
@@ -825,7 +850,7 @@ mod tests {
     #[test]
     fn every_valid_key_is_accepted() {
         for key in super::KNOWN_CAPABILITY_KEYS {
-            let value = if key == "dynamic" {
+            let value = if key == "dynamic" || key == "dangerouslyUseNode" {
                 serde_json::json!(true)
             } else {
                 serde_json::json!(["x"])
@@ -834,6 +859,20 @@ mod tests {
             let out = parse_deka_security_policy(&doc);
             assert!(!out.has_errors(), "{key} must be accepted");
         }
+    }
+
+    #[test]
+    fn dangerously_use_node_is_a_boolean_and_a_deny_wins() {
+        let granted = parse_deka_security_policy(&serde_json::json!({ "security": { "allow": { "dangerouslyUseNode": true } } }));
+        assert!(!granted.has_errors() && super::uses_node(&granted.policy));
+        assert!(!super::uses_node(&parse_deka_security_policy(&serde_json::json!({ "name": "app" })).policy), "off by default");
+        let denied = parse_deka_security_policy(&serde_json::json!({ "security": {
+            "allow": { "dangerouslyUseNode": true }, "deny": { "dangerouslyUseNode": true } } }));
+        assert!(!super::uses_node(&denied.policy), "a deny wins");
+        let list = parse_deka_security_policy(&serde_json::json!({ "security": { "allow": { "dangerouslyUseNode": ["x"] } } }));
+        assert!(list.has_errors(), "a capability, not a scope");
+        let round_trip = parse_deka_security_policy(&super::policy_to_json(&granted.policy));
+        assert!(super::uses_node(&round_trip.policy), "survives the per-execution JSON");
     }
 
     #[test]

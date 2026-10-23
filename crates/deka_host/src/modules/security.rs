@@ -588,6 +588,28 @@ pub(super) fn enforce_wasm(target: Option<&str>) -> Result<(), simien_core::erro
     enforce_scope("wasm", &policy.allow.wasm, &policy.deny.wasm, target)
 }
 
+pub(super) fn enforce_run(target: Option<&str>) -> Result<(), simien_core::error::CoreError> {
+    let policy = security_policy_from_context()?;
+    enforce_scope("run", &policy.allow.run, &policy.deny.run, target)
+}
+
+/// The current execution's policy on one access: `capability` (`read`,
+/// `write`, `net`, `env`, `run`) to `target` (`None`: all of it). A denial
+/// is the bridge's encoded [`permissions::host_bridge::PermissionDenied`];
+/// `PermissionDenied::explain` says it for people. For embedders whose own
+/// checks answer to Simien's policy: the Node layer in a granted app.
+pub fn enforce_capability(capability: &str, target: Option<&str>) -> Result<(), String> {
+    let outcome = match capability {
+        "read" => enforce_read(target),
+        "write" => enforce_write(target),
+        "net" => enforce_net(target),
+        "env" => enforce_env(target),
+        "run" => enforce_run(target),
+        other => return Err(format!("{other} isn't a capability Simien checks here")),
+    };
+    outcome.map_err(|err| err.to_string())
+}
+
 #[cfg(test)]
 mod path_normalization_tests {
     use super::path_matches;
@@ -658,6 +680,7 @@ mod permission_denied_tests {
             db: RuleList::None,
             wasm: RuleList::None,
             dynamic: false,
+            dangerously_use_node: false,
         }
     }
 

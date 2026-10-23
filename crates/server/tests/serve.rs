@@ -655,3 +655,66 @@ fn a_served_app_queries_its_database_only_with_the_db_permission() {
     assert_eq!(queried["kind"], "database", "the engine ran it and Postgres wasn't there: {queried}");
     assert!(queried["message"].as_str().unwrap_or_default().contains("Postgres"), "{queried}");
 }
+
+/// An app whose simien.json grants `dangerouslyUseNode` (APS 2, #74) gets
+/// Node's own modules, and every access they make is still the policy's:
+/// it may read its own folder and nothing else, and start a program only
+/// when `run` names it.
+#[test]
+fn a_granted_app_gets_node_and_the_policy_still_checks_it() {
+    let app = r#"import fs from "node:fs";
+        import path from "node:path";
+        import { execFileSync } from "node:child_process";
+        const attempt = (run) => { try { return run(); } catch (error) { return `${error.name}: ${error.message}`; } };
+        export default {
+          fetch: () => Response.json({
+            own: attempt(() => JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "config.json"), "utf8")).name),
+            hosts: attempt(() => fs.readFileSync("/etc/hosts", "utf8").length),
+            // An empty environment: Simien refuses to start a program with
+            // LD_*/DYLD_* variables unless every program may run.
+            run: attempt(() => String(execFileSync("echo", ["hi"], { env: {} })).trim()),
+            buffer: typeof Buffer,
+          }),
+        };"#;
+    let serve = |run: security::security_policy::RuleList| -> serde_json::Value {
+        let dir = tempfile::tempdir().expect("app dir");
+        let root = dir.path().canonicalize().expect("real path");
+        fs::write(root.join("app.js"), app).unwrap();
+        fs::write(root.join("config.json"), r#"{ "name": "granted" }"#).unwrap();
+        let mut policy = security::security_policy::SecurityPolicy::default();
+        policy.allow.dangerously_use_node = true;
+        policy.allow.read = security::security_policy::RuleList::List(vec![root.display().to_string()]);
+        policy.allow.run = run;
+        // Node's child_process reads this before it starts a program.
+        policy.allow.env = security::security_policy::RuleList::List(vec!["NODE_V8_COVERAGE".into()]);
+        let server = server::start(ServerOptions {
+            addr: "127.0.0.1:0".parse().expect("addr"),
+            entry: root.join("app.js"),
+            project_root: root.clone(),
+            isolates: 1,
+            inbox_capacity: 8,
+            max_busy: None,
+            on_event: None,
+            security: pool::ExecutionSecurity {
+                policy_json: security::security_policy::policy_to_json(&policy).to_string(),
+                no_prompt: true,
+            },
+        })
+        .expect("start");
+        let addr = server.addr;
+        std::mem::forget(server);
+        client().get(format!("http://{addr}/")).send().expect("request").json().expect("json")
+    };
+
+    let seen = serve(security::security_policy::RuleList::None);
+    assert_eq!(seen["own"], "granted", "{seen}");
+    assert_eq!(seen["buffer"], "function", "Node's globals: {seen}");
+    let hosts = seen["hosts"].as_str().unwrap_or_default();
+    assert!(hosts.starts_with("NotCapable") && hosts.contains("/etc/hosts") && hosts.contains(r#""allow": { "read""#), "{seen}");
+    let refused = seen["run"].as_str().unwrap_or_default();
+    assert_ne!(refused, "hi", "no program may start without `run`: {seen}");
+    assert!(!refused.contains("env access"), "refused by `run`, not by the environment: {seen}");
+    // A granted `run` starting the program is simien/tests/node_app.rs's: a
+    // test process's own DYLD_*/LD_* variables (cargo sets one) keep any
+    // program from starting here unless every program may run.
+}

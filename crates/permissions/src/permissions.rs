@@ -131,6 +131,7 @@ impl Permissions {
                     RuleList::None
                 },
                 dynamic: false,
+                dangerously_use_node: false,
             },
             deny: SecurityScope::default(),
             prompt,

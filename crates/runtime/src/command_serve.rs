@@ -31,7 +31,18 @@ pub fn cmd(context: &Context) {
         crate::invoke_dev_serve(context);
         return;
     }
-    if context.args.flags.get("--warm").copied().unwrap_or(false) {
+    // The warm server is where a granted app's Node layer lives (APS 2,
+    // #74), so an app granted `dangerouslyUseNode` is served there.
+    let node = crate::security::resolve_security_policy_for_serve(context, false)
+        .ok()
+        .and_then(|resolved| serde_json::from_str::<serde_json::Value>(&resolved.policy_json).ok())
+        .is_some_and(|json| {
+            ::security::security_policy::uses_node(&::security::security_policy::parse_deka_security_policy(&json).policy)
+        });
+    if node || context.args.flags.get("--warm").copied().unwrap_or(false) {
+        if node {
+            stdio::log("serve", "the app is granted dangerouslyUseNode: serving it on the warm server, with Node's APIs");
+        }
         if let Err(err) = crate::serve::serve_warm(context) {
             stdio::error("serve", &err);
             std::process::exit(1);
