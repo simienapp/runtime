@@ -37,5 +37,9 @@ simien_napi = "0.1.1"
 
 [dev-dependencies]
 reqwest = { version = "0.13", features = ["blocking", "json"] }
+container = { path = "../container" }
+postgres = "0.19"
+project = { path = "../project" }
+schema_sync = { path = "../schema_sync" }
 libc = "0.2"
 tempfile = "3.23.0"

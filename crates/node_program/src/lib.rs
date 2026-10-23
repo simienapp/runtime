@@ -7,7 +7,14 @@
 //! resolution from the program's node_modules. `[rules]` are the sandbox's
 //! (`packages::sandbox::Rules`, passed by the runner): Simien's checks in the
 //! program, fetch() included, answer as the sandbox does ([`policy`]).
+//!
+//! `--data` gives the program the project's database: `simien:db` and
+//! `simien:schema` import from Simien itself, and queries go straight to the
+//! engine ([`data::binding`]). Only `simien dev` passes it, for the app's own
+//! dev server; no other program sees the app's data, and a program it starts
+//! doesn't inherit it.
 
+mod modules;
 pub mod policy;
 
 use std::path::{Path, PathBuf};
@@ -27,21 +34,28 @@ pub struct Invocation {
     pub project: PathBuf,
     /// What the program's sandbox allows; none given, nothing beyond reads.
     pub rules: Rules,
+    /// `--data`: the project's database, through `simien:db`.
+    pub data: bool,
     pub script: PathBuf,
     pub args: Vec<String>,
 }
 
 impl Invocation {
-    /// `--project <dir> [--write <dir>]… [--deny <path>]… [--network] <script> [args]`.
+    /// `--project <dir> [--write <dir>]… [--deny <path>]… [--network] [--data] <script> [args]`.
     pub fn parse(mut argv: impl Iterator<Item = String>) -> anyhow::Result<Self> {
         if argv.next().as_deref() != Some("--project") {
             bail!("usage: __node-program --project <dir> [rules] <script> [args]");
         }
         let project = argv.next().context("--project needs a folder")?;
         let mut rules = Rules::default();
+        let mut data = false;
         let script = loop {
             let arg = argv.next().context("no program to run")?;
             if rules.take_arg(&arg, &mut argv)? {
+                continue;
+            }
+            if arg == packages::exec::DATA_FLAG {
+                data = true;
                 continue;
             }
             // A program that starts another like it (fork(), spawn of
@@ -63,6 +77,7 @@ impl Invocation {
         Ok(Self {
             project: PathBuf::from(project),
             rules,
+            data,
             script: PathBuf::from(script),
             args: argv.collect(),
         })
@@ -157,6 +172,7 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
     let main = ModuleSpecifier::from_file_path(std::fs::canonicalize(&invocation.script)?)
         .map_err(|()| anyhow::anyhow!("{} is not absolute", invocation.script.display()))?;
     let program = NodeProgram::new(&modules_root(&package_dir));
+    let engine = if invocation.data { engine_for(&invocation.project)? } else { None };
     let exit_code = simien_os::ExitCode::default();
 
     let policy = Arc::new(policy::SandboxPolicy::new(&invocation.rules));
@@ -165,6 +181,10 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
         forked_channel(),
     )];
     extensions.extend(web_host::web(simien_fetch::PermissionsContainer::new(policy)));
+    let with_data = invocation.data;
+    if let Some(engine) = engine {
+        extensions.push(data::binding::extension(engine));
+    }
     extensions.extend(simien_node_runtime::extensions(
         Some(&program),
         main.clone(),
@@ -187,7 +207,11 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
     let tokio = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
     tokio.block_on(async {
         let mut runtime = JsRuntime::new(RuntimeOptions {
-            module_loader: Some(program.module_loader()),
+            module_loader: Some(if with_data {
+                Rc::new(modules::WithData::new(program.module_loader()))
+            } else {
+                program.module_loader()
+            }),
             extension_transpiler: Some(Rc::new(simien_node_runtime::transpile::transpile_extension)),
             extensions,
             ..Default::default()
@@ -199,6 +223,21 @@ pub fn run(invocation: Invocation) -> anyhow::Result<i32> {
             .await
             .map_err(|error| anyhow::anyhow!("{error}"))
     })
+}
+
+/// The engine for the project's database: its schema.ts and its local
+/// Postgres, from simien.json and `.simien/`. None when the project has no
+/// database yet: the program still runs, and `simien:db`'s queries say so.
+fn engine_for(project: &Path) -> anyhow::Result<Option<data::Engine>> {
+    if !project.join(project::CONFIG).is_file() {
+        return Ok(None);
+    }
+    let project = project::Project::open(project).map_err(anyhow::Error::msg)?;
+    if project.database.is_none() {
+        return Ok(None);
+    }
+    let url = schema_sync::database_url(&project).map_err(anyhow::Error::msg)?;
+    Ok(Some(data::Engine::new(project.schema_file(), url)))
 }
 
 #[cfg(test)]
@@ -213,10 +252,16 @@ mod tests {
             Invocation {
                 project: "/p".into(),
                 rules: Rules::default(),
+                data: false,
                 script: "bin/vite.js".into(),
                 args: vec!["dev".into(), "--port".into(), "3000".into()],
             }
         );
+        // --data before the script is Simien's; after it, the program's own.
+        let argv = ["--project", "/p", "--data", "bin/vite.js", "--data"].map(String::from);
+        let invocation = Invocation::parse(argv.into_iter()).unwrap();
+        assert!(invocation.data);
+        assert_eq!(invocation.args, vec!["--data".to_string()]);
         assert!(Invocation::parse(["bin/vite.js".to_string()].into_iter()).is_err());
         let argv = ["--project", "/p", "--write", "/p", "--deny", "/h/.ssh", "--network", "cli.js", "--write"]
             .map(String::from);

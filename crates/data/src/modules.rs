@@ -38,3 +38,27 @@ export function connect(schema) {{
 "#
     )
 }
+
+/// `simien:db` inside Simien: the engine through the binding's op
+/// ([`crate::binding`]), which put its transport under a symbol. Where the
+/// binding isn't loaded, every query says so.
+pub fn db_native() -> String {
+    format!(
+        r#"{CLIENT}
+const transport = globalThis[Symbol.for("simien.data.send")];
+
+async function send(query) {{
+  if (transport === undefined) {{
+    throw new SimienDataError("invalid", "this project has no database yet; run `simien db init`");
+  }}
+  const answer = await transport(query);
+  if (answer.error) throw new SimienDataError(answer.error.kind, answer.error.message);
+  return answer.result;
+}}
+
+export function connect(schema) {{
+  return client(schema, send);
+}}
+"#
+    )
+}

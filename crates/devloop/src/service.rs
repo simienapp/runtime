@@ -9,20 +9,20 @@
 //!   `{ "error": { "kind", "message" } }` with 400 (refused) or 500 (Postgres).
 //! - `GET /modules/simien:db` and `GET /modules/simien:schema` serve the client
 //!   modules, so the framework's dev server can load them from the binary.
-//! - Each query reads schema.ts as saved, so it checks against what the app
-//!   says now.
+//! - Queries run on [`data::Engine`], the same engine the native `simien:db`
+//!   binding uses.
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use data::{DataError, Query};
+use data::DataError;
 use project::Project;
-use serde_json::{Value, json};
+use serde_json::json;
 
 /// Where the service writes its address and token, under `.simien/`.
 pub const FILE: &str = "data.json";
@@ -30,11 +30,9 @@ pub const FILE: &str = "data.json";
 const MAX_REQUEST: usize = 8 * 1024 * 1024;
 
 struct Shared {
-    schema_file: PathBuf,
-    url: String,
+    engine: data::Engine,
     token: String,
     endpoint: String,
-    database: Mutex<Option<postgres::Client>>,
 }
 
 /// The running service. Dropping it stops it and removes `.simien/data.json`.
@@ -64,11 +62,9 @@ pub fn start(project: &Project, url: String) -> Result<DataService, String> {
     let file = project.state_dir().join(FILE);
     project::write_private(&file, &format!("{}\n", json!({ "url": endpoint, "token": token })))?;
     let shared = Arc::new(Shared {
-        schema_file: project.schema_file(),
-        url,
+        engine: data::Engine::new(project.schema_file(), url),
         token,
         endpoint: endpoint.clone(),
-        database: Mutex::new(None),
     });
     let stop = Arc::new(AtomicBool::new(false));
     let stopping = Arc::clone(&stop);
@@ -189,10 +185,10 @@ fn respond(request: &Request, shared: &Shared) -> (u16, &'static str, Vec<u8>) {
         return (401, "application/json", error_body("unauthorized", "the data service needs its token"));
     }
     match (request.method.as_str(), request.path.as_str()) {
-        ("POST", "/query") => match query(&request.body, shared) {
+        ("POST", "/query") => match shared.engine.query(&request.body) {
             Ok(result) => (200, "application/json", json!({ "result": result }).to_string().into_bytes()),
-            Err(DataError::Invalid(message)) => (400, "application/json", error_body("invalid", &message)),
-            Err(DataError::Database(message)) => (500, "application/json", error_body("database", &message)),
+            Err(error @ DataError::Invalid(_)) => (400, "application/json", error_body(error.kind(), &error.to_string())),
+            Err(error @ DataError::Database(_)) => (500, "application/json", error_body(error.kind(), &error.to_string())),
         },
         ("GET", "/modules/simien:db") => (
             200,
@@ -204,28 +200,3 @@ fn respond(request: &Request, shared: &Shared) -> (u16, &'static str, Vec<u8>) {
     }
 }
 
-fn query(body: &[u8], shared: &Shared) -> Result<Value, DataError> {
-    let query: Query =
-        serde_json::from_slice(body).map_err(|err| DataError::Invalid(format!("not a query object: {err}")))?;
-    let text = std::fs::read_to_string(&shared.schema_file)
-        .map_err(|err| DataError::Invalid(format!("{}: {err}", shared.schema_file.display())))?;
-    let schema = schema::parse::parse(&text)
-        .map_err(|err| DataError::Invalid(format!("schema.ts: {}", err.message)))?;
-    let mut database = shared.database.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-    // One connection serves every request; a dropped one (Postgres restarted)
-    // is opened again once.
-    for attempt in 0..2 {
-        if database.as_ref().is_none_or(postgres::Client::is_closed) {
-            *database = Some(
-                schema_sync::connect(&shared.url, Duration::from_secs(5))
-                    .map_err(|err| DataError::Database(format!("Postgres: {err}")))?,
-            );
-        }
-        let client = database.as_mut().expect("connected above");
-        match data::run(client, &schema, &query) {
-            Err(DataError::Database(_)) if attempt == 0 && client.is_closed() => *database = None,
-            outcome => return outcome,
-        }
-    }
-    unreachable!("the second attempt returns")
-}

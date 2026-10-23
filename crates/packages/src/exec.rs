@@ -46,6 +46,10 @@ pub struct Runner {
 /// The hidden command Simien runs a granted Node program with.
 pub const NODE_PROGRAM_COMMAND: &str = "__node-program";
 
+/// The runner flag that gives a Node program the project's database
+/// (`simien:db`); only `simien dev` passes it, for the app's dev server.
+pub const DATA_FLAG: &str = "--data";
+
 /// The program to run and how.
 #[derive(Debug, Serialize)]
 pub struct Program {
@@ -63,6 +67,15 @@ pub struct Program {
 }
 
 impl Program {
+    /// Gives the program the project's database, if Simien runs it (a Node
+    /// program); anything else runs as it would.
+    pub fn with_data(mut self) -> Self {
+        if let Some(runner) = &mut self.runner {
+            runner.args.push(DATA_FLAG.to_string());
+        }
+        self
+    }
+
     /// The sandbox it runs in, for a project at `project`. Keep it until the
     /// program ends.
     pub fn sandbox(&self, project: &Path) -> anyhow::Result<crate::sandbox::Prepared> {

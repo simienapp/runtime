@@ -126,4 +126,6 @@ jobs:
         run: cargo test --locked -p data --test engine
       - name: The dev data service, driven by the real client on Bun
         run: cargo test --locked -p devloop --test service
+      - name: simien:db natively in a program given the database (simien dev's Vite)
+        run: cargo test --locked -p simien --test data_native -- --ignored
       - run: sccache --show-stats

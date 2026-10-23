@@ -9,11 +9,13 @@ publish = false
 bytes = "1.12.1"
 postgres = "0.19"
 schema = { path = "../schema" }
+schema_sync = { path = "../schema_sync" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+simien_core = { workspace = true }
+tokio = { workspace = true, features = ["rt"] }
 
 [dev-dependencies]
 container = { path = "../container" }
 project = { path = "../project" }
-schema_sync = { path = "../schema_sync" }
 tempfile = "3.23.0"

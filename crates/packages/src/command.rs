@@ -417,7 +417,7 @@ fn x(context: &Context) {
         let [spec] = context.args.positionals.as_slice() else {
             anyhow::bail!("name the package to run, e.g. `simien x prettier --write .`");
         };
-        code = run_sandboxed(&root, spec, output::Passthrough::of(context), Globals::of(context)).await?;
+        code = run_sandboxed(&root, spec, output::Passthrough::of(context), Globals::of(context), Data::Withheld).await?;
         Ok(())
     });
     std::process::exit(code);
@@ -427,8 +427,11 @@ fn x(context: &Context) {
 /// x` does: installed first if the project doesn't have it, with the
 /// project's grants, its output passed through. Returns its exit code; on a
 /// failure, says what the sandbox allowed and how to grant more.
-pub async fn run_sandboxed(root: &Path, spec: &str, args: &[String], globals: Globals) -> anyhow::Result<i32> {
-    let program = crate::exec::resolve(root, spec, None).await?;
+pub async fn run_sandboxed(root: &Path, spec: &str, args: &[String], globals: Globals, data: Data) -> anyhow::Result<i32> {
+    let mut program = crate::exec::resolve(root, spec, None).await?;
+    if data == Data::Given {
+        program = program.with_data();
+    }
     let prepared = program.sandbox(root)?;
     let mut child = tokio::process::Command::from(program.command(&prepared.sandbox, args)?)
         .spawn()
@@ -481,10 +484,19 @@ pub async fn wait_forwarding_signals(child: &mut tokio::process::Child) -> std::
 }
 
 /// [`run_sandboxed`] from synchronous code.
-pub fn run_sandboxed_blocking(root: &Path, spec: &str, args: &[String], globals: Globals) -> anyhow::Result<i32> {
+pub fn run_sandboxed_blocking(root: &Path, spec: &str, args: &[String], globals: Globals, data: Data) -> anyhow::Result<i32> {
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
     let local = tokio::task::LocalSet::new();
-    local.block_on(&runtime, run_sandboxed(root, spec, args, globals))
+    local.block_on(&runtime, run_sandboxed(root, spec, args, globals, data))
+}
+
+/// Whether a program Simien runs gets the project's database (`simien:db`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Data {
+    /// `simien dev`'s app dev server.
+    Given,
+    /// Every other program.
+    Withheld,
 }
 
 /// The program's exit code, or 128 + the signal that ended it.

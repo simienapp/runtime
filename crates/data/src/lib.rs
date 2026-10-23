@@ -3,7 +3,9 @@
 //! compiled to one parameterized SQL statement, and run on Postgres. Writes
 //! reach Zega through pg_zega inside the same transaction.
 
+pub mod binding;
 mod compile;
+mod engine;
 pub mod modules;
 mod param;
 pub mod query;
@@ -14,6 +16,7 @@ use schema::model::Schema;
 use serde_json::Value;
 
 pub use compile::{Compiled, Shape, compile};
+pub use engine::Engine;
 pub use query::Query;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,6 +36,17 @@ impl std::fmt::Display for DataError {
 }
 
 impl std::error::Error for DataError {}
+
+impl DataError {
+    /// What a client is told it is: `invalid` (the query's to fix) or
+    /// `database` (Postgres refused or failed it).
+    pub fn kind(&self) -> &'static str {
+        match self {
+            DataError::Invalid(_) => "invalid",
+            DataError::Database(_) => "database",
+        }
+    }
+}
 
 /// Runs `query` and returns its result: a list of rows, one row or `null`, or a count.
 pub fn run(

@@ -27,7 +27,8 @@ pub fn run(root: &Path, port: Option<&str>, globals: Globals) -> i32 {
     output::event(&serde_json::json!({ "event": "dev", "server": "vite" }), globals, || {
         stdio::log("dev", "Vite app: running Vite's dev server (sandboxed); the database loop runs alongside")
     });
-    match packages::command::run_sandboxed_blocking(root, "vite", &args, globals) {
+    // The app's own dev server: the one program that gets its database.
+    match packages::command::run_sandboxed_blocking(root, "vite", &args, globals, packages::command::Data::Given) {
         Ok(code) => code,
         Err(error) => {
             output::failure(&output::SimienError::new(format!("{error:#}")), globals);
