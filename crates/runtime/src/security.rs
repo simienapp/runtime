@@ -396,7 +396,6 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
     use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     const PHASE_AWARE: &str = r#"{
         "permissions": {
@@ -423,18 +422,13 @@ mod tests {
         }
     }"#;
 
-    fn temp_project(manifest: &str) -> std::path::PathBuf {
-        static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-        let mut dir = std::env::temp_dir();
-        let stamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
-        let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        dir.push(format!("deka-phase-perms-test-{stamp}-{seq}"));
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("simien.json"), manifest).unwrap();
-        dir
+    /// A project with `manifest` as its simien.json, removed when the
+    /// returned folder is dropped.
+    fn temp_project(manifest: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_path_buf();
+        fs::write(root.join("simien.json"), manifest).unwrap();
+        (dir, root)
     }
 
     fn no_flags() -> (HashMap<String, bool>, HashMap<String, String>) {
@@ -443,7 +437,7 @@ mod tests {
 
     #[test]
     fn a_built_entry_runs_under_its_projects_policy() {
-        let root = temp_project(r#"{ "security": { "deny": { "dynamic": true, "run": true } } }"#);
+        let (_dir, root) = temp_project(r#"{ "security": { "deny": { "dynamic": true, "run": true } } }"#);
         let server = root.join("dist").join("server");
         fs::create_dir_all(&server).unwrap();
         assert_eq!(policy_root(&server), root.as_path());
@@ -455,7 +449,7 @@ mod tests {
 
     #[test]
     fn phase_aware_manifest_selects_profile_by_command_phase() {
-        let root = temp_project(PHASE_AWARE);
+        let (_dir, root) = temp_project(PHASE_AWARE);
         let (flags, params) = no_flags();
 
         let dev = resolve_security_policy_for_root(&root, &flags, &params, ProjectKind::Js, true)
@@ -479,7 +473,7 @@ mod tests {
 
     #[test]
     fn phase_aware_prod_build_is_a_manifest_error() {
-        let root = temp_project(r#"{ "permissions": { "prod": { "build": true } } }"#);
+        let (_dir, root) = temp_project(r#"{ "permissions": { "prod": { "build": true } } }"#);
         let (flags, params) = no_flags();
         let err = resolve_security_policy_for_root(&root, &flags, &params, ProjectKind::Js, false)
             .err()
@@ -496,7 +490,7 @@ mod tests {
             "{err}"
         );
 
-        let root = temp_project(r#"{ "permissions": { "prod": { "build": { "read": true } } } }"#);
+        let (_dir, root) = temp_project(r#"{ "permissions": { "prod": { "build": { "read": true } } } }"#);
         let err = resolve_security_policy_for_root(&root, &flags, &params, ProjectKind::Js, false)
             .err()
             .expect("prod.build object must fail validation");
@@ -508,7 +502,7 @@ mod tests {
 
     #[test]
     fn phase_aware_build_slots_use_dev_build_only() {
-        let root = temp_project(PHASE_AWARE);
+        let (_dir, root) = temp_project(PHASE_AWARE);
         let (flags, params) = no_flags();
         let build =
             resolve_build_policy_for_root(&root, &flags, &params, true).expect("build resolution");
@@ -530,7 +524,7 @@ mod tests {
 
     #[test]
     fn phase_aware_resolution_ignores_permission_env_vars() {
-        let root = temp_project(PHASE_AWARE);
+        let (_dir, root) = temp_project(PHASE_AWARE);
         let (flags, params) = no_flags();
         let baseline =
             resolve_security_policy_for_root(&root, &flags, &params, ProjectKind::Js, false)
@@ -562,7 +556,7 @@ mod tests {
 
     #[test]
     fn legacy_security_manifest_keeps_the_legacy_path() {
-        let root = temp_project(r#"{ "security": { "allow": { "env": ["LEGACY_KEY"] } } }"#);
+        let (_dir, root) = temp_project(r#"{ "security": { "allow": { "env": ["LEGACY_KEY"] } } }"#);
         let (flags, params) = no_flags();
         let resolved =
             resolve_security_policy_for_root(&root, &flags, &params, ProjectKind::Js, false)

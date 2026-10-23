@@ -349,3 +349,100 @@ fn only_a_program_given_data_can_query_the_projects_database() {
         "the import itself is refused: {withheld}"
     );
 }
+
+/// A package program at `node_modules/probe` running `source`, with
+/// node_modules/.bin/probe linked to it, as an install puts it. `grant`
+/// says whether simien.json grants it dangerouslyUseNode.
+#[cfg(unix)]
+fn probe_project(grant: bool, source: &str) -> tempfile::TempDir {
+    let project = tempfile::tempdir().expect("project");
+    let permissions = if grant {
+        r#"{ "packagePermissions": { "probe": { "dangerouslyUseNode": true } } }"#
+    } else {
+        "{}"
+    };
+    fs::write(project.path().join("simien.json"), permissions).expect("simien.json");
+    let package = project.path().join("node_modules/probe");
+    fs::create_dir_all(&package).expect("package dir");
+    fs::write(package.join("package.json"), r#"{ "name": "probe", "version": "1.0.0", "bin": "cli.js" }"#)
+        .expect("package.json");
+    fs::write(package.join("cli.js"), format!("#!/usr/bin/env node\n{source}")).expect("cli.js");
+    let bin = project.path().join("node_modules/.bin");
+    fs::create_dir_all(&bin).expect(".bin");
+    std::os::unix::fs::symlink("../probe/cli.js", bin.join("probe")).expect("link");
+    project
+}
+
+#[cfg(unix)]
+/// Without dangerouslyUseNode a package program gets no Node APIs: it's
+/// refused before it runs, with how to grant it.
+#[test]
+fn a_package_without_the_grant_is_refused_node() {
+    let project = probe_project(false, "require(\"node:fs\").writeFileSync(\"ran.txt\", \"x\");\n");
+    let home = tempfile::tempdir().expect("fake home");
+    let output = Command::new(env!("CARGO_BIN_EXE_simien"))
+        .args(["x", "probe"])
+        .current_dir(project.path())
+        .env("HOME", home.path())
+        .output()
+        .expect("run simien x");
+    let all = format!("{}{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert!(!output.status.success(), "it ran: {all}");
+    assert!(all.contains("granted dangerouslyUseNode"), "says why: {all}");
+    assert!(all.contains(r#""probe": { \"dangerouslyUseNode\": true }"#) || all.contains(r#"\"probe\": { \"dangerouslyUseNode\": true }"#), "says how to grant it: {all}");
+    assert!(!project.path().join("ran.txt").exists(), "the program ran");
+}
+
+#[cfg(unix)]
+/// A granted program reads the project but not the user's secrets, and
+/// sees no credentials in its environment (APS 3), however it asks.
+#[test]
+fn a_granted_program_reads_no_secrets_and_sees_no_credentials() {
+    let project = probe_project(
+        true,
+        r#"const fs = require("node:fs");
+        const path = require("node:path");
+        const read = (file) => {
+          try { fs.readFileSync(file, "utf8"); return "read"; }
+          catch (e) { return `${e.name}: ${e.message}`; }
+        };
+        console.log(JSON.stringify({
+          project: read(path.join(process.cwd(), "simien.json")),
+          sshKey: read(path.join(process.env.HOME, ".ssh", "id_probe")),
+          awsCredentials: read(path.join(process.env.HOME, ".aws", "credentials")),
+          token: process.env.GITHUB_TOKEN ?? null,
+          inKeys: Object.keys(process.env).includes("GITHUB_TOKEN"),
+          ordinary: process.env.PROBE_ORDINARY ?? null,
+        }));
+        "#,
+    );
+    let home = tempfile::tempdir().expect("fake home");
+    for (folder, file) in [(".ssh", "id_probe"), (".aws", "credentials")] {
+        fs::create_dir_all(home.path().join(folder)).expect("secret folder");
+        fs::write(home.path().join(folder).join(file), "secret").expect("secret");
+    }
+    let output = Command::new(env!("CARGO_BIN_EXE_simien"))
+        .args(["x", "probe"])
+        .current_dir(project.path())
+        .env("HOME", home.path())
+        .env("GITHUB_TOKEN", "ghp_probe")
+        .env("PROBE_ORDINARY", "seen")
+        .output()
+        .expect("run simien x");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "exit {:?}\nstdout: {stdout}\nstderr: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let line = stdout.lines().find(|line| line.starts_with('{')).expect("the program's JSON line");
+    let seen: serde_json::Value = serde_json::from_str(line).expect("JSON");
+    assert_eq!(seen["project"], "read", "{seen}");
+    for secret in ["sshKey", "awsCredentials"] {
+        assert_ne!(seen[secret], "read", "{secret} was read: {seen}");
+    }
+    assert_eq!(seen["token"], serde_json::Value::Null, "{seen}");
+    assert_eq!(seen["inKeys"], false, "{seen}");
+    assert_eq!(seen["ordinary"], "seen", "ordinary variables pass: {seen}");
+}

@@ -505,6 +505,55 @@ fn an_app_imports_a_commonjs_package_as_node_would() {
     assert_eq!(body["same"], true, "the default export is module.exports");
 }
 
+/// A served app has no grant to Node: Node's modules beyond the framework's
+/// carve-outs are refused when it loads, the carved-out `node:fs` has no way
+/// to touch a file, and the default policy gives it no network.
+#[test]
+fn a_served_app_without_a_grant_gets_no_node_and_no_network() {
+    for module in ["node:child_process", "node:net", "node:http", "node:worker_threads", "node:vm", "node:os"] {
+        let error = start_app(&[
+            ("app.js", &format!("import * as m from \"{module}\";\nexport default {{ fetch: () => new Response(String(m)) }};\n")),
+            ("simien.json", "{}"),
+        ], &[])
+        .expect_err(module);
+        assert!(error.contains(&format!("{module} isn't available")), "{module}: {error}");
+    }
+
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a local listener");
+    let port = listener.local_addr().expect("addr").port();
+    let (_dir, addr) = start_app(&[
+        (
+            "app.js",
+            &format!(
+                r#"import * as fs from "node:fs";
+                export default {{
+                  fetch: async () => {{
+                    let fetched;
+                    try {{ await fetch("http://127.0.0.1:{port}/"); fetched = "fetched"; }}
+                    catch (error) {{ fetched = `${{error.name}}: ${{error.message}}`; }}
+                    return Response.json({{
+                      fsExports: Object.keys(fs).filter((key) => key !== "default"),
+                      readFileSync: typeof fs.readFileSync,
+                      writeFileSync: typeof fs.writeFileSync,
+                      fetched,
+                    }});
+                  }},
+                }};"#
+            ),
+        ),
+        ("simien.json", "{}"),
+    ], &[])
+    .expect("start");
+    let body: serde_json::Value = client().get(format!("http://{addr}/")).send().expect("request").json().expect("json");
+    assert_eq!(body["fsExports"], serde_json::json!([]), "{body}");
+    assert_eq!(body["readFileSync"], "undefined", "{body}");
+    assert_eq!(body["writeFileSync"], "undefined", "{body}");
+    let fetched = body["fetched"].as_str().unwrap_or_default();
+    assert_ne!(fetched, "fetched", "{body}");
+    assert!(fetched.starts_with("NotCapable") && fetched.contains("127.0.0.1"), "refused by the network policy: {body}");
+    drop(listener);
+}
+
 #[test]
 fn a_bare_node_module_name_is_still_a_node_module() {
     let error = start_app(&[
