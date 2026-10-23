@@ -8,7 +8,7 @@ description = "Serves a fetch-handler app with one warm isolate per core, each s
 deka_host = { path = "../deka_host", default-features = false, features = ["runtime"] }
 permissions = { path = "../permissions" }
 serde_json = { workspace = true }
-simien_node_runtime = "0.4.1"
+simien_node_runtime = "0.4.2"
 simien_os = "0.1.0"
 simien_permissions = "0.1.0"
 data = { path = "../data" }

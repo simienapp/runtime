@@ -1,0 +1,78 @@
+# Node's tests that fail on Simien: <test> <platforms> <issue> <reason>.
+# Platforms: all, or a comma-separated list of linux, macos, windows.
+# A test here that passes fails the gate: move it to passing.txt.
+test/parallel/test-buffer-constructor-node-modules-paths.js                all  runtime#86  see the checklist
+test/parallel/test-buffer-constructor-node-modules.js                      all  runtime#86  see the checklist
+test/parallel/test-buffer-isascii.js                                       all  runtime#86  see the checklist
+test/parallel/test-buffer-isutf8.js                                        all  runtime#86  see the checklist
+test/parallel/test-child-process-exec-maxbuf.js                            all  runtime#86  see the checklist
+test/parallel/test-child-process-execfile-maxbuf.js                        all  runtime#86  see the checklist
+test/parallel/test-child-process-execfilesync-maxbuf.js                    all  runtime#86  see the checklist
+test/parallel/test-child-process-execsync-maxbuf.js                        all  runtime#86  see the checklist
+test/parallel/test-child-process-fork-stdio-string-variant.js              all  runtime#85  fork IPC and cluster hang
+test/parallel/test-child-process-kill.js                                   all  runtime#86  see the checklist
+test/parallel/test-child-process-promisified.js                            all  n/a         `simien -p`: Simien runs Node programs from files only
+test/parallel/test-child-process-server-close.js                           all  runtime#85  fork IPC and cluster hang
+test/parallel/test-child-process-spawn-argv0.js                            all  runtime#86  see the checklist
+test/parallel/test-child-process-spawn-shell.js                            all  runtime#86  see the checklist
+test/parallel/test-child-process-spawnsync-input.js                        all  runtime#86  see the checklist
+test/parallel/test-child-process-spawnsync-maxbuf.js                       all  runtime#86  see the checklist
+test/parallel/test-crypto-key-objects-messageport.js                       all  runtime#86  see the checklist
+test/parallel/test-crypto-prime.js                                         all  runtime#46  node:worker_threads is not supported yet
+test/parallel/test-crypto-webcrypto-aes-decrypt-tag-too-small.js           all  runtime#86  see the checklist
+test/parallel/test-crypto-worker-thread.js                                 all  runtime#46  node:worker_threads is not supported yet
+test/parallel/test-fs-chmod-mask.js                                        macos  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-chmod.js                                             macos  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-async-copy-non-directory-symlink.mjs              all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-async-dereference-symlink.mjs                     all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-async-dest-symlink-points-to-src-error.mjs        all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-async-file-url.mjs                                all  runtime#86  see the checklist
+test/parallel/test-fs-cp-async-socket.mjs                                  macos  n/a         the suite's path under the build folder is past macOS's 104-byte socket path limit
+test/parallel/test-fs-cp-async-symlink-dest-points-to-src.mjs              all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-async-symlink-over-file.mjs                       all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-async-symlink-points-to-dest.mjs                  all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-sync-copy-socket-error.mjs                        macos  n/a         the suite's path under the build folder is past macOS's 104-byte socket path limit
+test/parallel/test-fs-cp-sync-copy-symlink-not-pointing-to-folder.mjs      all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-sync-copy-symlink-over-file-error.mjs             all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-sync-copy-symlinks-to-existing-symlinks.mjs       all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-sync-dereference-directory.mjs                    all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-sync-dereference-file.mjs                         all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-sync-dereference.js                               all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-sync-parent-symlink-dest-points-to-src-error.mjs  all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-sync-resolve-relative-symlinks-default.mjs        all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-sync-resolve-relative-symlinks-false.mjs          all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-sync-symlink-dest-points-to-src-error.mjs         all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-sync-symlink-points-to-dest-error.mjs             all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-cp-sync-verbatim-symlinks-true.mjs                   all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-glob.mjs                                             all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-lchown-negative-one.js                               all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-options-immutable.js                                 all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-readdir-types-symlinks.js                            all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-realpath-native.js                                   all  runtime#86  see the checklist
+test/parallel/test-fs-realpath-pipe.js                                     all  runtime#86  see the checklist
+test/parallel/test-fs-realpath.js                                          all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-stat-bigint.js                                       all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-symlink-buffer-path.js                               all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-symlink-dir-junction-relative.js                     all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-symlink-dir-junction.js                              all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-symlink-dir.js                                       all  runtime#86  see the checklist
+test/parallel/test-fs-symlink-longpath.js                                  all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-symlink.js                                           all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-fs-utimes.js                                            all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-http-debug.js                                           all  runtime#86  see the checklist
+test/parallel/test-module-circular-symlinks.js                             all  runtime#84  symlinks need write access to every path (decision)
+test/parallel/test-module-main-extension-lookup.js                         all  runtime#86  see the checklist
+test/parallel/test-module-multi-extensions.js                              all  runtime#86  see the checklist
+test/parallel/test-net-better-error-messages-listen-path.js                all  n/a         writes outside the sandbox (/tmp, /blah); refused by design (APS 3)
+test/parallel/test-net-better-error-messages-path.js                       all  n/a         writes outside the sandbox (/tmp, /blah); refused by design (APS 3)
+test/parallel/test-net-listen-exclusive-random-ports.js                    all  runtime#85  fork IPC and cluster hang
+test/parallel/test-net-listen-twice.js                                     all  runtime#85  fork IPC and cluster hang
+test/parallel/test-net-server-close-before-ipc-response.js                 all  runtime#85  fork IPC and cluster hang
+test/parallel/test-net-socket-constructor.js                               all  runtime#85  fork IPC and cluster hang
+test/parallel/test-os-userinfo-handles-getter-errors.js                    all  runtime#86  see the checklist
+test/parallel/test-path-resolve.js                                         all  runtime#86  see the checklist
+test/parallel/test-process-execve-worker-threads.js                        all  runtime#46  node:worker_threads is not supported yet
+test/parallel/test-process-get-builtin.mjs                                 all  runtime#86  see the checklist
+test/parallel/test-timers-process-tampering.js                             all  runtime#86  see the checklist
+test/parallel/test-timers-promises.js                                      all  runtime#86  see the checklist
+test/parallel/test-zlib-brotli-kmaxlength-rangeerror.js                    all  runtime#86  see the checklist
