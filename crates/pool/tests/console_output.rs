@@ -17,12 +17,16 @@
 //! share). `console` is a JS global installed by the pool bootstrap
 //! regardless of dsc, so this does not need the pinned compiler.
 //!
-//! Capturing real fd 1/2 needs two independent defenses, not one — see
-//! `stdio_lock` and `strip_harness_noise` below for why (deka#1116).
+//! Capturing real fd 1/2 means nothing else in the process may write to them
+//! while a case has them redirected. libtest's harness did, from its own
+//! threads (`test <name> ... ok`, sometimes split across writes, so no line
+//! filter could take it back out: #30, deka#1116). So this file is its own
+//! harness (`harness = false` in Cargo.toml): [`main`] runs the cases one
+//! after another on one thread, and reports each only after its capture ends.
 
 use std::io::Read;
 use std::os::unix::io::RawFd;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::Arc;
 
 use pool::{ExecutionMode, ExecutionSecurity, HandlerKey, IsolatePool, PoolConfig, RequestData, RequestParts};
 
@@ -58,67 +62,6 @@ fn handler_request(handler_code: &str) -> RequestData {
             no_prompt: true,
         },
     }
-}
-
-/// Every `#[test]` in *this file* runs in one process and shares real fd
-/// 1/2, so redirecting them to a pipe to capture output is process-global
-/// state. Serialize the redirect/run/restore/read-back sequence across this
-/// file's tests with one lock; other test binaries (separate processes)
-/// are unaffected.
-///
-/// This alone is *not* enough (deka#1116 CI failure): `cargo test` runs the
-/// other `#[test]` fns in this binary concurrently on their own threads by
-/// default, and CI must keep it that way (no `--test-threads=1`). The lock
-/// only serializes *our* redirect windows against each other — it cannot
-/// stop libtest's own harness, on another thread, from printing that
-/// thread's `test <name> ... ok`/`FAILED` line to the real fd 1 at the
-/// moment our fd 1 happens to be pointed at our pipe. See
-/// `strip_harness_noise` for the other half of the fix.
-fn stdio_lock() -> &'static Mutex<()> {
-    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    LOCK.get_or_init(|| Mutex::new(()))
-}
-
-/// Removes libtest's own progress/result lines from captured output.
-///
-/// `stdio_lock` prevents this file's fd captures from overlapping each
-/// other, but it cannot prevent *libtest's* announcements for whichever
-/// other test happens to finish, on its own thread, while our fd 1/2 is
-/// redirected — those go through ordinary `print!`/`println!` to the same
-/// process-wide fd. That is exactly what broke CI run 35149546804:
-/// `console_log_prints_structured_values_not_object_object`'s captured
-/// stdout got `test console_has_exactly_the_whatwg_surface_no_chrome_only_extras ... ok`
-/// spliced in as its first line, ahead of the real structured-printer
-/// output (which was itself correct). Each libtest write is one line
-/// (`running N tests`, `test <name> ... ok|FAILED|ignored`,
-/// `test result: ...`, and the blank lines around them), and pipe writes
-/// that size don't tear mid-line, so a line-based filter reliably strips
-/// them without touching our own output.
-fn strip_harness_noise(text: &str) -> String {
-    text.lines()
-        .filter(|line| {
-            let trimmed = line.trim();
-            if trimmed.is_empty() {
-                return false;
-            }
-            if trimmed.starts_with("running ") && (trimmed.ends_with(" test") || trimmed.ends_with(" tests"))
-            {
-                return false;
-            }
-            if trimmed.starts_with("test result:") {
-                return false;
-            }
-            if trimmed.starts_with("test ")
-                && (trimmed.ends_with("... ok")
-                    || trimmed.ends_with("... FAILED")
-                    || trimmed.ends_with("... ignored"))
-            {
-                return false;
-            }
-            true
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 /// Redirects `target_fd` (1 or 2) to a pipe for the duration of a scope,
@@ -180,7 +123,6 @@ impl FdCapture {
 /// (stdout, stderr). Panics (via `expect`/`assert`) surface as normal test
 /// failures; the pool's own response is asserted by the caller.
 fn run_capturing_stdio(handler_code: &str) -> (String, String, pool::IsolateResponse) {
-    let _guard = stdio_lock().lock().unwrap_or_else(|e| e.into_inner());
     let out_cap = FdCapture::start(libc::STDOUT_FILENO);
     let err_cap = FdCapture::start(libc::STDERR_FILENO);
 
@@ -190,8 +132,8 @@ fn run_capturing_stdio(handler_code: &str) -> (String, String, pool::IsolateResp
         .block_on(pool.execute(HandlerKey::new("console_test"), handler_request(handler_code)))
         .expect("pool execution");
 
-    let stdout = strip_harness_noise(&out_cap.finish());
-    let stderr = strip_harness_noise(&err_cap.finish());
+    let stdout = out_cap.finish();
+    let stderr = err_cap.finish();
     (stdout, stderr, response)
 }
 
@@ -200,7 +142,6 @@ fn ok_response(response: &pool::IsolateResponse) {
 }
 
 #[cfg(unix)]
-#[test]
 fn console_streams_are_separated_and_reach_real_stdio() {
     let handler = r#"
 globalThis.app = function(req) {
@@ -238,7 +179,6 @@ globalThis.app = function(req) {
 }
 
 #[cfg(unix)]
-#[test]
 fn console_log_prints_structured_values_not_object_object() {
     let handler = r#"
 globalThis.app = function(req) {
@@ -291,7 +231,6 @@ globalThis.app = function(req) {
 /// printer against what dsc really emits, not against the pool's own
 /// differently-shaped test convenience globals.
 #[cfg(unix)]
-#[test]
 fn console_log_formats_erased_option_and_result_per_rfd44() {
     let handler = r#"
 globalThis.app = function(req) {
@@ -341,7 +280,6 @@ globalThis.app = function(req) {
 }
 
 #[cfg(unix)]
-#[test]
 fn console_group_indents_and_count_time_track_labels() {
     let handler = r#"
 globalThis.app = function(req) {
@@ -382,7 +320,6 @@ globalThis.app = function(req) {
 }
 
 #[cfg(unix)]
-#[test]
 fn console_has_exactly_the_whatwg_surface_no_chrome_only_extras() {
     let handler = r#"
 globalThis.app = function(req) {
@@ -432,7 +369,6 @@ globalThis.app = function(req) {
 /// fix: the whole request must still complete and return 200, fast,
 /// no matter what `console.log` was asked to print.
 #[cfg(unix)]
-#[test]
 fn console_log_never_throws_or_hangs_on_hostile_values() {
     let handler = r#"
 globalThis.app = function(req) {
@@ -491,4 +427,37 @@ globalThis.app = function(req) {
         elapsed_ms < 5_000,
         "hostile console values must not measurably stall the request; took {elapsed_ms}ms"
     );
+}
+
+/// The harness: each case in turn on this thread, reported after it ends,
+/// as libtest would. Arguments that aren't flags filter by name, as with
+/// `cargo test -p pool --test console_output -- <name>`.
+fn main() {
+    let cases: [(&str, fn()); 6] = [
+        ("console_streams_are_separated_and_reach_real_stdio", console_streams_are_separated_and_reach_real_stdio as fn()),
+        ("console_log_prints_structured_values_not_object_object", console_log_prints_structured_values_not_object_object as fn()),
+        ("console_log_formats_erased_option_and_result_per_rfd44", console_log_formats_erased_option_and_result_per_rfd44 as fn()),
+        ("console_group_indents_and_count_time_track_labels", console_group_indents_and_count_time_track_labels as fn()),
+        ("console_has_exactly_the_whatwg_surface_no_chrome_only_extras", console_has_exactly_the_whatwg_surface_no_chrome_only_extras as fn()),
+        ("console_log_never_throws_or_hangs_on_hostile_values", console_log_never_throws_or_hangs_on_hostile_values as fn()),
+    ];
+    let filters: Vec<String> = std::env::args().skip(1).filter(|arg| !arg.starts_with('-')).collect();
+    let chosen: Vec<_> = cases
+        .into_iter()
+        .filter(|(name, _)| filters.is_empty() || filters.iter().any(|filter| name.contains(filter.as_str())))
+        .collect();
+    println!("\nrunning {} tests", chosen.len());
+    let mut failed = Vec::new();
+    for (name, case) in &chosen {
+        let outcome = std::panic::catch_unwind(case);
+        println!("test {name} ... {}", if outcome.is_ok() { "ok" } else { "FAILED" });
+        if outcome.is_err() {
+            failed.push(*name);
+        }
+    }
+    let verdict = if failed.is_empty() { "ok" } else { "FAILED" };
+    println!("\ntest result: {verdict}. {} passed; {} failed\n", chosen.len() - failed.len(), failed.len());
+    if !failed.is_empty() {
+        std::process::exit(101);
+    }
 }
