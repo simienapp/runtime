@@ -161,7 +161,8 @@ jobs:
             exit 1
           fi
           printf 'console.log(["simien", 1 + 1].join(" "));\n' > smoke.js
-          OUT="$("$BIN" run smoke.js 2>/dev/null | tail -n 1)"
+          # stderr stays in the log: when this fails, it says why.
+          OUT="$("$BIN" run smoke.js | tail -n 1)"
           if [ "$OUT" != "simien 2" ]; then
             echo "::error::simien run smoke.js printed '${OUT}', expected 'simien 2'"
             exit 1
