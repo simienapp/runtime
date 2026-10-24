@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/cloud",
     "crates/node_program",
     "crates/deka_executable",
     "crates/dcore",

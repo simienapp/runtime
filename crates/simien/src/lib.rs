@@ -94,6 +94,7 @@ pub fn register_fns() -> Vec<fn(&mut Registry)> {
         packages::command::register,
         project::db::register,
         container::register,
+        cloud::command::register,
         check::register,
         compile::register,
         introspect::register,
