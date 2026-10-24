@@ -134,6 +134,7 @@ pub fn make(root: &Path, name: Option<&str>, port: Option<&str>, force: bool, ma
         "db".into(),
         json!({ "ports": { "postgres": base, "zega": base + 1 } }),
     );
+    grant_db(&mut settings)?;
     let text = serde_json::to_string_pretty(&Value::Object(settings)).expect("json");
     std::fs::write(&config, format!("{text}\n")).map_err(|err| format!("{}: {err}", config.display()))?;
 
@@ -155,6 +156,22 @@ pub fn make(root: &Path, name: Option<&str>, port: Option<&str>, force: bool, ma
         postgres: base,
         zega: base + 1,
     })
+}
+
+/// The `db` permission `simien:db` asks for (APS 4), as the Tana templates
+/// grant it: `security.allow.db` gains `"postgres"`. Whatever else the
+/// policy says is kept; a project that asks for a database is granted it
+/// (Sami, #80), rather than having every query refused until it adds the line.
+fn grant_db(settings: &mut Map<String, Value>) -> Result<(), String> {
+    let shape = || format!("{CONFIG}'s security section must be an object, with security.allow an object and security.allow.db a list");
+    let security = settings.entry("security").or_insert_with(|| json!({}));
+    let allow = security.as_object_mut().ok_or_else(shape)?.entry("allow").or_insert_with(|| json!({}));
+    let db = allow.as_object_mut().ok_or_else(shape)?.entry("db").or_insert_with(|| json!([]));
+    let list = db.as_array_mut().ok_or_else(shape)?;
+    if !list.iter().any(|entry| entry == "postgres") {
+        list.push(json!("postgres"));
+    }
+    Ok(())
 }
 
 fn slug(raw: &str) -> String {

@@ -61,9 +61,9 @@ fn adds_the_db_section_to_an_existing_simien_json_and_keeps_the_rest() {
     assert_eq!(config["name"], "shop", "the existing name is kept");
     assert_eq!(config["packagePermissions"]["esbuild"]["write"][0], "$PACKAGE");
     assert_eq!(config["db"]["ports"]["zega"], 6001);
-    // Order is kept: name, packagePermissions, then the new db.
+    // Order is kept: name, packagePermissions, then the new db and its grant.
     let order: Vec<&str> = config.as_object().unwrap().keys().map(String::as_str).collect();
-    assert_eq!(order, ["name", "packagePermissions", "db"]);
+    assert_eq!(order, ["name", "packagePermissions", "db", "security"]);
 }
 
 #[test]
@@ -178,4 +178,40 @@ fn a_stopped_projects_ports_stay_its_own_until_it_is_gone() {
     let claims = map.claims().unwrap();
     assert!(!claims.contains_key(&shop.canonicalize().unwrap()));
     assert_eq!(claims[&wiki.canonicalize().unwrap()], Claim::new(6100));
+}
+
+/// #80: a project that asks for a database is granted `simien:db`, exactly
+/// as the Tana templates grant it, instead of every query being refused.
+#[test]
+fn grants_the_db_permission_and_keeps_the_rest_of_the_policy() {
+    let (_dir, root) = folder("granted");
+    make(&root, None, None, false, &map_of(&root)).unwrap();
+    let config = |root: &std::path::Path| -> serde_json::Value {
+        serde_json::from_str(&std::fs::read_to_string(root.join("simien.json")).unwrap()).unwrap()
+    };
+    assert_eq!(config(&root)["security"], serde_json::json!({ "allow": { "db": ["postgres"] } }));
+
+    // An existing policy: its other grants stay, `db` is added once, even on --force.
+    let (_dir2, root) = folder("has-a-policy");
+    std::fs::write(
+        root.join("simien.json"),
+        r#"{ "security": { "allow": { "read": ["./src"], "db": ["analytics"] }, "deny": { "net": ["*"] } } }"#,
+    )
+    .unwrap();
+    make(&root, None, None, false, &map_of(&root)).unwrap();
+    make(&root, None, None, true, &map_of(&root)).unwrap();
+    assert_eq!(
+        config(&root)["security"],
+        serde_json::json!({ "allow": { "read": ["./src"], "db": ["analytics", "postgres"] }, "deny": { "net": ["*"] } })
+    );
+}
+
+#[test]
+fn a_policy_it_cannot_read_is_refused_not_overwritten() {
+    let (_dir, root) = folder("odd-policy");
+    let odd = r#"{ "security": { "allow": { "db": "postgres" } } }"#;
+    std::fs::write(root.join("simien.json"), odd).unwrap();
+    let err = make(&root, None, None, false, &map_of(&root)).unwrap_err();
+    assert!(err.contains("security.allow.db a list"), "{err}");
+    assert_eq!(std::fs::read_to_string(root.join("simien.json")).unwrap(), odd);
 }
