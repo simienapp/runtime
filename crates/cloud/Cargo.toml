@@ -2,13 +2,13 @@
 name = "cloud"
 version.workspace = true
 edition = "2024"
-description = "simien login / logout: who you are on Simien Cloud, by GitHub's device flow"
+description = "simien login / logout: who you are on Simien Cloud, by account.simien.cloud's device sign-in"
 publish = false
 
 [dependencies]
 dcore = { path = "../dcore" }
 output = { path = "../output" }
-reqwest = { version = "0.13", features = ["blocking", "form", "json"] }
+reqwest = { version = "0.13", features = ["blocking", "json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 stdio = "0.5.0"

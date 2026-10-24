@@ -4,13 +4,13 @@ use dcore::{CommandSpec, Context, FlagSpec, Registry};
 use output::{Globals, SimienError};
 use serde_json::json;
 
-use crate::{Client, GitHub, Store, now};
+use crate::{ACCOUNT_ORIGIN, Client, Store};
 
 const LOGIN: CommandSpec = CommandSpec {
     owner: "cloud",
     name: "login",
     category: "cloud",
-    summary: "sign in to Simien Cloud with GitHub",
+    summary: "sign in to Simien Cloud (GitHub, Apple or Google, at account.simien.cloud)",
     aliases: &[],
     subcommands: &[],
     handler: login,
@@ -32,7 +32,7 @@ pub fn register(registry: &mut Registry) {
     registry.add_flag(FlagSpec {
         name: "--no-browser",
         aliases: &[],
-        description: "login: print the GitHub link without opening a browser",
+        description: "login: print the sign-in link without opening a browser",
     });
 }
 
@@ -47,29 +47,29 @@ fn run(context: &Context, command: impl FnOnce(&Context, Globals) -> Result<(), 
 fn login(context: &Context) {
     run(context, |context, globals| {
         let store = Store::user()?;
-        if let Some(session) = store.read()?.filter(|session| !session.expired(now())) {
-            output::result(&json!({ "login": session.login, "already": true }), globals, || {
-                stdio::log("login", &format!("already signed in as {}", session.login));
+        if let Some(session) = store.read()? {
+            output::result(&json!({ "account": session.account, "login": session.login, "already": true }), globals, || {
+                stdio::log("login", &format!("already signed in as {}", session.label()));
                 stdio::next_step("sign in as someone else", "simien logout");
             });
             return Ok(());
         }
         let open = !context.args.flags.get("--no-browser").copied().unwrap_or(false);
-        let client = Client::new(GitHub::default())?;
+        let client = Client::new(ACCOUNT_ORIGIN)?;
         let show = |code: &crate::DeviceCode| {
             output::event(
-                &json!({ "event": "code", "userCode": code.user_code, "verificationUri": code.verification_uri }),
+                &json!({ "event": "code", "userCode": code.user_code, "verificationUri": code.verification_uri_complete }),
                 globals,
-                || stdio::log("login", &format!("enter {} at {}", code.user_code, code.verification_uri)),
+                || stdio::log("login", &format!("approve {} at {}", code.user_code, code.verification_uri_complete)),
             );
             if open {
-                open_browser(&code.verification_uri);
+                open_browser(&code.verification_uri_complete);
             }
         };
         let session = client.sign_in(&show, &std::thread::sleep)?;
         store.write(&session)?;
-        output::result(&json!({ "login": session.login, "already": false }), globals, || {
-            stdio::success(&format!("signed in as {}", session.login));
+        output::result(&json!({ "account": session.account, "login": session.login, "already": false }), globals, || {
+            stdio::success(&format!("signed in as {}", session.label()));
         });
         Ok(())
     });

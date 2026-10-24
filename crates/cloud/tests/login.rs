@@ -1,6 +1,6 @@
-//! Sign-in against a stand-in GitHub that answers as the real one does
-//! (docs.github.com, "Authorizing OAuth apps", device flow): the code, a
-//! few polls while the user is away, the token, who it belongs to.
+//! Sign-in against a stand-in account.simien.cloud that answers as the real
+//! one does (simienapp/account `lib/device.ts`): a code, a few polls while
+//! the person is away (202), the token (200), who it belongs to (/auth/me).
 
 use std::cell::RefCell;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -8,34 +8,37 @@ use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use cloud::{Client, GitHub, Session, Store};
+use cloud::{Client, Session, Store};
 use serde_json::{Value, json};
 
 /// One request as the stand-in saw it.
 #[derive(Debug, Clone)]
 struct Seen {
+    method: String,
     path: String,
-    accept: String,
     authorization: String,
-    body: String,
+    body: Value,
 }
 
-/// Serves `/login/device/code`, then `token_answers` one per poll, then
-/// `/user`. Returns its base URL and what it was sent.
-fn github(token_answers: Vec<Value>) -> (String, Arc<Mutex<Vec<Seen>>>) {
+/// Serves `/auth/device/start`, then `polls` (status, body) one per poll of
+/// `/auth/device/token`, and `/auth/me`. Returns its origin and what it was sent.
+fn accounts(polls: Vec<(u16, Value)>) -> (String, Arc<Mutex<Vec<Seen>>>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
-    let base = format!("http://{}", listener.local_addr().expect("addr"));
+    let origin = format!("http://{}", listener.local_addr().expect("addr"));
     let seen = Arc::new(Mutex::new(Vec::new()));
     let log = Arc::clone(&seen);
+    let base = origin.clone();
     std::thread::spawn(move || {
-        let mut answers = token_answers.into_iter();
+        let mut polls = polls.into_iter();
         for stream in listener.incoming() {
             let Ok(mut stream) = stream else { return };
             let mut reader = BufReader::new(stream.try_clone().expect("clone"));
             let mut line = String::new();
             reader.read_line(&mut line).expect("request line");
-            let path = line.split_whitespace().nth(1).unwrap_or_default().to_string();
-            let (mut length, mut accept, mut authorization) = (0, String::new(), String::new());
+            let mut words = line.split_whitespace();
+            let method = words.next().unwrap_or_default().to_string();
+            let path = words.next().unwrap_or_default().to_string();
+            let (mut length, mut authorization) = (0, String::new());
             loop {
                 let mut header = String::new();
                 reader.read_line(&mut header).expect("header");
@@ -46,107 +49,117 @@ fn github(token_answers: Vec<Value>) -> (String, Arc<Mutex<Vec<Seen>>>) {
                 let (name, value) = header.split_once(':').unwrap_or((header, ""));
                 match name.to_ascii_lowercase().as_str() {
                     "content-length" => length = value.trim().parse().unwrap_or(0),
-                    "accept" => accept = value.trim().to_string(),
                     "authorization" => authorization = value.trim().to_string(),
                     _ => {}
                 }
             }
             let mut body = vec![0; length];
             reader.read_exact(&mut body).expect("body");
-            let body = String::from_utf8(body).expect("utf-8");
-            log.lock().expect("log").push(Seen { path: path.clone(), accept, authorization, body });
-            let answer = match path.as_str() {
-                "/login/device/code" => json!({
-                    "device_code": "dev-123",
+            let body = serde_json::from_slice(&body).unwrap_or(Value::Null);
+            log.lock().expect("log").push(Seen { method, path: path.clone(), authorization: authorization.clone(), body });
+            let (status, answer) = match path.as_str() {
+                "/auth/device/start" => (200, json!({
                     "user_code": "WDJB-MJHT",
-                    "verification_uri": "https://github.com/login/device",
-                    "expires_in": 900,
+                    "device_code": "dev-123",
+                    "verification_uri": format!("{base}/activate"),
+                    "verification_uri_complete": format!("{base}/activate?code=WDJB-MJHT"),
                     "interval": 5,
-                }),
-                "/login/oauth/access_token" => answers.next().expect("a poll the test did not expect"),
-                "/user" => json!({ "login": "octocat", "id": 583231 }),
-                _ => json!({ "error": "not_found" }),
+                    "expires_in": 600,
+                })),
+                "/auth/device/token" => polls.next().expect("a poll the test did not expect"),
+                "/auth/me" if authorization == "Bearer sim_token" => {
+                    (200, json!({ "signedIn": true, "account": 42, "login": "octocat", "name": "The Octocat", "amr": [] }))
+                }
+                "/auth/me" => (200, json!({ "signedIn": false })),
+                _ => (404, json!({ "error": "not found" })),
             };
             let text = answer.to_string();
             let _ = write!(
                 stream,
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{text}",
+                "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{text}",
                 text.len()
             );
         }
     });
-    (base, seen)
-}
-
-fn client(base: &str) -> Client {
-    Client::new(GitHub { web: base.into(), api: base.into(), client_id: "client-abc".into() }).expect("client")
+    (origin, seen)
 }
 
 #[test]
-fn signs_in_after_the_user_enters_the_code() {
-    let (base, seen) = github(vec![
-        json!({ "error": "authorization_pending" }),
-        json!({ "error": "authorization_pending" }),
-        json!({ "access_token": "ghu_token", "token_type": "bearer", "expires_in": 28800 }),
+fn signs_in_once_the_code_is_approved() {
+    let (origin, seen) = accounts(vec![
+        (202, json!({ "status": "pending" })),
+        (202, json!({ "status": "pending" })),
+        (200, json!({ "token": "sim_token" })),
     ]);
     let shown = RefCell::new(None);
     let slept = RefCell::new(Vec::new());
-    let session = client(&base)
-        .sign_in(&|code| *shown.borrow_mut() = Some(code.user_code.clone()), &|wait| slept.borrow_mut().push(wait))
+    let session = Client::new(&origin)
+        .expect("client")
+        .sign_in(
+            &|code| *shown.borrow_mut() = Some((code.user_code.clone(), code.verification_uri_complete.clone())),
+            &|wait| slept.borrow_mut().push(wait),
+        )
         .expect("signed in");
 
-    assert_eq!(shown.borrow().as_deref(), Some("WDJB-MJHT"));
-    assert_eq!(session.login, "octocat");
-    assert_eq!(session.github_id, 583231);
-    assert_eq!(session.github_token, "ghu_token");
-    let expires = session.expires_at.expect("an expiry") - cloud::now();
-    assert!((28790..=28800).contains(&expires), "expires in {expires}s");
-    // GitHub's interval, before every poll.
+    assert_eq!(*shown.borrow(), Some(("WDJB-MJHT".into(), format!("{origin}/activate?code=WDJB-MJHT"))));
+    assert_eq!(
+        session,
+        Session { account: 42, login: Some("octocat".into()), name: Some("The Octocat".into()), token: "sim_token".into() }
+    );
+    assert_eq!(session.label(), "octocat");
+    // The interval account.simien.cloud gave, before every poll.
     assert_eq!(*slept.borrow(), vec![Duration::from_secs(5); 3]);
 
     let seen = seen.lock().expect("log");
-    let polls: Vec<_> = seen.iter().filter(|r| r.path == "/login/oauth/access_token").collect();
+    let start = &seen[0];
+    assert_eq!((start.method.as_str(), start.path.as_str()), ("POST", "/auth/device/start"));
+    // What the approval page and Devices list will show for this session.
+    assert!(start.body["name"].as_str().is_some_and(|name| name.starts_with("Simien CLI on ")), "{:?}", start.body);
+    assert_eq!(start.body["platform"], "cli");
+    let polls: Vec<_> = seen.iter().filter(|r| r.path == "/auth/device/token").collect();
     assert_eq!(polls.len(), 3);
-    assert!(seen[0].body.contains("client_id=client-abc"), "{:?}", seen[0]);
-    assert!(polls[0].body.contains("device_code=dev-123"));
-    assert!(polls[0].body.contains("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code"));
-    // Without this GitHub answers form-encoded text, not JSON.
-    assert!(seen.iter().filter(|r| r.path != "/user").all(|r| r.accept == "application/json"));
-    let user = seen.iter().find(|r| r.path == "/user").expect("asked who");
-    assert_eq!(user.authorization, "Bearer ghu_token");
+    assert!(polls.iter().all(|poll| poll.method == "POST" && poll.body == json!({ "device_code": "dev-123" })));
+    let me = seen.iter().find(|r| r.path == "/auth/me").expect("asked who");
+    assert_eq!((me.method.as_str(), me.authorization.as_str()), ("GET", "Bearer sim_token"));
 }
 
 #[test]
-fn slows_down_when_github_asks() {
-    let (base, _) = github(vec![
-        json!({ "error": "slow_down", "interval": 10 }),
-        json!({ "access_token": "ghu_token" }),
+fn slows_down_when_asked() {
+    let (origin, _) = accounts(vec![
+        (429, json!({ "status": "slow_down", "interval": 10 })),
+        (200, json!({ "token": "sim_token" })),
     ]);
     let slept = RefCell::new(Vec::new());
-    let session = client(&base).sign_in(&|_| {}, &|wait| slept.borrow_mut().push(wait)).expect("signed in");
+    Client::new(&origin).expect("client").sign_in(&|_| {}, &|wait| slept.borrow_mut().push(wait)).expect("signed in");
     assert_eq!(*slept.borrow(), vec![Duration::from_secs(5), Duration::from_secs(10)]);
-    assert_eq!(session.expires_at, None);
 }
 
 #[test]
-fn a_refusal_or_an_expired_code_is_an_error() {
-    let (base, _) = github(vec![json!({ "error": "access_denied" })]);
-    let err = client(&base).sign_in(&|_| {}, &|_| {}).expect_err("refused");
-    assert!(err.contains("cancelled"), "{err}");
-
-    let (base, _) = github(vec![json!({ "error": "expired_token" })]);
-    let err = client(&base).sign_in(&|_| {}, &|_| {}).expect_err("expired");
+fn an_expired_code_or_a_refusal_is_an_error() {
+    let (origin, _) = accounts(vec![(410, json!({ "status": "expired" }))]);
+    let err = Client::new(&origin).expect("client").sign_in(&|_| {}, &|_| {}).expect_err("expired");
     assert!(err.contains("expired"), "{err}");
+
+    let (origin, _) = accounts(vec![(503, json!({ "error": "Device sign-in is not configured." }))]);
+    let err = Client::new(&origin).expect("client").sign_in(&|_| {}, &|_| {}).expect_err("refused");
+    assert!(err.contains("Device sign-in is not configured.") && err.contains("503"), "{err}");
 }
 
 #[test]
 fn stops_waiting_when_the_code_runs_out() {
-    // 900 s at 5 s a poll: 180 polls, then it gives up without asking again.
-    let (base, seen) = github(vec![json!({ "error": "authorization_pending" }); 180]);
-    let err = client(&base).sign_in(&|_| {}, &|_| {}).expect_err("ran out");
+    // 600 s at 5 s a poll: 120 polls, then it gives up without asking again.
+    let (origin, seen) = accounts(vec![(202, json!({ "status": "pending" })); 120]);
+    let err = Client::new(&origin).expect("client").sign_in(&|_| {}, &|_| {}).expect_err("ran out");
     assert!(err.contains("expired"), "{err}");
-    let polls = seen.lock().expect("log").iter().filter(|r| r.path == "/login/oauth/access_token").count();
-    assert_eq!(polls, 180);
+    let polls = seen.lock().expect("log").iter().filter(|r| r.path == "/auth/device/token").count();
+    assert_eq!(polls, 120);
+}
+
+#[test]
+fn a_token_the_accounts_do_not_recognise_is_not_a_sign_in() {
+    let (origin, _) = accounts(vec![(200, json!({ "token": "someone_elses" }))]);
+    let err = Client::new(&origin).expect("client").sign_in(&|_| {}, &|_| {}).expect_err("unknown session");
+    assert!(err.contains("does not recognise"), "{err}");
 }
 
 #[test]
@@ -155,10 +168,10 @@ fn the_session_is_kept_for_its_owner_only_and_logout_removes_it() {
     let store = Store::at(dir.path().join("simien").join("credentials.json"));
     assert_eq!(store.read().expect("read"), None);
 
-    let session = Session { login: "octocat".into(), github_id: 1, github_token: "ghu_token".into(), expires_at: Some(10) };
+    let session = Session { account: 7, login: None, name: None, token: "sim_token".into() };
+    assert_eq!(session.label(), "account 7");
     store.write(&session).expect("write");
-    assert_eq!(store.read().expect("read"), Some(session.clone()));
-    assert!(session.expired(10) && !session.expired(9));
+    assert_eq!(store.read().expect("read"), Some(session));
 
     #[cfg(unix)]
     {
