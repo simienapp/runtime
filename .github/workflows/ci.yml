@@ -83,7 +83,7 @@ jobs:
           printf 'console.log(["simien", 1 + 1].join(" "));\n' > runs-anywhere/smoke.js
           out="$(docker run --rm \
             -v "$PWD/target/debug/simien:/usr/local/bin/simien:ro" \
-            -v "$PWD/runs-anywhere:/work:ro" -w /work \
+            -v "$PWD/runs-anywhere:/work" -w /work \
             ubuntu:24.04 simien run smoke.js | tail -n 1)"
           if [ "$out" != "simien 2" ]; then
             echo "::error::simien in a bare container printed '${out}', expected 'simien 2'"
