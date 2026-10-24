@@ -97,7 +97,16 @@ pub fn prepare_http_session(
     } else {
         resolved.path.parent().unwrap_or(&resolved.path)
     };
+    // Live queries' feed (APS 4 §4): the project's database, when it has one
+    // and the app's policy grants `db`; the same project the isolates use.
+    let changes_database = pool::esm_loader::resolve_project_root(&resolved.path)
+        .ok()
+        .and_then(|root| project::Project::open(&root).ok())
+        .filter(|project| project.database.is_some())
+        .filter(|_| deka_host::modules::simien_db_allowed(&execution_security.policy_json).unwrap_or(false))
+        .and_then(|project| schema_sync::database_url(&project).ok());
     let http_config = deka_http::HttpConfig {
+        changes_database,
         project_root: Some(config_dir.to_path_buf()),
         static_entry: matches!(resolved.mode, runtime_config::ServeMode::Static)
             .then(|| resolved.path.clone()),
@@ -197,11 +206,18 @@ pub fn prepare_http_session(
     });
     let perf_mode = perf_mode_enabled();
 
+    // `--assets`: a built app's client files (dist/client), answered before
+    // the app, as a Worker's assets binding would.
+    let assets = match context.args.params.get("--assets") {
+        Some(dir) if FsPath::new(dir).is_dir() => Some(PathBuf::from(dir)),
+        Some(dir) => return Err(format!("--assets: {dir} isn't a folder")),
+        None => None,
+    };
     let state = Arc::new(RuntimeState {
         engine: Arc::clone(&engine),
         handler_code,
         handler_entry,
-        public_dir: artifact
+        public_dir: assets.or_else(|| artifact
             .as_ref()
             .map(|artifact| artifact.root.join("client"))
             .filter(|path| path.is_dir())
@@ -210,7 +226,7 @@ pub fn prepare_http_session(
                     .as_ref()
                     .map(|root| root.join("public"))
                     .filter(|path| path.is_dir())
-            }),
+            })),
         artifact_manifest: artifact.map(|artifact| artifact.manifest),
         handler_key,
         dev_mode,

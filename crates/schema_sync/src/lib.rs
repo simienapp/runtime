@@ -22,8 +22,24 @@ pub const CHANNEL: &str = "simien_schema";
 /// notification per statement, its payload the table's name (APS 4 §4).
 pub const DATA_CHANNEL: &str = "simien_data";
 
-/// The local stack's Postgres, as the project's superuser.
+/// Where a deployed app's database is: `.simien/database.json`, written by
+/// the platform that runs it (Simien Cloud, APS 6), `{ "postgres": "<url>" }`.
+pub const DEPLOYED_DATABASE: &str = "database.json";
+
+/// The project's Postgres: a deployed app's, from [`DEPLOYED_DATABASE`],
+/// else the local stack's, as the project's superuser. Sync, `simien:db` and
+/// live queries' feed all connect through this.
 pub fn database_url(project: &Project) -> Result<String, String> {
+    let deployed = project.state_dir().join(DEPLOYED_DATABASE);
+    if deployed.is_file() {
+        let text = std::fs::read_to_string(&deployed).map_err(|err| format!("{}: {err}", deployed.display()))?;
+        let value: serde_json::Value =
+            serde_json::from_str(&text).map_err(|err| format!("{}: {err}", deployed.display()))?;
+        return value["postgres"]
+            .as_str()
+            .map(str::to_string)
+            .ok_or_else(|| format!("{}: no \"postgres\" URL", deployed.display()));
+    }
     Ok(format!(
         "postgres://postgres:{}@127.0.0.1:{}/postgres",
         project.secret("postgres_password")?,
@@ -283,6 +299,40 @@ impl Listener {
     }
 }
 
+/// How often an idle change feed sends a comment, which also finds out
+/// whether the subscriber is still there.
+pub const KEEPALIVE: Duration = Duration::from_secs(15);
+
+/// Live queries' feed (APS 4 §4) as server-sent events: each item is the
+/// next chunk to send, `: listening` first, then an `event: change` with the
+/// table's name per committed write, or a `: keepalive` comment after
+/// [`KEEPALIVE`] of quiet. It ends when Postgres goes away. The dev data
+/// service and `simien serve` both stream this.
+pub struct ChangeStream {
+    listener: Listener,
+    started: bool,
+}
+
+pub fn change_stream(url: &str) -> Result<ChangeStream, String> {
+    Ok(ChangeStream { listener: Listener::data(url)?, started: false })
+}
+
+impl Iterator for ChangeStream {
+    type Item = String;
+
+    fn next(&mut self) -> Option<String> {
+        if !self.started {
+            self.started = true;
+            return Some(": listening\n\n".to_string());
+        }
+        match self.listener.next(KEEPALIVE) {
+            Ok(Some(table)) => Some(format!("event: change\ndata: {table}\n\n")),
+            Ok(None) => Some(": keepalive\n\n".to_string()),
+            Err(_) => None,
+        }
+    }
+}
+
 /// `simien/schema.ts` relative to the project, for messages.
 pub fn schema_path(project: &Project) -> String {
     project
@@ -291,4 +341,23 @@ pub fn schema_path(project: &Project) -> String {
         .unwrap_or(Path::new("simien/schema.ts"))
         .display()
         .to_string()
+}
+
+#[cfg(test)]
+mod database_url_tests {
+    use super::*;
+
+    #[test]
+    fn a_deployed_app_uses_the_database_its_platform_wrote() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("simien.json"), r#"{ "name": "app", "db": { "ports": { "postgres": 54330, "zega": 54331 } } }"#).unwrap();
+        let project = Project::open(root).unwrap();
+        std::fs::create_dir_all(project.state_dir()).unwrap();
+        std::fs::write(project.state_dir().join(DEPLOYED_DATABASE), r#"{ "postgres": "postgres://app:pw@db.internal:5432/app" }"#).unwrap();
+        assert_eq!(database_url(&project).unwrap(), "postgres://app:pw@db.internal:5432/app");
+
+        std::fs::write(project.state_dir().join(DEPLOYED_DATABASE), r#"{ "zega": "x" }"#).unwrap();
+        assert!(database_url(&project).unwrap_err().contains("no \"postgres\" URL"));
+    }
 }

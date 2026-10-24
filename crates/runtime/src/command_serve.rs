@@ -1,4 +1,4 @@
-use dcore::{CommandSpec, Context, FlagSpec, Registry};
+use dcore::{CommandSpec, Context, FlagSpec, ParamSpec, Registry};
 
 const COMMAND: CommandSpec = CommandSpec {
     owner: "runtime",
@@ -16,6 +16,10 @@ pub fn register(registry: &mut Registry) {
         name: "--dev",
         aliases: &[],
         description: "enable development runtime mode (watch + hmr scaffolding)",
+    });
+    registry.add_param(ParamSpec {
+        name: "--assets",
+        description: "serve: a folder of static files answered before the app (a built app's dist/client)",
     });
     registry.add_flag(FlagSpec {
         name: "--warm",

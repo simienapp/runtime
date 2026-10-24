@@ -158,4 +158,6 @@ jobs:
         run: cargo test --locked -p devloop --test service
       - name: simien:db natively in a program given the database (simien dev's Vite)
         run: cargo test --locked -p simien --test data_native -- --ignored
+      - name: An app as Simien Cloud runs it (db sync, --assets, live queries' feed)
+        run: cargo test --locked -p simien --test app_machine -- --ignored
       - run: sccache --show-stats

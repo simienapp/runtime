@@ -26,6 +26,7 @@ struct HttpExtensions {
     debug: bool,
     utility_css: UtilityCssConfig,
     static_files: Option<StaticFiles>,
+    changes_database: Option<String>,
 }
 
 pub fn app_router(state: Arc<RuntimeState>, config: HttpConfig) -> Router {
@@ -43,6 +44,7 @@ pub fn app_router_with_rate_limiter(
     let extensions = HttpExtensions {
         debug: config.debug,
         static_files: config.static_entry.as_deref().map(StaticFiles::new),
+        changes_database: config.changes_database.clone(),
         utility_css: crate::utility_css::load_config(config.project_root.as_deref()),
     };
     let limiter_state = (rate_limiter, state.dev_mode);
@@ -76,6 +78,11 @@ async fn handle_request(
     let method = request.method().as_str().to_string();
     let uri = request.uri().to_string();
     let path = request.uri().path().to_string();
+    if path == CHANGES {
+        if let Some(url) = &extensions.changes_database {
+            return changes_response(url.clone());
+        }
+    }
     if let Some(response) = try_public_response(&state, &path) {
         return response;
     }
@@ -823,4 +830,33 @@ Available modules: crypto, bytes. Lockfile: /tmp/deka-leak/deka.lock";
         assert!(dev_body.contains("Available modules"));
         assert!(dev_body.contains("Attempted roots"));
     }
+}
+
+/// Where the browser subscribes to live queries' feed (APS 4 §4).
+const CHANGES: &str = "/__simien/changes";
+
+/// `/__simien/changes`: the app's committed writes as server-sent events
+/// (schema_sync::change_stream), read on a thread of their own; it stops at
+/// the first chunk after the browser has gone.
+fn changes_response(url: String) -> Response {
+    let (sender, receiver) = tokio::sync::mpsc::channel::<String>(16);
+    tokio::task::spawn_blocking(move || {
+        let Ok(feed) = schema_sync::change_stream(&url) else {
+            return;
+        };
+        for chunk in feed {
+            if sender.blocking_send(chunk).is_err() {
+                return;
+            }
+        }
+    });
+    let body = futures_util::stream::unfold(receiver, |mut receiver| async move {
+        receiver.recv().await.map(|chunk| (Ok::<_, std::convert::Infallible>(chunk), receiver))
+    });
+    Response::builder()
+        .status(200)
+        .header("content-type", "text/event-stream")
+        .header("cache-control", "no-store")
+        .body(axum::body::Body::from_stream(body))
+        .unwrap()
 }

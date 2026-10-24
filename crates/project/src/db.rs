@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use dcore::{CommandSpec, Context, FlagSpec, ParamSpec, Registry, SubcommandSpec};
+use dcore::{Context, FlagSpec, ParamSpec, Registry};
 use output::{Globals, SimienError};
 use serde_json::{Map, Value, json};
 
@@ -70,23 +70,9 @@ pub fn free_template_ports(root: &Path, map: &PortMap) -> Result<Option<u16>, St
     Ok(Some(base))
 }
 
-const DB: CommandSpec = CommandSpec {
-    owner: "project",
-    name: "db",
-    category: "project",
-    summary: "the project's database (Postgres + pg_zega and Zega), configured in simien.json",
-    aliases: &[],
-    subcommands: &[SubcommandSpec {
-        name: "init",
-        summary: "give this project a database: simien.json's db section and simien/schema.ts (--name, --port, --force)",
-        aliases: &[],
-        handler: init,
-    }],
-    handler: db,
-};
-
+/// `db`'s parameters; the command itself is registered by devloop (its
+/// `sync` needs schema sync, which this crate is below).
 pub fn register(registry: &mut Registry) {
-    registry.add_command(DB);
     registry.add_param(ParamSpec {
         name: "--name",
         description: "db init: project name (default: simien.json's, else this directory)",
@@ -178,12 +164,14 @@ fn slug(raw: &str) -> String {
         .collect()
 }
 
-fn db(context: &Context) {
-    output::usage_error("name a db command: init", Some("simien db init"), Globals::of(context));
+/// `simien db` with no subcommand.
+pub fn db(context: &Context) {
+    output::usage_error("name a db command: init or sync", Some("simien db init"), Globals::of(context));
     std::process::exit(2);
 }
 
-fn init(context: &Context) {
+/// `simien db init`.
+pub fn init(context: &Context) {
     let globals = Globals::of(context);
     let result = std::env::current_dir()
         .map_err(|err| err.to_string())

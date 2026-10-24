@@ -8,6 +8,7 @@ default = []
 dev-server = []
 
 [dependencies]
+schema_sync = { path = "../schema_sync" }
 axum = { workspace = true, features = ["ws"] }
 base64 = "0.22"
 bytes = { workspace = true }
