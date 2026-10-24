@@ -26,6 +26,7 @@ jobs:
       RUSTC_WRAPPER: sccache
       SCCACHE_BUCKET: simien-sccache-linux-x64
       SCCACHE_REGION: auto
+      SCCACHE_S3_USE_SSL: "true"
       SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
@@ -39,6 +40,10 @@ jobs:
             echo "::error::The R2 sccache keys are missing (public-ci environment). SCCACHE IS REQUIRED FOR ALL RUST COMPILATION."
             exit 1
           fi
+          # R2_ENDPOINT keeps its https:// for the AWS CLI; sccache wants the
+          # bare host and adds the scheme itself (SCCACHE_S3_USE_SSL).
+          export SCCACHE_ENDPOINT="${SCCACHE_ENDPOINT#https://}"
+          echo "SCCACHE_ENDPOINT=$SCCACHE_ENDPOINT" >> "$GITHUB_ENV"
           sccache --start-server
           sccache --show-stats | tee sccache-stats.txt
           grep -q "$SCCACHE_BUCKET" sccache-stats.txt || { echo "::error::sccache is not using the R2 bucket $SCCACHE_BUCKET"; exit 1; }
@@ -82,6 +87,7 @@ jobs:
       RUSTC_WRAPPER: sccache
       SCCACHE_BUCKET: simien-sccache-linux-x64
       SCCACHE_REGION: auto
+      SCCACHE_S3_USE_SSL: "true"
       SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
@@ -95,6 +101,10 @@ jobs:
             echo "::error::The R2 sccache keys are missing (public-ci environment). SCCACHE IS REQUIRED FOR ALL RUST COMPILATION."
             exit 1
           fi
+          # R2_ENDPOINT keeps its https:// for the AWS CLI; sccache wants the
+          # bare host and adds the scheme itself (SCCACHE_S3_USE_SSL).
+          export SCCACHE_ENDPOINT="${SCCACHE_ENDPOINT#https://}"
+          echo "SCCACHE_ENDPOINT=$SCCACHE_ENDPOINT" >> "$GITHUB_ENV"
           sccache --start-server
           sccache --show-stats | tee sccache-stats.txt
           grep -q "$SCCACHE_BUCKET" sccache-stats.txt || { echo "::error::sccache is not using the R2 bucket $SCCACHE_BUCKET"; exit 1; }
@@ -139,6 +149,7 @@ jobs:
       RUSTC_WRAPPER: sccache
       SCCACHE_BUCKET: simien-sccache-linux-x64
       SCCACHE_REGION: auto
+      SCCACHE_S3_USE_SSL: "true"
       SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
@@ -152,6 +163,10 @@ jobs:
             echo "::error::The R2 sccache keys are missing (public-ci environment). SCCACHE IS REQUIRED FOR ALL RUST COMPILATION."
             exit 1
           fi
+          # R2_ENDPOINT keeps its https:// for the AWS CLI; sccache wants the
+          # bare host and adds the scheme itself (SCCACHE_S3_USE_SSL).
+          export SCCACHE_ENDPOINT="${SCCACHE_ENDPOINT#https://}"
+          echo "SCCACHE_ENDPOINT=$SCCACHE_ENDPOINT" >> "$GITHUB_ENV"
           sccache --start-server
           sccache --show-stats | tee sccache-stats.txt
           grep -q "$SCCACHE_BUCKET" sccache-stats.txt || { echo "::error::sccache is not using the R2 bucket $SCCACHE_BUCKET"; exit 1; }
@@ -181,6 +196,7 @@ jobs:
       RUSTC_WRAPPER: sccache
       SCCACHE_BUCKET: simien-sccache-linux-x64
       SCCACHE_REGION: auto
+      SCCACHE_S3_USE_SSL: "true"
       SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
@@ -194,6 +210,10 @@ jobs:
             echo "::error::The R2 sccache keys are missing (public-ci environment). SCCACHE IS REQUIRED FOR ALL RUST COMPILATION."
             exit 1
           fi
+          # R2_ENDPOINT keeps its https:// for the AWS CLI; sccache wants the
+          # bare host and adds the scheme itself (SCCACHE_S3_USE_SSL).
+          export SCCACHE_ENDPOINT="${SCCACHE_ENDPOINT#https://}"
+          echo "SCCACHE_ENDPOINT=$SCCACHE_ENDPOINT" >> "$GITHUB_ENV"
           sccache --start-server
           sccache --show-stats | tee sccache-stats.txt
           grep -q "$SCCACHE_BUCKET" sccache-stats.txt || { echo "::error::sccache is not using the R2 bucket $SCCACHE_BUCKET"; exit 1; }
