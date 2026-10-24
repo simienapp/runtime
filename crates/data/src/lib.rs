@@ -88,3 +88,35 @@ pub fn run(
         _ => Value::Array(values),
     })
 }
+
+#[cfg(test)]
+mod kinds {
+    use super::DataError;
+
+    /// One of each variant. The match has no wildcard, so a new variant
+    /// does not compile until it is listed here, and so checked below.
+    fn every() -> Vec<DataError> {
+        let all = vec![DataError::Invalid(String::new()), DataError::Database(String::new()), DataError::Refused(String::new())];
+        for error in &all {
+            match error {
+                DataError::Invalid(_) | DataError::Database(_) | DataError::Refused(_) => {}
+            }
+        }
+        all
+    }
+
+    /// The types apps are checked against (`simien:db`'s SimienDataError)
+    /// name every kind a query can fail with, so `err.kind === "refused"`
+    /// type-checks.
+    #[test]
+    fn simien_d_ts_declares_every_kind() {
+        let class = project::SCHEMA_TYPES.split("class SimienDataError").nth(1).expect("simien.d.ts declares SimienDataError");
+        let declared = class
+            .lines()
+            .find_map(|line| line.trim().strip_prefix("readonly kind: "))
+            .expect("SimienDataError declares its kind");
+        for error in every() {
+            assert!(declared.contains(&format!("\"{}\"", error.kind())), "simien.d.ts lacks {:?}: {declared}", error.kind());
+        }
+    }
+}

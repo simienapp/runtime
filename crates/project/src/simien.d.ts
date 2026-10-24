@@ -113,9 +113,13 @@ declare module "simien:db" {
     inc(step: number): Inc
   }
 
-  /** The query was refused (`invalid`) or Postgres failed it (`database`). */
+  /**
+   * Why a query failed: it doesn't fit schema.ts (`invalid`), Postgres
+   * refused or failed it (`database`), or the app may not use its database
+   * here: no database yet, or the `db` permission isn't granted (`refused`).
+   */
   export class SimienDataError extends Error {
-    readonly kind: "invalid" | "database"
+    readonly kind: "invalid" | "database" | "refused"
   }
 
   export function connect<S extends Record<string, TableDefinition<any> | EdgeDefinition<any>>>(schema: S): Db<S>
