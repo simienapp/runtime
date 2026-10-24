@@ -71,6 +71,25 @@ jobs:
         run: cargo test --locked -p web_host -p server -p simien -p output -p container -p project -p packages -p node_program -p schema -p check -p platform_server -p pool -p carve_outs
       - name: Web APIs in a served app
         run: cargo test --locked -p simien --test web_apis
+      # A release runs on machines that never had this source tree. Run the
+      # binary in a bare container (no checkout, no cargo registry): anything
+      # it still reads from the build machine's disk fails here, not after a
+      # release (simienapp/core#50).
+      - name: simien runs on a machine with no source tree
+        run: |
+          set -euo pipefail
+          cargo build --locked -p simien --bin simien
+          mkdir -p runs-anywhere
+          printf 'console.log(["simien", 1 + 1].join(" "));\n' > runs-anywhere/smoke.js
+          out="$(docker run --rm \
+            -v "$PWD/target/debug/simien:/usr/local/bin/simien:ro" \
+            -v "$PWD/runs-anywhere:/work" -w /work \
+            ubuntu:24.04 simien run smoke.js | tail -n 1)"
+          if [ "$out" != "simien 2" ]; then
+            echo "::error::simien in a bare container printed '${out}', expected 'simien 2'"
+            exit 1
+          fi
+          echo "simien runs with no source tree"
       - run: sccache --show-stats
 
   # Simien alone runs a Vite + React app's install, dev server and build:
