@@ -194,15 +194,11 @@ fn authorized(request: &Request, shared: &Shared) -> bool {
     request.authorization.as_deref().is_some_and(|given| same(given.as_bytes(), expected.as_bytes()))
 }
 
-/// How often an idle change feed sends a comment, which also finds out
-/// whether the subscriber is still there.
-const KEEPALIVE: Duration = Duration::from_secs(15);
-
-/// `GET /changes`: one `event: change` per committed write, until the
-/// subscriber goes away.
+/// `GET /changes`: live queries' feed (schema_sync::change_stream), until
+/// the subscriber goes away.
 fn stream_changes(mut stream: TcpStream, shared: &Shared) {
-    let mut listener = match schema_sync::Listener::data(&shared.url) {
-        Ok(listener) => listener,
+    let feed = match schema_sync::change_stream(&shared.url) {
+        Ok(feed) => feed,
         Err(message) => {
             let body = error_body("database", &message);
             let head = format!(
@@ -213,17 +209,12 @@ fn stream_changes(mut stream: TcpStream, shared: &Shared) {
             return;
         }
     };
-    let head = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncache-control: no-store\r\nconnection: close\r\n\r\n: listening\n\n";
-    if stream.write_all(head.as_bytes()).and_then(|_| stream.flush()).is_err() {
+    let head = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncache-control: no-store\r\nconnection: close\r\n\r\n";
+    if stream.write_all(head.as_bytes()).is_err() {
         return;
     }
-    loop {
-        let event = match listener.next(KEEPALIVE) {
-            Ok(Some(table)) => format!("event: change\ndata: {table}\n\n"),
-            Ok(None) => ": keepalive\n\n".to_string(),
-            Err(_) => return,
-        };
-        if stream.write_all(event.as_bytes()).and_then(|_| stream.flush()).is_err() {
+    for chunk in feed {
+        if stream.write_all(chunk.as_bytes()).and_then(|_| stream.flush()).is_err() {
             return;
         }
     }

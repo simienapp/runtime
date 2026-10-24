@@ -93,6 +93,7 @@ pub fn register_fns() -> Vec<fn(&mut Registry)> {
         dev::register,
         packages::command::register,
         project::db::register,
+        devloop::db_command::register,
         container::register,
         check::register,
         compile::register,

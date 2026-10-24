@@ -21,6 +21,9 @@ pub struct HttpConfig {
     pub project_root: Option<PathBuf>,
     /// Explicit static file or directory, served without executing a handler.
     pub static_entry: Option<PathBuf>,
+    /// The app's Postgres, when it has a database and may use it: then
+    /// `/__simien/changes` streams live queries' feed (APS 4 §4).
+    pub changes_database: Option<String>,
 }
 
 impl Default for HttpConfig {
@@ -30,6 +33,7 @@ impl Default for HttpConfig {
             debug: false,
             project_root: None,
             static_entry: None,
+            changes_database: None,
         }
     }
 }

@@ -13,6 +13,7 @@
 //! Nothing here exits on an error: it is reported and the loop waits for the
 //! next change, so fixing schema.ts or starting Docker is enough.
 
+pub mod db_command;
 pub mod service;
 
 use std::collections::VecDeque;

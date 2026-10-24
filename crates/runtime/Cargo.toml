@@ -4,6 +4,8 @@ version.workspace = true
 edition = "2024"
 
 [dependencies]
+project = { path = "../project" }
+schema_sync = { path = "../schema_sync" }
 server = { path = "../server" }
 output = { path = "../output" }
 stdio_new = { package = "stdio", version = "0.5.0" }
