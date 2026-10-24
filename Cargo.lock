@@ -911,6 +911,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cloud"
+version = "0.61.0"
+dependencies = [
+ "dcore",
+ "output",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "stdio 0.5.0",
+ "tempfile",
+]
+
+[[package]]
 name = "cmake"
 version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7473,6 +7486,7 @@ name = "simien"
 version = "0.61.0"
 dependencies = [
  "check",
+ "cloud",
  "compile",
  "container",
  "dcore",

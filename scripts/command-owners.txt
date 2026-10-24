@@ -15,8 +15,8 @@ init pm
 install pm
 introspect introspect
 link pm
-login registry
-logout registry
+login cloud
+logout cloud
 lsp compiler
 pkg pm
 platform runtime
