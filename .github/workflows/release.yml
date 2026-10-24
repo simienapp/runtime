@@ -168,12 +168,14 @@ jobs:
             exit 1
           fi
           echo "simien ${VERSION} runs on ${{ matrix.platform }}"
-      - name: Linux needs nothing but libc
+      # libc's family plus zlib, which every glibc Linux has in its base
+      # system (bare ubuntu:24.04 included, where CI runs simien).
+      - name: Linux needs nothing but libc and zlib
         if: matrix.platform == 'linux-x64'
         run: |
           set -euo pipefail
           ldd "dist/simien-linux-x64" | tee ldd.txt
-          if grep -v -E 'linux-vdso|ld-linux|lib(c|m|dl|rt|pthread|gcc_s|util)\.so' ldd.txt | grep -q '=>'; then
+          if grep -v -E 'linux-vdso|ld-linux|lib(c|m|dl|rt|pthread|gcc_s|util|z)\.so' ldd.txt | grep -q '=>'; then
             echo "::error::simien-linux-x64 links a library a bare Linux may not have (see above)"
             exit 1
           fi
